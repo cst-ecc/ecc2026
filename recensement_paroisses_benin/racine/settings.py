@@ -19,15 +19,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Variables d'environnement (.env)
 # ---------------------------------------------------------------------------
 env = environ.Env(
-    DEBUG=(bool, False),
+    DEBUG=(bool),
 )
 
 # Cherche le fichier .env à la racine du projet (à côté de manage.py)
 environ.Env.read_env(BASE_DIR / ".env")
 
 SECRET_KEY = env("SECRET_KEY")
-DEBUG = env.bool("DEBUG", default=False)
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+DEBUG = env.bool("DEBUG")
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 
 # ---------------------------------------------------------------------------
 # Applications
@@ -80,7 +80,7 @@ WSGI_APPLICATION = "racine.wsgi.application"
 # ---------------------------------------------------------------------------
 # Lit DATABASE_URL depuis le .env (sqlite:///db.sqlite3 par défaut en dev).
 DATABASES = {
-    "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
+    "default": env.db("DATABASE_URL"),
 }
 
 # ---------------------------------------------------------------------------
@@ -96,8 +96,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # ---------------------------------------------------------------------------
 # Internationalisation — adapté au Bénin
 # ---------------------------------------------------------------------------
-LANGUAGE_CODE = env("LANGUAGE_CODE", default="fr-fr")
-TIME_ZONE = env("TIME_ZONE", default="Africa/Porto-Novo")
+LANGUAGE_CODE = env("LANGUAGE_CODE")
+TIME_ZONE = env("TIME_ZONE")
 USE_I18N = True
 USE_TZ = True
 
@@ -134,7 +134,7 @@ SESSION_COOKIE_HTTPONLY = True       # idem pour le cookie de session (comportem
 # Sécurité — appliquée uniquement quand DEBUG=False (production)
 # ---------------------------------------------------------------------------
 if not DEBUG:
-    SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
+    SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 7  # 1 semaine, à augmenter progressivement

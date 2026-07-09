@@ -3,13 +3,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-recensement}
-      POSTGRES_USER: ${POSTGRES_USER:-recensement}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?la variable POSTGRES_PASSWORD doit être définie dans .env}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-recensement}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-recensement} -d ${POSTGRES_DB:-recensement}"]
       interval: 5s
       timeout: 5s
       retries: 10
