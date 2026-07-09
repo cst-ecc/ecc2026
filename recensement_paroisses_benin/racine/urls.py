@@ -21,5 +21,8 @@ urlpatterns = [
     # compte : la première URL qui correspond gagne).
     path('accounts/login/', RateLimitedLoginView.as_view(), name='login'),
     path('accounts/', include('django.contrib.auth.urls')),      # fournit 'logout', 'password_change', etc.
+
+    # API (Phase 1 — séparation frontend/backend)
+    path('api/', include('api.urls')),
 ]
 

@@ -1,0 +1,294 @@
+"""
+Authentification API par JWT, avec une attention particulière à la
+sécurité du jeton de rafraîchissement :
+
+- Le jeton d'ACCÈS (courte durée, ex. 15 min) est renvoyé dans le corps de
+  la réponse JSON. Le frontend le garde en mémoire (jamais dans
+  localStorage/sessionStorage, qui sont lisibles par n'importe quel script
+  injecté en cas de faille XSS).
+- Le jeton de RAFRAÎCHISSEMENT (longue durée, ex. 7 jours) n'est JAMAIS
+  renvoyé au JavaScript du frontend : il est posé directement en cookie
+  httpOnly par le serveur. Un script malveillant côté frontend ne peut
+  donc pas le lire, même en cas de faille XSS sur le frontend Next.js.
+- Rotation + liste noire activées (voir SIMPLE_JWT dans settings.py) :
+  chaque rafraîchissement invalide l'ancien jeton, limitant la fenêtre
+  d'exploitation en cas de vol malgré tout.
+- Limitation de débit sur la connexion (même logique que
+  recensement.views.RateLimitedLoginView, dupliquée ici car c'est un point
+  d'entrée distinct — l'API n'utilise pas les vues Django classiques).
+"""
+
+from django.conf import settings
+from django.contrib.auth.models import User
+from django.core.cache import cache
+from rest_framework import generics, status
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
+from recensement.models import District, FicheParoisse, Profil, Province, Region, Village, Zone
+from recensement.permissions import get_role
+from recensement.views import _fiches_visibles_pour
+
+from .permissions import EstAgentOuSuperAdmin
+from .serializers import (
+    DistrictSerializer, FicheParoisseCreateSerializer, FicheParoisseDetailSerializer,
+    FicheParoisseListSerializer, ProvinceSerializer, RegionSerializer,
+    UtilisateurCourantSerializer, VillageSerializer, ZoneSerializer,
+)
+
+COOKIE_NAME = settings.JWT_REFRESH_COOKIE_NAME
+MAX_TENTATIVES_CONNEXION = 5
+DUREE_BLOCAGE_SECONDES = 15 * 60
+
+
+def _cookie_kwargs():
+    return dict(
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite=settings.JWT_REFRESH_COOKIE_SAMESITE,
+        path="/api/auth/",  # cookie envoyé uniquement vers les endpoints d'auth, jamais vers le reste de l'API
+    )
+
+
+def _duree_refresh_secondes():
+    return int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Ajoute le rôle et le nom complet directement dans le jeton d'accès :
+    le frontend peut afficher/adapter l'interface sans appel supplémentaire
+    à /api/auth/me/ au premier chargement."""
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token["role"] = get_role(user)
+        token["full_name"] = user.get_full_name() or user.get_username()
+        return token
+
+
+class LoginView(TokenObtainPairView):
+    """POST {username, password} -> {access: "..."} + cookie httpOnly
+    contenant le jeton de rafraîchissement."""
+
+    serializer_class = CustomTokenObtainPairSerializer
+    permission_classes = [AllowAny]
+
+    def _cle_cache(self, request):
+        ip = request.META.get("REMOTE_ADDR", "inconnu")
+        identifiant = (request.data.get("username") or "").strip().lower()
+        return f"api_login_tentatives:{ip}:{identifiant}"
+
+    def post(self, request, *args, **kwargs):
+        cle = self._cle_cache(request)
+        tentatives = cache.get(cle, 0)
+        if tentatives >= MAX_TENTATIVES_CONNEXION:
+            return Response(
+                {"detail": "Trop de tentatives de connexion. Réessayez dans quelques minutes."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        try:
+            # IMPORTANT : TokenObtainPairSerializer.validate() lève
+            # AuthenticationFailed directement en cas d'identifiants
+            # invalides — cette exception traverse is_valid() sans jamais
+            # le faire retourner False. Il faut donc l'intercepter ici,
+            # sinon le compteur de tentatives n'est jamais incrémenté.
+            serializer.is_valid(raise_exception=True)
+        except (AuthenticationFailed, TokenError):
+            cache.set(cle, tentatives + 1, DUREE_BLOCAGE_SECONDES)
+            raise  # DRF renvoie la 401 standard, comportement inchangé pour l'appelant
+
+        cache.delete(cle)
+        data = serializer.validated_data
+        response = Response({"access": data["access"]}, status=status.HTTP_200_OK)
+        response.set_cookie(COOKIE_NAME, str(data["refresh"]), max_age=_duree_refresh_secondes(), **_cookie_kwargs())
+        return response
+
+
+class RefreshView(TokenRefreshView):
+    """Renouvelle le jeton d'accès à partir du cookie httpOnly — jamais du
+    corps de la requête, pour que le frontend n'ait jamais à manipuler le
+    jeton de rafraîchissement lui-même."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        raw_token = request.COOKIES.get(COOKIE_NAME)
+        if not raw_token:
+            return Response({"detail": "Aucune session active."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        serializer = self.get_serializer(data={"refresh": raw_token})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError:
+            response = Response({"detail": "Session expirée, reconnexion nécessaire."}, status=status.HTTP_401_UNAUTHORIZED)
+            response.delete_cookie(COOKIE_NAME, path="/api/auth/")
+            return response
+
+        data = serializer.validated_data
+        response = Response({"access": data["access"]}, status=status.HTTP_200_OK)
+
+        nouveau_refresh = data.get("refresh")  # présent car ROTATE_REFRESH_TOKENS=True
+        if nouveau_refresh:
+            response.set_cookie(COOKIE_NAME, str(nouveau_refresh), max_age=_duree_refresh_secondes(), **_cookie_kwargs())
+        return response
+
+
+class LogoutView(APIView):
+    """Met le jeton de rafraîchissement en liste noire (ne peut plus jamais
+    être réutilisé, même volé) et supprime le cookie."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        raw_token = request.COOKIES.get(COOKIE_NAME)
+        if raw_token:
+            try:
+                RefreshToken(raw_token).blacklist()
+            except TokenError:
+                pass  # déjà invalide/expiré : rien de plus à faire
+
+        response = Response({"detail": "Déconnecté."}, status=status.HTTP_200_OK)
+        response.delete_cookie(COOKIE_NAME, path="/api/auth/")
+        return response
+
+
+class MeView(APIView):
+    """Profil de la personne connectée (rôle, périmètre) — le frontend
+    l'appelle après connexion et à chaque rechargement de page pour
+    adapter l'interface selon les droits réels côté serveur (jamais faire
+    confiance uniquement au contenu du jeton côté client)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(UtilisateurCourantSerializer(request.user).data)
+
+
+# ---------------------------------------------------------------------------
+# Référentiel géographique (lecture seule). Reste derrière IsAuthenticated
+# (comportement par défaut) : ce sont les mêmes données que les endpoints
+# AJAX des templates (recensement.views.ajax_*), qui exigeaient déjà une
+# connexion — on ne relâche pas cette contrainte côté API.
+# ---------------------------------------------------------------------------
+
+class RegionListView(generics.ListAPIView):
+    serializer_class = RegionSerializer
+    queryset = Region.objects.all()
+
+
+class ProvinceListView(generics.ListAPIView):
+    serializer_class = ProvinceSerializer
+
+    def get_queryset(self):
+        return Province.objects.filter(region_id=self.kwargs["region_id"])
+
+
+class DistrictListView(generics.ListAPIView):
+    serializer_class = DistrictSerializer
+
+    def get_queryset(self):
+        return District.objects.filter(province_id=self.kwargs["province_id"])
+
+
+class ZoneListView(generics.ListAPIView):
+    serializer_class = ZoneSerializer
+
+    def get_queryset(self):
+        return Zone.objects.filter(district_id=self.kwargs["district_id"])
+
+
+class VillageListView(generics.ListAPIView):
+    serializer_class = VillageSerializer
+
+    def get_queryset(self):
+        return Village.objects.filter(zone_id=self.kwargs["zone_id"])
+
+
+# ---------------------------------------------------------------------------
+# Fiches de recensement (lecture seule — création/édition en Phase 1c).
+# Réutilise _fiches_visibles_pour (recensement.views), qui reste donc la
+# SEULE source de vérité sur "qui voit quoi" : templates et API partagent
+# exactement la même règle, jamais deux implémentations à maintenir.
+# ---------------------------------------------------------------------------
+
+class FicheParoisseListView(generics.ListAPIView):
+    """Liste des fiches visibles par la personne connectée. Paramètres
+    optionnels : ?statut=validees|tous|attente_superviseur|attente_manager
+    (super admin uniquement — mêmes règles que fiche_list côté templates),
+    ?region=, ?district=, ?province=, ?q=."""
+
+    serializer_class = FicheParoisseListSerializer
+
+    def get_queryset(self):
+        request = self.request
+        fiches = _fiches_visibles_pour(request.user)
+        role = get_role(request.user)
+
+        statut = request.query_params.get("statut", "")
+        if role == Profil.Role.SUPER_ADMIN:
+            if statut == "attente_superviseur":
+                fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR)
+            elif statut == "attente_manager":
+                fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER)
+            elif statut != "tous":
+                fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.VALIDEE)
+
+        region_id = request.query_params.get("region", "")
+        if region_id.isdigit():
+            fiches = fiches.filter(region_id=int(region_id))
+
+        district_id = request.query_params.get("district", "")
+        if district_id.isdigit():
+            fiches = fiches.filter(district_id=int(district_id))
+
+        province_id = request.query_params.get("province", "")
+        if province_id.isdigit():
+            fiches = fiches.filter(province_id=int(province_id))
+
+        q = (request.query_params.get("q") or "").strip()[:100]
+        if q:
+            fiches = fiches.filter(nom_paroisse__icontains=q)
+
+        return fiches.order_by("-date_recensement")
+
+
+class FicheParoisseDetailView(generics.RetrieveAPIView):
+    """Détail d'une fiche. 404 (pas 403) si elle est hors du périmètre
+    visible par la personne connectée — même protection anti-IDOR que le
+    template (ne révèle pas l'existence d'une fiche à qui n'y a pas droit)."""
+
+    serializer_class = FicheParoisseDetailSerializer
+
+    def get_queryset(self):
+        return _fiches_visibles_pour(self.request.user)
+
+
+class FicheParoisseCreateView(generics.CreateAPIView):
+    """Création d'une fiche — réservée aux agents et au super admin
+    (EstAgentOuSuperAdmin, même règle que role_required côté templates).
+    `cree_par` est assigné ici depuis request.user, jamais accepté du
+    client : impossible de créer une fiche au nom de quelqu'un d'autre."""
+
+    serializer_class = FicheParoisseCreateSerializer
+    permission_classes = [IsAuthenticated, EstAgentOuSuperAdmin]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(cree_par=request.user)
+
+        # Réponse au format "détail complet" (plus riche que les seuls
+        # champs acceptés en entrée), pratique pour que le frontend affiche
+        # immédiatement la fiche créée sans requête supplémentaire.
+        detail = FicheParoisseDetailSerializer(serializer.instance)
+        headers = self.get_success_headers(detail.data)
+        return Response(detail.data, status=status.HTTP_201_CREATED, headers=headers)
