@@ -1,0 +1,46 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}Suivi de modification — Recensement{% endblock %}
+
+{% block content %}
+<a href="{% url 'recensement:dashboard' %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour au tableau de bord</a>
+
+<h1 class="text-xl font-semibold text-slate-900 mt-2 mb-1">Suivi de modification</h1>
+<p class="text-sm text-slate-500 mb-6">
+  Historique de toutes les corrections apportées aux fiches par les superviseurs et managers.
+  Cliquez sur une fiche pour voir le détail avant/après de chaque modification.
+</p>
+
+<div class="overflow-x-auto bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <table class="min-w-full text-sm">
+    <thead class="bg-slate-800 text-white text-left">
+      <tr>
+        <th class="px-4 py-3 font-medium">Paroisse</th>
+        <th class="px-4 py-3 font-medium">Modifié par</th>
+        <th class="px-4 py-3 font-medium">Motif</th>
+        <th class="px-4 py-3 font-medium">Date</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for entree in historique %}
+      <tr class="hover:bg-slate-50">
+        <td class="px-4 py-3">
+          <a href="{% url 'recensement:fiche_detail' entree.fiche_id %}#historique"
+             class="text-brand-600 hover:underline font-medium">
+            {{ entree.fiche.nom_paroisse }}
+          </a>
+        </td>
+        <td class="px-4 py-3">{{ entree.modifie_par.get_full_name|default:entree.modifie_par.get_username|default:"Compte supprimé" }}</td>
+        <td class="px-4 py-3 text-slate-600 max-w-md truncate" title="{{ entree.motif }}">{{ entree.motif }}</td>
+        <td class="px-4 py-3 whitespace-nowrap">{{ entree.date_modification|date:"d/m/Y H:i" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="text-center text-slate-400 py-8">Aucune modification enregistrée pour le moment.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if historique|length >= 500 %}
+  <p class="text-slate-400 text-sm mt-3">Affichage limité aux 500 modifications les plus récentes.</p>
+{% endif %}
+{% endblock %}

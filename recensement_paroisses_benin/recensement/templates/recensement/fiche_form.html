@@ -1,0 +1,236 @@
+{% extends "recensement/base.html" %}
+{% load static %}
+
+{% block title %}Nouvelle fiche de recensement{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold text-slate-900 mb-1">Fiche de recensement d'une paroisse</h1>
+<p class="text-sm text-slate-500 mb-6">
+  Avancez étape par étape. Les listes région → province → district → zone → village
+  se remplissent automatiquement. Si le village n'existe pas dans la liste, choisissez
+  "Autre / village non répertorié" : un champ apparaîtra pour préciser son nom.
+</p>
+
+<!-- Indicateur d'étapes -->
+<nav class="mb-2" aria-label="Étapes du formulaire">
+  <ol class="flex justify-between gap-1 overflow-x-auto">
+    <li class="stepper-item active flex flex-col items-center flex-1 min-w-[56px] text-center cursor-pointer pb-1" data-step-index="0">
+      <span class="stepper-circle relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold mb-1 bg-slate-200 text-slate-600">1</span>
+      <span class="stepper-label text-xs text-slate-500">Localisation</span>
+    </li>
+    <li class="stepper-item flex flex-col items-center flex-1 min-w-[56px] text-center cursor-pointer pb-1" data-step-index="1">
+      <span class="stepper-circle relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold mb-1 bg-slate-200 text-slate-600">2</span>
+      <span class="stepper-label text-xs text-slate-500">Paroisse</span>
+    </li>
+    <li class="stepper-item flex flex-col items-center flex-1 min-w-[56px] text-center cursor-pointer pb-1" data-step-index="2">
+      <span class="stepper-circle relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold mb-1 bg-slate-200 text-slate-600">3</span>
+      <span class="stepper-label text-xs text-slate-500">Chargé</span>
+    </li>
+    <li class="stepper-item flex flex-col items-center flex-1 min-w-[56px] text-center cursor-pointer pb-1" data-step-index="3">
+      <span class="stepper-circle relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold mb-1 bg-slate-200 text-slate-600">4</span>
+      <span class="stepper-label text-xs text-slate-500">GPS</span>
+    </li>
+    <li class="stepper-item flex flex-col items-center flex-1 min-w-[56px] text-center cursor-pointer pb-1" data-step-index="4">
+      <span class="stepper-circle relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold mb-1 bg-slate-200 text-slate-600">5</span>
+      <span class="stepper-label text-xs text-slate-500">Récapitulatif</span>
+    </li>
+  </ol>
+</nav>
+<p class="text-center text-sm text-slate-400 mb-6" id="step-counter">Étape 1 sur 5</p>
+
+<form method="post" novalidate id="fiche-form">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div class="mb-4 rounded-lg bg-red-50 text-red-800 border border-red-200 px-4 py-3 text-sm">
+      {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Piège anti-robot : champ invisible pour un humain, jamais à remplir. -->
+  <div class="hp-wrapper" aria-hidden="true">
+    {{ form.site_web }}
+  </div>
+
+  <!-- ============================= ÉTAPE 1 : Localisation ============================= -->
+  <div class="form-step" data-step="0">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4">
+      <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">1. Localisation ecclésiale</div>
+      <div class="p-5 space-y-4 step-body">
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label for="id_region" class="block text-sm font-medium text-slate-700 mb-1">{{ form.region.label }}</label>
+            {{ form.region }}
+            {% for error in form.region.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="id_province" class="block text-sm font-medium text-slate-700 mb-1">{{ form.province.label }}</label>
+            {{ form.province }}
+            {% for error in form.province.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="id_district" class="block text-sm font-medium text-slate-700 mb-1">{{ form.district.label }}</label>
+            {{ form.district }}
+            {% for error in form.district.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="id_zone" class="block text-sm font-medium text-slate-700 mb-1">{{ form.zone.label }}</label>
+            {{ form.zone }}
+            {% for error in form.zone.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="id_village" class="block text-sm font-medium text-slate-700 mb-1">{{ form.village.label }}</label>
+            {{ form.village }}
+            {% for error in form.village.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+          <div class="{% if not form.nouvelle_localite_nom.value %}hidden{% endif %}" id="nouvelle-localite-wrapper">
+            <label for="id_nouvelle_localite_nom" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nouvelle_localite_nom.label }}</label>
+            {{ form.nouvelle_localite_nom }}
+            <p class="text-xs text-slate-400 mt-1">Précisez le nom du village/quartier, puisqu'il n'apparaît pas dans la liste officielle.</p>
+            {% for error in form.nouvelle_localite_nom.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 flex-wrap mb-8">
+      <button type="button" class="btn-next bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg min-h-[44px]">Suivant →</button>
+    </div>
+  </div>
+
+  <!-- ============================= ÉTAPE 2 : Identité de la paroisse ============================= -->
+  <div class="form-step hidden" data-step="1">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4">
+      <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">2. Identité de la paroisse</div>
+      <div class="p-5 space-y-4 step-body">
+        <div>
+          <label for="{{ form.nom_paroisse.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nom_paroisse.label }}</label>
+          {{ form.nom_paroisse }}
+          {% for error in form.nom_paroisse.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label for="{{ form.annee_fondation.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.annee_fondation.label }}</label>
+            {{ form.annee_fondation }}
+            {% for error in form.annee_fondation.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="{{ form.statut_batiment.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.statut_batiment.label }}</label>
+            {{ form.statut_batiment }}
+            {% for error in form.statut_batiment.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="{{ form.nombre_fideles_estime.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nombre_fideles_estime.label }}</label>
+            {{ form.nombre_fideles_estime }}
+            {% for error in form.nombre_fideles_estime.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="flex justify-between gap-2 flex-wrap mb-8">
+      <button type="button" class="btn-prev bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-5 py-2.5 rounded-lg min-h-[44px]">← Précédent</button>
+      <button type="button" class="btn-next bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg min-h-[44px]">Suivant →</button>
+    </div>
+  </div>
+
+  <!-- ============================= ÉTAPE 3 : Chargé de paroisse ============================= -->
+  <div class="form-step hidden" data-step="2">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4">
+      <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">3. Chargé de paroisse</div>
+      <div class="p-5 grid sm:grid-cols-2 gap-4 step-body">
+        <div>
+          <label for="{{ form.parish_shepherd.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.parish_shepherd.label }}</label>
+          {{ form.parish_shepherd }}
+          {% for error in form.parish_shepherd.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label for="{{ form.contact_responsable.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.contact_responsable.label }}</label>
+          {{ form.contact_responsable }}
+          {% for error in form.contact_responsable.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="flex justify-between gap-2 flex-wrap mb-8">
+      <button type="button" class="btn-prev bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-5 py-2.5 rounded-lg min-h-[44px]">← Précédent</button>
+      <button type="button" class="btn-next bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg min-h-[44px]">Suivant →</button>
+    </div>
+  </div>
+
+  <!-- ============================= ÉTAPE 4 : GPS & observations ============================= -->
+  <div class="form-step hidden" data-step="3">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4">
+      <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">4. Géolocalisation GPS & observations</div>
+      <div class="p-5 space-y-4 step-body">
+        <p class="text-sm text-slate-500">
+          Appuyez sur le bouton ci-dessous une fois arrivé sur le lieu de la paroisse.
+          L'application recherche activement une position d'une précision d'au moins
+          5 mètres avant de l'enregistrer ; en intérieur ou si le signal est faible,
+          vous pourrez accepter manuellement la meilleure position trouvée.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" id="btn-gps" class="border border-brand-600 text-brand-700 hover:bg-brand-50 font-medium px-4 py-2.5 rounded-lg min-h-[44px]">
+            📍 Rechercher ma position (précision ≤ 5 m)
+          </button>
+          <button type="button" id="btn-gps-accept" class="hidden border border-green-600 text-green-700 hover:bg-green-50 font-medium px-4 py-2.5 rounded-lg min-h-[44px]">
+            ✅ Utiliser cette position quand même
+          </button>
+          <button type="button" id="btn-gps-cancel" class="hidden border border-red-600 text-red-700 hover:bg-red-50 font-medium px-4 py-2.5 rounded-lg min-h-[44px]">
+            ✖ Annuler la recherche
+          </button>
+        </div>
+        <div id="gps-status" class="text-sm"></div>
+        {{ form.latitude }}
+        {{ form.longitude }}
+        {{ form.precision_gps }}
+
+        <div class="pt-2 border-t border-slate-100">
+          <label for="{{ form.observations.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.observations.label }}</label>
+          {{ form.observations }}
+          {% for error in form.observations.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="flex justify-between gap-2 flex-wrap mb-8">
+      <button type="button" class="btn-prev bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-5 py-2.5 rounded-lg min-h-[44px]">← Précédent</button>
+      <button type="button" class="btn-next bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg min-h-[44px]">Suivant →</button>
+    </div>
+  </div>
+
+  <!-- ============================= ÉTAPE 5 : Récapitulatif ============================= -->
+  <div class="form-step hidden" data-step="4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4">
+      <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">5. Récapitulatif — vérifiez avant d'enregistrer</div>
+      <div class="p-5 step-body">
+        <p class="text-sm text-slate-500 mb-4">
+          Relisez attentivement les informations ci-dessous. Une fois enregistrée, cette
+          fiche ne pourra plus être modifiée que par un superviseur ou un manager, avec
+          justification obligatoire.
+        </p>
+        <dl id="recap-content" class="text-sm divide-y divide-slate-100">
+          <!-- Rempli dynamiquement en JS (wizard.js) au moment d'atteindre cette étape -->
+        </dl>
+      </div>
+    </div>
+    <div class="flex justify-between gap-2 flex-wrap mb-8">
+      <button type="button" class="btn-prev bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-5 py-2.5 rounded-lg min-h-[44px]">← Précédent, je corrige</button>
+      <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-lg min-h-[44px]">
+        ✅ Confirmer et enregistrer la fiche
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Templates d'URL AJAX générés par Django (pk=0 remplacé dynamiquement en JS)
+  window.RECENSEMENT_AJAX_URLS = {
+    provinces: "{% url 'recensement:ajax_provinces' 0 %}",
+    districts: "{% url 'recensement:ajax_districts' 0 %}",
+    zones: "{% url 'recensement:ajax_zones' 0 %}",
+    villages: "{% url 'recensement:ajax_villages' 0 %}"
+  };
+</script>
+<script src="{% static 'recensement/js/cascade.js' %}"></script>
+<script src="{% static 'recensement/js/geolocation.js' %}"></script>
+<script src="{% static 'recensement/js/wizard.js' %}"></script>
+{% endblock %}

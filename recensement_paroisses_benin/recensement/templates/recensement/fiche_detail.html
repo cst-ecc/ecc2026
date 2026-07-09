@@ -1,0 +1,168 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}{{ fiche.nom_paroisse }} — Détail{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+  <a href="{% url 'recensement:fiche_list' %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour à la liste</a>
+  <div class="flex gap-2 flex-wrap">
+    {% if peut_valider %}
+      <form method="post" action="{% url 'recensement:fiche_valider' fiche.pk %}"
+            data-confirm-valider="Valider cette fiche ? Vous ne pourrez plus la modifier vous-même après validation.">
+        {% csrf_token %}
+        <button type="submit"
+                class="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-3.5 py-2 rounded-lg">
+          Valider
+        </button>
+      </form>
+    {% endif %}
+    {% if peut_modifier %}
+      <a href="{% url 'recensement:fiche_update' fiche.pk %}"
+         class="inline-flex items-center gap-1.5 border border-brand-600 text-brand-700 hover:bg-brand-50 text-sm font-medium px-3.5 py-2 rounded-lg">
+        Modifier
+      </a>
+    {% endif %}
+    {% if is_super_admin %}
+      <a href="{% url 'recensement:fiche_delete' fiche.pk %}"
+         class="inline-flex items-center gap-1.5 border border-red-600 text-red-700 hover:bg-red-50 text-sm font-medium px-3.5 py-2 rounded-lg">
+        Supprimer
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if peut_valider %}
+  <p class="text-xs text-amber-600 mb-4 -mt-2">
+    En validant, vous transmettez cette fiche au palier suivant et vous ne pourrez plus la modifier vous-même ensuite.
+  </p>
+{% endif %}
+
+<h1 class="text-xl font-semibold text-slate-900 mb-1">{{ fiche.nom_paroisse }}</h1>
+<p class="mb-4">
+  {% if fiche.statut_validation == "validee" %}
+    <span class="inline-block px-2.5 py-1 rounded-full bg-green-50 text-green-700 text-xs font-medium">✅ Validée</span>
+  {% elif fiche.statut_validation == "attente_manager" %}
+    <span class="inline-block px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">⏳ En attente du chef de province</span>
+  {% else %}
+    <span class="inline-block px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">⏳ En attente du chef de district</span>
+  {% endif %}
+</p>
+
+<div class="space-y-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Localisation ecclésiale</div>
+    <dl class="p-5 grid grid-cols-3 gap-y-2 text-sm">
+      <dt class="col-span-1 text-slate-500">Région</dt><dd class="col-span-2">{{ fiche.region.nom }}</dd>
+      <dt class="col-span-1 text-slate-500">Province</dt><dd class="col-span-2">{{ fiche.province.nom }}</dd>
+      <dt class="col-span-1 text-slate-500">District</dt><dd class="col-span-2">{{ fiche.district.nom }}</dd>
+      <dt class="col-span-1 text-slate-500">Zone</dt><dd class="col-span-2">{{ fiche.zone.nom }}</dd>
+      <dt class="col-span-1 text-slate-500">Localité</dt><dd class="col-span-2">{{ fiche.localite }}</dd>
+    </dl>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Paroisse</div>
+    <dl class="p-5 grid grid-cols-3 gap-y-2 text-sm">
+      <dt class="col-span-1 text-slate-500">Année de fondation</dt><dd class="col-span-2">{{ fiche.annee_fondation|default:"Non précisée" }}</dd>
+      <dt class="col-span-1 text-slate-500">Statut du bâtiment</dt><dd class="col-span-2">{{ fiche.get_statut_batiment_display }}</dd>
+      <dt class="col-span-1 text-slate-500">Nombre de fidèles estimé</dt><dd class="col-span-2">{{ fiche.nombre_fideles_estime|default:"Non précisé" }}</dd>
+    </dl>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Chargé de paroisse</div>
+    <dl class="p-5 grid grid-cols-3 gap-y-2 text-sm">
+      <dt class="col-span-1 text-slate-500">Nom</dt><dd class="col-span-2">{{ fiche.parish_shepherd }}</dd>
+      <dt class="col-span-1 text-slate-500">Contact</dt><dd class="col-span-2">{{ fiche.contact_responsable|default:"—" }}</dd>
+    </dl>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Géolocalisation</div>
+    <div class="p-5">
+      {% if fiche.a_coordonnees_gps %}
+        <dl class="grid grid-cols-3 gap-y-2 text-sm mb-3">
+          <dt class="col-span-1 text-slate-500">Latitude</dt><dd class="col-span-2">{{ fiche.latitude }}</dd>
+          <dt class="col-span-1 text-slate-500">Longitude</dt><dd class="col-span-2">{{ fiche.longitude }}</dd>
+          <dt class="col-span-1 text-slate-500">Précision</dt><dd class="col-span-2">{{ fiche.precision_gps|floatformat:0 }} m</dd>
+        </dl>
+        <a class="inline-flex items-center gap-1.5 border border-brand-600 text-brand-700 hover:bg-brand-50 text-sm font-medium px-3.5 py-2 rounded-lg"
+           href="https://www.google.com/maps?q={{ fiche.latitude }},{{ fiche.longitude }}"
+           target="_blank" rel="noopener">
+          🗺️ Voir sur Google Maps
+        </a>
+      {% else %}
+        <p class="text-slate-400 text-sm">Aucune coordonnée GPS enregistrée pour cette fiche.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Agent recenseur & observations</div>
+    <div class="p-5">
+      <dl class="grid grid-cols-3 gap-y-2 text-sm mb-2">
+        <dt class="col-span-1 text-slate-500">Agent recenseur</dt>
+        <dd class="col-span-2">{{ fiche.cree_par.get_full_name|default:fiche.cree_par.get_username|default:"—" }}</dd>
+        <dt class="col-span-1 text-slate-500">Date du recensement</dt><dd class="col-span-2">{{ fiche.date_recensement|date:"d/m/Y H:i" }}</dd>
+      </dl>
+      {% if fiche.observations %}
+        <p class="text-sm border-t border-slate-100 pt-3 mt-3">{{ fiche.observations|linebreaks }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if fiche.valide_par_superviseur or fiche.valide_par_manager %}
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Traçabilité de la validation</div>
+    <dl class="p-5 grid grid-cols-3 gap-y-2 text-sm">
+      {% if fiche.valide_par_superviseur %}
+        <dt class="col-span-1 text-slate-500">Validée par (district)</dt>
+        <dd class="col-span-2">{{ fiche.valide_par_superviseur.get_full_name|default:fiche.valide_par_superviseur.get_username }} — {{ fiche.date_validation_superviseur|date:"d/m/Y H:i" }}</dd>
+      {% endif %}
+      {% if fiche.valide_par_manager %}
+        <dt class="col-span-1 text-slate-500">Validée par (province)</dt>
+        <dd class="col-span-2">{{ fiche.valide_par_manager.get_full_name|default:fiche.valide_par_manager.get_username }} — {{ fiche.date_validation_manager|date:"d/m/Y H:i" }}</dd>
+      {% endif %}
+    </dl>
+  </div>
+  {% endif %}
+
+  {% if historique %}
+  <div id="historique" class="bg-white rounded-2xl border border-slate-200 shadow-sm scroll-mt-4">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">
+      Historique des modifications
+    </div>
+    <div class="divide-y divide-slate-100">
+      {% for entree in historique %}
+      <div class="p-5">
+        <div class="flex justify-between items-start gap-4 mb-2">
+          <div class="text-sm font-medium text-slate-800">
+            {{ entree.modifie_par.get_full_name|default:entree.modifie_par.get_username|default:"Compte supprimé" }}
+          </div>
+          <div class="text-xs text-slate-400 whitespace-nowrap">{{ entree.date_modification|date:"d/m/Y H:i" }}</div>
+        </div>
+        <p class="text-sm text-slate-600 mb-3"><span class="text-slate-400">Motif :</span> {{ entree.motif }}</p>
+        <details class="text-xs">
+          <summary class="cursor-pointer text-brand-600 hover:underline select-none">Voir le détail avant / après</summary>
+          <div class="grid sm:grid-cols-2 gap-3 mt-2">
+            <div class="bg-red-50 border border-red-100 rounded-lg p-3">
+              <div class="font-semibold text-red-700 mb-1">Avant</div>
+              {% for cle, valeur in entree.donnees_avant.items %}
+                <div class="flex justify-between gap-2 py-0.5"><span class="text-slate-500">{{ cle }}</span><span>{{ valeur|default:"—" }}</span></div>
+              {% endfor %}
+            </div>
+            <div class="bg-green-50 border border-green-100 rounded-lg p-3">
+              <div class="font-semibold text-green-700 mb-1">Après</div>
+              {% for cle, valeur in entree.donnees_apres.items %}
+                <div class="flex justify-between gap-2 py-0.5"><span class="text-slate-500">{{ cle }}</span><span>{{ valeur|default:"—" }}</span></div>
+              {% endfor %}
+            </div>
+          </div>
+        </details>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

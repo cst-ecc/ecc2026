@@ -1,0 +1,29 @@
+{% load static %}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>{% block title %}Recensement des paroisses{% endblock %}</title>
+
+<!-- Tailwind via CDN (Play CDN) : pratique pour démarrer sans outillage Node.
+     Pour la production, voir README §Tailwind pour passer à une build compilée. -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brand: {
+            50: '#EBF7FE', 100: '#D3EDFD', 200: '#A7DAFB', 300: '#71C4F9',
+            400: '#3BADF7', 500: '#0984D3', 600: '#0765A2', 700: '#054771',
+            800: '#032E4A', 900: '#021928',
+          },
+          accent: {
+            50: '#FFFEEB', 100: '#FFFCD1', 200: '#FFFAA3', 300: '#FFF66B',
+            400: '#FFF333', 500: '#FFF000', 600: '#CCC000', 700: '#999000',
+            800: '#706A00', 900: '#4D4800',
+          },
+        },
+      },
+    },
+  };
+</script>
+<link href="{% static 'recensement/css/style.css' %}" rel="stylesheet">

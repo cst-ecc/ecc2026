@@ -1,0 +1,189 @@
+{% extends "recensement/base.html" %}
+{% load static %}
+
+{% block title %}Modifier — {{ fiche.nom_paroisse }}{% endblock %}
+
+{% block content %}
+<a href="{% url 'recensement:fiche_detail' fiche.pk %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour à la fiche</a>
+
+<h1 class="text-xl font-semibold text-slate-900 mt-2 mb-1">Modifier la fiche : {{ fiche.nom_paroisse }}</h1>
+<p class="text-sm text-slate-500 mb-6">
+  Corrigez uniquement ce qui doit l'être. Le statut de validation en cours
+  n'est pas affecté par cette modification. Un motif est obligatoire.
+</p>
+
+<form method="post" id="fiche-edit-form" class="space-y-4">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div class="rounded-lg bg-red-50 text-red-800 border border-red-200 px-4 py-3 text-sm">
+      {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Localisation ecclésiale</div>
+    <div class="p-5 grid sm:grid-cols-2 gap-4">
+      <div>
+        <label for="id_region" class="block text-sm font-medium text-slate-700 mb-1">{{ form.region.label }}</label>
+        {{ form.region }}
+        {% for error in form.region.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label for="id_province" class="block text-sm font-medium text-slate-700 mb-1">{{ form.province.label }}</label>
+        {{ form.province }}
+        {% for error in form.province.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label for="id_district" class="block text-sm font-medium text-slate-700 mb-1">{{ form.district.label }}</label>
+        {{ form.district }}
+        {% for error in form.district.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label for="id_zone" class="block text-sm font-medium text-slate-700 mb-1">{{ form.zone.label }}</label>
+        {{ form.zone }}
+        {% for error in form.zone.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label for="id_village" class="block text-sm font-medium text-slate-700 mb-1">{{ form.village.label }}</label>
+        {{ form.village }}
+        {% for error in form.village.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      <div id="nouvelle-localite-wrapper" class="{% if not form.nouvelle_localite_nom.value %}hidden{% endif %}">
+        <label for="id_nouvelle_localite_nom" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nouvelle_localite_nom.label }}</label>
+        {{ form.nouvelle_localite_nom }}
+        {% for error in form.nouvelle_localite_nom.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Identité de la paroisse</div>
+    <div class="p-5 grid sm:grid-cols-2 gap-4">
+      <div class="sm:col-span-2">
+        <label for="{{ form.nom_paroisse.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nom_paroisse.label }}</label>
+        {{ form.nom_paroisse }}
+        {% for error in form.nom_paroisse.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label for="{{ form.annee_fondation.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.annee_fondation.label }}</label>
+        {{ form.annee_fondation }}
+        {% for error in form.annee_fondation.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label for="{{ form.statut_batiment.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.statut_batiment.label }}</label>
+        {{ form.statut_batiment }}
+        {% for error in form.statut_batiment.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label for="{{ form.nombre_fideles_estime.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nombre_fideles_estime.label }}</label>
+        {{ form.nombre_fideles_estime }}
+        {% for error in form.nombre_fideles_estime.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Chargé de paroisse</div>
+    <div class="p-5 grid sm:grid-cols-2 gap-4">
+      <div>
+        <label for="{{ form.parish_shepherd.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.parish_shepherd.label }}</label>
+        {{ form.parish_shepherd }}
+        {% for error in form.parish_shepherd.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label for="{{ form.contact_responsable.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.contact_responsable.label }}</label>
+        {{ form.contact_responsable }}
+        {% for error in form.contact_responsable.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">GPS & observations</div>
+    <div class="p-5 space-y-4">
+      <div class="grid sm:grid-cols-3 gap-4">
+        <div>
+          <label for="edit_latitude" class="block text-sm font-medium text-slate-700 mb-1">Latitude</label>
+          <input type="number" step="any" name="latitude" id="edit_latitude"
+                 value="{{ form.latitude.value|default_if_none:'' }}"
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label for="edit_longitude" class="block text-sm font-medium text-slate-700 mb-1">Longitude</label>
+          <input type="number" step="any" name="longitude" id="edit_longitude"
+                 value="{{ form.longitude.value|default_if_none:'' }}"
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label for="edit_precision" class="block text-sm font-medium text-slate-700 mb-1">Précision (m)</label>
+          <input type="number" step="any" name="precision_gps" id="edit_precision"
+                 value="{{ form.precision_gps.value|default_if_none:'' }}"
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+      </div>
+      <p class="text-xs text-slate-400">
+        À corriger uniquement si les coordonnées d'origine sont manifestement
+        erronées — l'agent ne peut pas recapturer le GPS après enregistrement.
+      </p>
+      {% for error in form.latitude.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+      {% for error in form.longitude.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+      {% for error in form.precision_gps.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+      <div>
+        <label for="{{ form.observations.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.observations.label }}</label>
+        {{ form.observations }}
+        {% for error in form.observations.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-amber-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-amber-100 font-semibold text-amber-800">Motif de la modification (obligatoire)</div>
+    <div class="p-5">
+      <p class="text-sm text-slate-500 mb-3">
+        Ce motif est enregistré dans l'historique de la fiche, consultable par
+        le super admin — expliquez ce qui était erroné et pourquoi vous le corrigez.
+      </p>
+      {{ motif_form.motif }}
+      {% for error in motif_form.motif.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+    </div>
+  </div>
+
+  <div class="flex justify-end gap-2">
+    <a href="{% url 'recensement:fiche_detail' fiche.pk %}"
+       class="border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg">
+      Annuler
+    </a>
+    <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-5 py-2.5 rounded-lg">
+      Enregistrer les modifications
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.RECENSEMENT_AJAX_URLS = {
+    provinces: "{% url 'recensement:ajax_provinces' 0 %}",
+    districts: "{% url 'recensement:ajax_districts' 0 %}",
+    zones: "{% url 'recensement:ajax_zones' 0 %}",
+    villages: "{% url 'recensement:ajax_villages' 0 %}"
+  };
+  // Pré-remplissage de la cascade géographique avec les valeurs actuelles de la fiche.
+  window.RECENSEMENT_INITIAL = {{ initial_ids_json|safe }};
+</script>
+<script src="{% static 'recensement/js/cascade.js' %}"></script>
+<script>
+  // Le select village n'accepte que de vrais identifiants de la base :
+  // la sentinelle "autre" (ajoutée par cascade.js) doit être vidée avant
+  // l'envoi, sinon le serveur rejette la fiche avec "choix invalide".
+  // (Le wizard de création gère déjà ceci dans wizard.js ; cette page
+  // d'édition n'utilise pas le wizard, d'où cette petite duplication ciblée.)
+  document.getElementById("fiche-edit-form").addEventListener("submit", function () {
+    var villageSelect = document.getElementById("id_village");
+    if (villageSelect && villageSelect.value === "autre") {
+      villageSelect.value = "";
+    }
+  });
+</script>
+{% endblock %}

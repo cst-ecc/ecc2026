@@ -1,0 +1,8 @@
+Django>=5.0,<5.1
+openpyxl>=3.1,<4.0
+django-environ>=0.11,<1.0
+psycopg2-binary>=2.9,<3.0       # PostgreSQL — obligatoire désormais (plus de SQLite)
+gunicorn>=22.0,<23.0            # serveur d'application utilisé dans le conteneur Docker
+
+
+# whitenoise>=6.7,<7.0           # à activer en Phase 3 pour servir les statiques sans Nginx

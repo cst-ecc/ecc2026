@@ -1,0 +1,111 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}Tableau de bord — Recensement{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center flex-wrap gap-2 mb-6">
+  <h1 class="text-xl font-semibold text-slate-900">Tableau de bord</h1>
+  <a href="{% url 'recensement:suivi_modifications' %}"
+     class="inline-flex items-center gap-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium px-3.5 py-2 rounded-lg">
+    Suivi de modification
+  </a>
+</div>
+
+<p class="text-xs text-slate-400 mb-2">Cliquez sur un compteur pour voir la liste correspondante.</p>
+<div class="grid sm:grid-cols-4 gap-4 mb-8">
+  <a href="{% url 'recensement:fiche_list' %}?statut=tous"
+     class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:border-brand-300 hover:shadow transition">
+    <div class="text-3xl font-bold text-slate-900">{{ total_general }}</div>
+    <div class="text-sm text-slate-500 mt-1">Paroisses enregistrées (tous statuts)</div>
+  </a>
+  <a href="{% url 'recensement:fiche_list' %}?statut=validees"
+     class="bg-white rounded-2xl border border-green-200 shadow-sm p-5 hover:border-green-400 hover:shadow transition">
+    <div class="text-3xl font-bold text-green-700">{{ total_valide }}</div>
+    <div class="text-sm text-slate-500 mt-1">Validées définitivement</div>
+  </a>
+  <a href="{% url 'recensement:fiche_list' %}?statut=attente_superviseur"
+     class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:border-slate-400 hover:shadow transition">
+    <div class="text-3xl font-bold text-slate-700">{{ total_attente_superviseur }}</div>
+    <div class="text-sm text-slate-500 mt-1">En attente du chef de district</div>
+  </a>
+  <a href="{% url 'recensement:fiche_list' %}?statut=attente_manager"
+     class="bg-white rounded-2xl border border-amber-200 shadow-sm p-5 hover:border-amber-400 hover:shadow transition">
+    <div class="text-3xl font-bold text-amber-700">{{ total_attente_manager }}</div>
+    <div class="text-sm text-slate-500 mt-1">En attente du chef de province</div>
+  </a>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">
+      En attente — chefs de district à relancer
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="text-left text-slate-500">
+          <tr>
+            <th class="px-5 py-2 font-medium">District</th>
+            <th class="px-5 py-2 font-medium">En attente</th>
+            <th class="px-5 py-2 font-medium">Responsable(s)</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for ligne in par_district %}
+          <tr class="hover:bg-slate-50">
+            <td class="px-5 py-2.5">
+              <a href="{% url 'recensement:fiche_list' %}?statut=attente_superviseur&district={{ ligne.district_id }}"
+                 class="text-brand-600 hover:underline">{{ ligne.district__nom }}</a>
+            </td>
+            <td class="px-5 py-2.5">
+              <a href="{% url 'recensement:fiche_list' %}?statut=attente_superviseur&district={{ ligne.district_id }}"
+                 class="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200">
+                {{ ligne.nb }}
+              </a>
+            </td>
+            <td class="px-5 py-2.5 text-slate-500">{{ ligne.responsables|join:", " }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="px-5 py-6 text-center text-slate-400">Rien en attente.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">
+      En attente — chefs de province à relancer
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="text-left text-slate-500">
+          <tr>
+            <th class="px-5 py-2 font-medium">Province</th>
+            <th class="px-5 py-2 font-medium">En attente</th>
+            <th class="px-5 py-2 font-medium">Responsable(s)</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for ligne in par_province %}
+          <tr class="hover:bg-slate-50">
+            <td class="px-5 py-2.5">
+              <a href="{% url 'recensement:fiche_list' %}?statut=attente_manager&province={{ ligne.province_id }}"
+                 class="text-brand-600 hover:underline">{{ ligne.province__nom }}</a>
+            </td>
+            <td class="px-5 py-2.5">
+              <a href="{% url 'recensement:fiche_list' %}?statut=attente_manager&province={{ ligne.province_id }}"
+                 class="inline-block px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold hover:bg-amber-100">
+                {{ ligne.nb }}
+              </a>
+            </td>
+            <td class="px-5 py-2.5 text-slate-500">{{ ligne.responsables|join:", " }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="px-5 py-6 text-center text-slate-400">Rien en attente.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

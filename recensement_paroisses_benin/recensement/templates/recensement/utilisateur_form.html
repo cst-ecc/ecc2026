@@ -1,0 +1,182 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}{% if is_edit %}Modifier un compte{% else %}Nouveau compte{% endif %} — Utilisateurs{% endblock %}
+
+{% block content %}
+<a href="{% url 'recensement:utilisateur_list' %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour aux utilisateurs</a>
+
+<h1 class="text-xl font-semibold text-slate-900 mt-2 mb-6">
+  {% if is_edit %}Modifier le compte : {{ utilisateur.username }}{% else %}Nouveau compte utilisateur{% endif %}
+</h1>
+
+<form method="post" id="utilisateur-form" class="space-y-4">
+  {% csrf_token %}
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Identité</div>
+    <div class="p-5 space-y-4">
+      {% if is_edit %}
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Identifiant</label>
+            <input type="text" value="{{ utilisateur.username }}" disabled
+                   class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-500">
+          </div>
+          <div></div>
+          <div>
+            <label for="first_name" class="block text-sm font-medium text-slate-700 mb-1">Prénom</label>
+            <input type="text" name="first_name" id="first_name" value="{{ utilisateur.first_name }}"
+                   class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <div>
+            <label for="last_name" class="block text-sm font-medium text-slate-700 mb-1">Nom</label>
+            <input type="text" name="last_name" id="last_name" value="{{ utilisateur.last_name }}"
+                   class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+        </div>
+        <label class="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" name="is_active" {% if utilisateur.is_active %}checked{% endif %}
+                 class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+          Compte actif (peut se connecter)
+        </label>
+      {% else %}
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div class="sm:col-span-2">
+            <label for="{{ user_form.username.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ user_form.username.label }}</label>
+            {{ user_form.username }}
+            {% for error in user_form.username.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="{{ user_form.first_name.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ user_form.first_name.label }}</label>
+            {{ user_form.first_name }}
+          </div>
+          <div>
+            <label for="{{ user_form.last_name.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ user_form.last_name.label }}</label>
+            {{ user_form.last_name }}
+          </div>
+          <div>
+            <label for="{{ user_form.password1.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ user_form.password1.label }}</label>
+            {{ user_form.password1 }}
+            {% for error in user_form.password1.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="{{ user_form.password2.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ user_form.password2.label }}</label>
+            {{ user_form.password2 }}
+            {% for error in user_form.password2.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Rôle & périmètre</div>
+    <div class="p-5 space-y-4">
+      <div>
+        <label for="{{ profil_form.role.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ profil_form.role.label }}</label>
+        {{ profil_form.role }}
+        {% for error in profil_form.role.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      <div id="champ-province">
+        <label for="{{ profil_form.province.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ profil_form.province.label }}</label>
+        {{ profil_form.province }}
+        {% for error in profil_form.province.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      <div id="champ-district">
+        <label for="province_filtre_district" class="block text-sm font-medium text-slate-700 mb-1">
+          Province (pour retrouver le district plus facilement)
+        </label>
+        <select id="province_filtre_district"
+                class="w-full rounded-lg border border-slate-300 px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 mb-3">
+          <option value="">— Sélectionnez d'abord une province —</option>
+          {% for p in provinces %}
+            <option value="{{ p.id }}" {% if p.id == province_du_district_id %}selected{% endif %}>{{ p.nom }}</option>
+          {% endfor %}
+        </select>
+
+        <label for="{{ profil_form.district.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ profil_form.district.label }}</label>
+        {{ profil_form.district }}
+        {% for error in profil_form.district.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="flex justify-end gap-2">
+    <a href="{% url 'recensement:utilisateur_list' %}"
+       class="border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg">
+      Annuler
+    </a>
+    <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-5 py-2.5 rounded-lg">
+      {% if is_edit %}Enregistrer les modifications{% else %}Créer le compte{% endif %}
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Affiche province/district uniquement selon le rôle choisi.
+  (function () {
+    var roleSelect = document.getElementById("id_role");
+    var champProvince = document.getElementById("champ-province");
+    var champDistrict = document.getElementById("champ-district");
+    if (!roleSelect) return;
+
+    function update() {
+      champProvince.classList.toggle("hidden", roleSelect.value !== "manager");
+      champDistrict.classList.toggle("hidden", roleSelect.value !== "superviseur");
+    }
+    roleSelect.addEventListener("change", update);
+    update();
+  })();
+
+  // Filtre la liste des districts selon la province choisie, en réutilisant
+  // le même endpoint AJAX que le formulaire de recensement — évite d'avoir
+  // à se souvenir de quelle province contient quel district.
+  (function () {
+    var provinceFiltre = document.getElementById("province_filtre_district");
+    var districtSelect = document.getElementById("id_district_profil");
+    if (!provinceFiltre || !districtSelect) return;
+
+    var URL_TEMPLATE = "{% url 'recensement:ajax_districts' 0 %}";
+    var districtActuelId = "{{ profil_form.district.value|default_if_none:'' }}";
+
+    function chargerDistricts(provinceId, districtASelectionner) {
+      districtSelect.innerHTML = "";
+      var placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = provinceId ? "— Sélectionnez un district —" : "— Choisissez d'abord une province —";
+      districtSelect.appendChild(placeholder);
+      districtSelect.disabled = !provinceId;
+      if (!provinceId) return;
+
+      fetch(URL_TEMPLATE.replace(/0\/$/, provinceId + "/"))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          (data.results || []).forEach(function (d) {
+            var opt = document.createElement("option");
+            opt.value = d.id;
+            opt.textContent = d.nom;
+            if (districtASelectionner && String(d.id) === String(districtASelectionner)) {
+              opt.selected = true;
+            }
+            districtSelect.appendChild(opt);
+          });
+        })
+        .catch(function () {
+          placeholder.textContent = "— Erreur de chargement, réessayez —";
+        });
+    }
+
+    provinceFiltre.addEventListener("change", function () {
+      chargerDistricts(provinceFiltre.value, null);
+    });
+
+    // Initialisation : si une province est déjà choisie (mode édition), on
+    // précharge et présélectionne son district ; sinon on désactive
+    // simplement le select tant qu'aucune province n'est choisie (au lieu
+    // de laisser apparaître la liste complète et non filtrée de Django).
+    chargerDistricts(provinceFiltre.value, districtActuelId);
+  })();
+</script>
+{% endblock %}

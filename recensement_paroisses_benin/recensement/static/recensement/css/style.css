@@ -1,0 +1,61 @@
+/* Le gros du style vient de Tailwind (classes utilitaires dans les templates).
+   Ce fichier ne couvre que ce qui est plus simple en CSS classique :
+   les connecteurs du stepper (pseudo-éléments) et le piège anti-robot. */
+
+.stepper-item {
+  position: relative;
+}
+
+.stepper-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 16px;
+  left: 55%;
+  width: 90%;
+  height: 2px;
+  background-color: #e2e8f0; /* slate-200 */
+  z-index: 0;
+}
+
+.stepper-item.done:not(:last-child)::after {
+  background-color: #16a34a; /* green-600 */
+}
+
+.stepper-item.active .stepper-circle {
+  background-color: #4f46e5; /* brand-600 */
+  color: #fff;
+}
+.stepper-item.active .stepper-label {
+  color: #4f46e5;
+  font-weight: 600;
+}
+.stepper-item.done .stepper-circle {
+  background-color: #16a34a; /* green-600 */
+  color: #fff;
+}
+.stepper-item.done .stepper-label {
+  color: #16a34a;
+}
+
+@media (max-width: 420px) {
+  .stepper-label {
+    display: none;
+  }
+}
+
+/* Bordure rouge sur les champs invalides, ajoutée dynamiquement par wizard.js */
+.form-step .is-invalid {
+  border-color: #dc2626 !important; /* red-600 */
+}
+
+/* Piège anti-robot : masqué visuellement (hors écran), mais toujours
+   présent dans le DOM. On évite display:none, que certains robots
+   ignorent lors du remplissage automatique des formulaires. */
+.hp-wrapper {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  height: 0;
+  width: 0;
+  overflow: hidden;
+}
