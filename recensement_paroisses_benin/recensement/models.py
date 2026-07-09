@@ -214,6 +214,10 @@ class FicheParoisse(models.Model):
     # --- Chargé de paroisse ---
     parish_shepherd = models.CharField(max_length=200)
     contact_responsable = models.CharField(max_length=30, blank=True)
+    photo_charge = models.ImageField(
+        upload_to="paroisses/charges/%Y/%m/", blank=True, null=True,
+        help_text="Photo du chargé de paroisse (facultative).",
+    )
 
     # --- Effectifs ---
     nombre_fideles_estime = models.PositiveIntegerField(
@@ -262,6 +266,11 @@ class FicheParoisse(models.Model):
     )
     date_validation_manager = models.DateTimeField(null=True, blank=True)
 
+    # --- Informateur (personne ayant renseigné l'agent sur place, si
+    #     différente du chargé de paroisse) — entièrement facultatif ---
+    nom_informateur = models.CharField(max_length=200, blank=True)
+    contact_informateur = models.CharField(max_length=30, blank=True)
+
     observations = models.TextField(blank=True)
     date_recensement = models.DateTimeField(auto_now_add=True)
 
@@ -293,6 +302,25 @@ class FicheParoisse(models.Model):
     @property
     def a_coordonnees_gps(self):
         return self.latitude is not None and self.longitude is not None
+
+
+class PhotoParoisse(models.Model):
+    """Photo du bâtiment/lieu de culte de la paroisse. Une fiche peut avoir
+    0 à 3 photos — la limite est appliquée côté formulaire (PhotosParoisseForm),
+    pas par une contrainte de base de données (Django ne permet pas
+    nativement de limiter le nombre de lignes liées en base)."""
+
+    fiche = models.ForeignKey(FicheParoisse, on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(upload_to="paroisses/photos/%Y/%m/")
+    date_ajout = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["date_ajout"]
+        verbose_name = "Photo de paroisse"
+        verbose_name_plural = "Photos de paroisse"
+
+    def __str__(self):
+        return f"Photo de {self.fiche.nom_paroisse} ({self.date_ajout:%d/%m/%Y})"
 
 
 class HistoriqueModification(models.Model):

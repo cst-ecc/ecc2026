@@ -12,7 +12,7 @@
   n'est pas affecté par cette modification. Un motif est obligatoire.
 </p>
 
-<form method="post" id="fiche-edit-form" class="space-y-4">
+<form method="post" id="fiche-edit-form" class="space-y-4" enctype="multipart/form-data">
   {% csrf_token %}
 
   {% if form.non_field_errors %}
@@ -96,6 +96,14 @@
         {{ form.contact_responsable }}
         {% for error in form.contact_responsable.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
       </div>
+      <div class="sm:col-span-2">
+        <label for="{{ form.photo_charge.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.photo_charge.label }}</label>
+        {% if fiche.photo_charge %}
+          <p class="text-xs text-slate-400 mb-1">Photo actuelle : <a href="{{ fiche.photo_charge.url }}" target="_blank" rel="noopener" class="text-brand-600 hover:underline">voir</a> — sélectionnez un fichier ci-dessous pour la remplacer.</p>
+        {% endif %}
+        {{ form.photo_charge }}
+        {% for error in form.photo_charge.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
     </div>
   </div>
 
@@ -133,6 +141,22 @@
         <label for="{{ form.observations.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.observations.label }}</label>
         {{ form.observations }}
         {% for error in form.observations.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Informateur</div>
+    <div class="p-5 grid sm:grid-cols-2 gap-4">
+      <div>
+        <label for="{{ form.nom_informateur.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nom_informateur.label }}</label>
+        {{ form.nom_informateur }}
+        {% for error in form.nom_informateur.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label for="{{ form.contact_informateur.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.contact_informateur.label }}</label>
+        {{ form.contact_informateur }}
+        {% for error in form.contact_informateur.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
       </div>
     </div>
   </div>
@@ -179,10 +203,39 @@
   // l'envoi, sinon le serveur rejette la fiche avec "choix invalide".
   // (Le wizard de création gère déjà ceci dans wizard.js ; cette page
   // d'édition n'utilise pas le wizard, d'où cette petite duplication ciblée.)
-  document.getElementById("fiche-edit-form").addEventListener("submit", function () {
+  document.getElementById("fiche-edit-form").addEventListener("submit", function (e) {
     var villageSelect = document.getElementById("id_village");
     if (villageSelect && villageSelect.value === "autre") {
       villageSelect.value = "";
+    }
+
+    // Même règle que recensement.forms.valider_telephone_benin, portée en
+    // JS pour un retour immédiat sans attendre la réponse du serveur.
+    var TELEPHONE_BENIN_REGEX = /^(\+229)?01\d{8}$/;
+    function telephoneValide(valeur) {
+      if (!valeur) return true;
+      return TELEPHONE_BENIN_REGEX.test(valeur.replace(/[\s.-]/g, ""));
+    }
+
+    var champsTelephone = ["id_contact_responsable", "id_contact_informateur"];
+    var premierInvalide = null;
+    champsTelephone.forEach(function (id) {
+      var champ = document.getElementById(id);
+      if (!champ) return;
+      champ.classList.remove("is-invalid");
+      if (!telephoneValide(champ.value)) {
+        champ.classList.add("is-invalid");
+        if (!premierInvalide) premierInvalide = champ;
+      }
+    });
+
+    if (premierInvalide) {
+      e.preventDefault();
+      window.alert(
+        "Numéro de téléphone invalide. Formats acceptés : 0196355621 "
+        + "(10 chiffres commençant par 01) ou +2290196355621."
+      );
+      premierInvalide.focus();
     }
   });
 </script>

@@ -1,13 +1,13 @@
 {% extends "recensement/base.html" %}
 
-{% block title %}Carte des paroisses — Recensement{% endblock %}
+{% block title %}Carte des paroisses — Recensement Bénin{% endblock %}
 
 {% block content %}
 <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
   <div>
     <h1 class="text-xl font-semibold text-slate-900">Carte des paroisses</h1>
     <p class="text-sm text-slate-500 mt-0.5">
-      {% if is_super_admin %}Tout.
+      {% if is_super_admin %}Tout le Bénin.
       {% elif is_manager %}Votre province.
       {% elif is_superviseur %}Votre district.
       {% else %}Les paroisses que vous avez enregistrées.{% endif %}
@@ -104,7 +104,7 @@
             '<div style="font-size:12px;margin-top:4px">Chargé : ' + p.chargeParoisse + '</div>' +
             '<div style="font-size:12px">Agent : ' + p.agent + '</div>' +
             '<div style="font-size:12px;margin-top:4px">Statut : ' + p.statutLabel + '</div>' +
-            '<a href="' + p.url + '" style="display:inline-block;margin-top:6px;font-size:12px;color:#4f46e5">Voir la fiche &rarr;</a>' +
+            '<a href="' + p.url + '" style="display:inline-block;margin-top:6px;font-size:12px;color:#0765A2">Voir la fiche &rarr;</a>' +
             '</div>';
 
           marker.bindPopup(popup);

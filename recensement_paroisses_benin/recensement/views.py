@@ -14,10 +14,13 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
 
 from .forms import (
-    FicheParoisseForm, MotifModificationForm, ProfilForm,
+    FicheParoisseForm, MotifModificationForm, PhotosParoisseForm, ProfilForm,
     TailwindSetPasswordForm, UtilisateurCreationForm,
 )
-from .models import District, FicheParoisse, HistoriqueModification, Profil, Province, Region, Village, Zone
+from .models import (
+    District, FicheParoisse, HistoriqueModification, PhotoParoisse, Profil,
+    Province, Region, Village, Zone,
+)
 from .permissions import get_role, peut_modifier_fiche, peut_valider_fiche, role_required
 
 # Caractères qu'un tableur (Excel, LibreOffice, Google Sheets) peut interpréter
@@ -39,6 +42,36 @@ def _csv_safe(value):
     return text
 
 
+# Associe chaque champ du wizard à son étape (index JS, base 0). Calculé
+# côté serveur — bien plus fiable qu'un scan JS du DOM à la recherche
+# d'une classe CSS, qui peut rater une erreur si la structure HTML change
+# ou si une classe est mal reprise quelque part.
+_CHAMP_VERS_ETAPE = {
+    "region": 0, "province": 0, "district": 0, "zone": 0, "village": 0,
+    "nouvelle_localite_nom": 0,
+    "nom_paroisse": 1, "annee_fondation": 1, "statut_batiment": 1, "nombre_fideles_estime": 1,
+    "photos": 1,  # champ du formulaire séparé PhotosParoisseForm, mais affiché à l'étape 1
+    "parish_shepherd": 2, "contact_responsable": 2, "photo_charge": 2,
+    "latitude": 3, "longitude": 3, "precision_gps": 3, "observations": 3,
+    "nom_informateur": 4, "contact_informateur": 4,
+}
+
+
+def _premiere_etape_en_erreur(form, photos_form=None):
+    """Renvoie l'index (base 0) de la première étape du wizard contenant
+    une erreur, en se basant sur les champs réellement en erreur — pas sur
+    une recherche de motif dans le HTML rendu. Retourne None si aucune
+    erreur (permet au template de ne rien forcer côté JS)."""
+    etapes = set()
+    for champ in form.errors:
+        etapes.add(_CHAMP_VERS_ETAPE.get(champ, 0))
+    if form.non_field_errors():
+        etapes.add(0)
+    if photos_form is not None and photos_form.errors:
+        etapes.add(_CHAMP_VERS_ETAPE.get("photos", 1))
+    return min(etapes) if etapes else None
+
+
 def _snapshot_fiche(fiche):
     """Capture lisible de l'état actuel d'une fiche, utilisée pour construire
     l'historique avant/après à chaque modification (HistoriqueModification)."""
@@ -53,11 +86,14 @@ def _snapshot_fiche(fiche):
         "annee_fondation": fiche.annee_fondation,
         "parish_shepherd": fiche.parish_shepherd,
         "contact_responsable": fiche.contact_responsable,
+        "photo_charge": fiche.photo_charge.name if fiche.photo_charge else None,
         "nombre_fideles_estime": fiche.nombre_fideles_estime,
         "statut_batiment": fiche.get_statut_batiment_display(),
         "latitude": str(fiche.latitude) if fiche.latitude is not None else None,
         "longitude": str(fiche.longitude) if fiche.longitude is not None else None,
         "precision_gps": fiche.precision_gps,
+        "nom_informateur": fiche.nom_informateur,
+        "contact_informateur": fiche.contact_informateur,
         "observations": fiche.observations,
     }
 
@@ -160,23 +196,50 @@ def fiche_create(request):
     """Formulaire de saisie terrain. Réservé aux agents et au super admin.
     L'identité de l'agent recenseur n'est plus saisie à la main : elle vient
     du compte connecté (`cree_par`)."""
+    etape_erreur = None
     if request.method == "POST":
-        form = FicheParoisseForm(request.POST)
-        if form.is_valid():
+        form = FicheParoisseForm(request.POST, request.FILES)
+        photos_form = PhotosParoisseForm(request.POST, request.FILES)
+        if form.is_valid() and photos_form.is_valid():
             fiche = form.save(commit=False)
             fiche.cree_par = request.user
             fiche.save()
+            for photo in photos_form.cleaned_data["photos"]:
+                PhotoParoisse.objects.create(fiche=fiche, image=photo)
             messages.success(
                 request,
                 "Fiche enregistrée avec succès, en attente de validation par le chef de "
                 "district. Vous pouvez recenser une autre paroisse.",
             )
             return redirect("recensement:fiche_create")
-        messages.error(request, "Veuillez corriger les erreurs ci-dessous.")
+        etape_erreur = _premiere_etape_en_erreur(form, photos_form)
+        messages.error(
+            request,
+            "La fiche n'a pas pu être enregistrée : le formulaire s'est rouvert directement "
+            "à l'étape contenant l'erreur, indiquée en rouge ci-dessous.",
+        )
     else:
         form = FicheParoisseForm()
+        photos_form = PhotosParoisseForm()
 
-    return render(request, "recensement/fiche_form.html", {"form": form})
+    # Valeurs déjà saisies (vides à l'ouverture, ou telles que soumises en
+    # cas d'erreur) : permet à cascade.js de restaurer la sélection
+    # région/province/district/zone/village au lieu de tout réinitialiser,
+    # et à wizard.js de rouvrir directement la bonne étape.
+    initial_ids = {
+        "region": form["region"].value(),
+        "province": form["province"].value(),
+        "district": form["district"].value(),
+        "zone": form["zone"].value(),
+        "village": form["village"].value(),
+    }
+
+    return render(request, "recensement/fiche_form.html", {
+        "form": form,
+        "photos_form": photos_form,
+        "initial_ids_json": json.dumps(initial_ids),
+        "etape_erreur_json": json.dumps(etape_erreur),
+    })
 
 
 @login_required
@@ -209,7 +272,7 @@ def fiche_update(request, pk):
             return redirect("recensement:fiche_detail", pk=fiche.pk)
 
     if request.method == "POST":
-        form = FicheParoisseForm(request.POST, instance=fiche)
+        form = FicheParoisseForm(request.POST, request.FILES, instance=fiche)
         motif_form = MotifModificationForm(request.POST)
         if form.is_valid() and motif_form.is_valid():
             avant = _snapshot_fiche(fiche)
@@ -366,6 +429,7 @@ def fiche_export_csv(request):
         "Nom paroisse", "Année fondation", "Chargé de paroisse", "Contact chargé de paroisse",
         "Nombre fidèles estimé", "Statut bâtiment",
         "Latitude", "Longitude", "Précision GPS (m)",
+        "Nom informateur", "Contact informateur",
         "Agent recenseur", "Statut de validation", "Observations", "Date recensement",
     ])
     for f in fiches:
@@ -376,6 +440,7 @@ def fiche_export_csv(request):
             _csv_safe(f.contact_responsable),
             f.nombre_fideles_estime or "", f.get_statut_batiment_display(),
             f.latitude or "", f.longitude or "", f.precision_gps or "",
+            _csv_safe(f.nom_informateur), _csv_safe(f.contact_informateur),
             _csv_safe(agent), f.get_statut_validation_display(), _csv_safe(f.observations),
             f.date_recensement.strftime("%d/%m/%Y %H:%M"),
         ])

@@ -1,7 +1,7 @@
 {% extends "recensement/base.html" %}
 {% load static %}
 
-{% block title %}Nouvelle fiche de recensement{% endblock %}
+{% block title %}Nouvelle fiche de recensement — Bénin{% endblock %}
 
 {% block content %}
 <h1 class="text-xl font-semibold text-slate-900 mb-1">Fiche de recensement d'une paroisse</h1>
@@ -32,13 +32,17 @@
     </li>
     <li class="stepper-item flex flex-col items-center flex-1 min-w-[56px] text-center cursor-pointer pb-1" data-step-index="4">
       <span class="stepper-circle relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold mb-1 bg-slate-200 text-slate-600">5</span>
+      <span class="stepper-label text-xs text-slate-500">Informateur</span>
+    </li>
+    <li class="stepper-item flex flex-col items-center flex-1 min-w-[56px] text-center cursor-pointer pb-1" data-step-index="5">
+      <span class="stepper-circle relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold mb-1 bg-slate-200 text-slate-600">6</span>
       <span class="stepper-label text-xs text-slate-500">Récapitulatif</span>
     </li>
   </ol>
 </nav>
-<p class="text-center text-sm text-slate-400 mb-6" id="step-counter">Étape 1 sur 5</p>
+<p class="text-center text-sm text-slate-400 mb-6" id="step-counter">Étape 1 sur 6</p>
 
-<form method="post" novalidate id="fiche-form">
+<form method="post" novalidate id="fiche-form" enctype="multipart/form-data">
   {% csrf_token %}
 
   {% if form.non_field_errors %}
@@ -124,6 +128,12 @@
             {% for error in form.nombre_fideles_estime.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
           </div>
         </div>
+        <div class="pt-2 border-t border-slate-100">
+          <label for="id_photos" class="block text-sm font-medium text-slate-700 mb-1">{{ photos_form.photos.label }}</label>
+          {{ photos_form.photos }}
+          <p class="text-xs text-slate-400 mt-1">Facultatif — jusqu'à 3 photos du bâtiment/lieu de culte (jpg, png ou webp, 5 Mo max chacune).</p>
+          {% for error in photos_form.photos.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        </div>
       </div>
     </div>
     <div class="flex justify-between gap-2 flex-wrap mb-8">
@@ -146,6 +156,12 @@
           <label for="{{ form.contact_responsable.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.contact_responsable.label }}</label>
           {{ form.contact_responsable }}
           {% for error in form.contact_responsable.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        </div>
+        <div class="sm:col-span-2">
+          <label for="{{ form.photo_charge.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.photo_charge.label }}</label>
+          {{ form.photo_charge }}
+          <p class="text-xs text-slate-400 mt-1">Facultatif (jpg, png ou webp, 5 Mo max).</p>
+          {% for error in form.photo_charge.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
         </div>
       </div>
     </div>
@@ -195,10 +211,39 @@
     </div>
   </div>
 
-  <!-- ============================= ÉTAPE 5 : Récapitulatif ============================= -->
+  <!-- ============================= ÉTAPE 5 : Informateur ============================= -->
   <div class="form-step hidden" data-step="4">
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4">
-      <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">5. Récapitulatif — vérifiez avant d'enregistrer</div>
+      <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">5. Informateur</div>
+      <div class="p-5 space-y-4 step-body">
+        <p class="text-sm text-slate-500">
+          Facultatif — si une autre personne que le chargé de paroisse vous a
+          renseigné sur place (voisin, fidèle, autorité locale...).
+        </p>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label for="{{ form.nom_informateur.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nom_informateur.label }}</label>
+            {{ form.nom_informateur }}
+            {% for error in form.nom_informateur.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="{{ form.contact_informateur.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.contact_informateur.label }}</label>
+            {{ form.contact_informateur }}
+            {% for error in form.contact_informateur.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="flex justify-between gap-2 flex-wrap mb-8">
+      <button type="button" class="btn-prev bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-5 py-2.5 rounded-lg min-h-[44px]">← Précédent</button>
+      <button type="button" class="btn-next bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg min-h-[44px]">Suivant →</button>
+    </div>
+  </div>
+
+  <!-- ============================= ÉTAPE 6 : Récapitulatif ============================= -->
+  <div class="form-step hidden" data-step="5">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4">
+      <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">6. Récapitulatif — vérifiez avant d'enregistrer</div>
       <div class="p-5 step-body">
         <p class="text-sm text-slate-500 mb-4">
           Relisez attentivement les informations ci-dessous. Une fois enregistrée, cette
@@ -229,8 +274,31 @@
     zones: "{% url 'recensement:ajax_zones' 0 %}",
     villages: "{% url 'recensement:ajax_villages' 0 %}"
   };
+  // Vide au premier chargement (GET) ; rempli avec les valeurs déjà
+  // saisies si la page se rouvre après une erreur de validation (POST) —
+  // évite de perdre la cascade géographique et de devoir tout recommencer.
+  window.RECENSEMENT_INITIAL = {{ initial_ids_json|safe }};
+  // Index (base 0) de la première étape contenant une erreur, calculé
+  // côté serveur — null si aucune erreur. Bien plus fiable qu'un scan JS
+  // du DOM à la recherche d'une classe CSS.
+  window.RECENSEMENT_ETAPE_ERREUR = {{ etape_erreur_json|safe }};
 </script>
 <script src="{% static 'recensement/js/cascade.js' %}"></script>
 <script src="{% static 'recensement/js/geolocation.js' %}"></script>
 <script src="{% static 'recensement/js/wizard.js' %}"></script>
+<script>
+  // Garde-fou côté client : au-delà de 3 photos sélectionnées pour la
+  // paroisse, on vide la sélection et on prévient — le serveur reste la
+  // vérification faisant foi (voir PhotosParoisseForm.clean_photos).
+  (function () {
+    var champPhotos = document.getElementById("id_photos");
+    if (!champPhotos) return;
+    champPhotos.addEventListener("change", function () {
+      if (this.files.length > 3) {
+        window.alert("Vous ne pouvez sélectionner que 3 photos maximum.");
+        this.value = "";
+      }
+    });
+  })();
+</script>
 {% endblock %}

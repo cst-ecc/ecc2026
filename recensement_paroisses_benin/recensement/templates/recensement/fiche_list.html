@@ -1,6 +1,6 @@
 {% extends "recensement/base.html" %}
 
-{% block title %}Fiches recensées{% endblock %}
+{% block title %}Fiches recensées — Bénin{% endblock %}
 
 {% block content %}
 <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
@@ -8,10 +8,10 @@
     <h1 class="text-xl font-semibold text-slate-900">Fiches recensées ({{ total }})</h1>
     <p class="text-sm text-slate-500 mt-0.5">
       {% if is_super_admin %}
-        {% if statut_filtre == "tous" %}Toutes les fiches (tous statuts confondus).
-        {% elif statut_filtre == "attente_superviseur" %}Fiches en attente du chef de district.
-        {% elif statut_filtre == "attente_manager" %}Fiches en attente du chef de province.
-        {% else %}Fiches validées.{% endif %}
+        {% if statut_filtre == "tous" %}Toutes les fiches (tous statuts confondus), tout le Bénin.
+        {% elif statut_filtre == "attente_superviseur" %}Fiches en attente du chef de district, tout le Bénin.
+        {% elif statut_filtre == "attente_manager" %}Fiches en attente du chef de province, tout le Bénin.
+        {% else %}Fiches validées, tout le Bénin.{% endif %}
       {% elif is_manager %}Fiches de votre province.
       {% elif is_superviseur %}Fiches de votre district.
       {% else %}Fiches que vous avez enregistrées.{% endif %}

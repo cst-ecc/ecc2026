@@ -9,7 +9,10 @@
     <div class="max-w-5xl mx-auto px-4 sm:px-6">
       <div class="flex items-center justify-between h-14">
         <a href="{% url 'recensement:landing' %}" class="font-semibold flex items-center gap-2">
-          <span class="hidden sm:inline">Recensement des paroisses</span>
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v4m0 0l-3 3m3-3l3 3M6 21V10l6-4 6 4v11M9 21v-6h6v6" />
+          </svg>
+          <span class="hidden sm:inline">Recensement des paroisses — Bénin</span>
           <span class="sm:hidden">Recensement</span>
         </a>
         {% if not user.is_authenticated %}
@@ -43,7 +46,7 @@
   </main>
 
   <footer class="text-center text-xs text-slate-400 py-6 border-t border-slate-200 mt-6">
-    <p>&copy; {% now "Y" %} Église du Christianisme Céleste — Recensement des paroisses</p>
+    <p>&copy; {% now "Y" %} Église du Christianisme Céleste — Recensement des paroisses (Bénin)</p>
     <p class="mt-1.5 flex items-center justify-center gap-1 text-slate-400">
       Développé avec
       <svg class="w-3.5 h-3.5 text-red-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

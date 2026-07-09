@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     # App métier
     "recensement",
     "api",
+    "core",
 ]
 
 MIDDLEWARE = [

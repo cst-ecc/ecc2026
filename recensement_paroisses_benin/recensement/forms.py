@@ -5,7 +5,7 @@ from django.contrib.auth.forms import SetPasswordForm, UserCreationForm
 from django.contrib.auth.models import User
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 
-from .models import District, FicheParoisse, Profil, Province, Region, Village, Zone
+from .models import District, FicheParoisse, PhotoParoisse, Profil, Province, Region, Village, Zone
 
 # Numérotation béninoise (réforme 2021) : tous les numéros commencent par
 # "01" suivi de 8 chiffres (10 chiffres au total), avec ou sans l'indicatif
@@ -31,6 +31,51 @@ def valider_telephone_benin(value):
 
 
 MAX_ANNEE_FONDATION = 2100  # borne haute large et fixe
+
+# --- Photos : format et taille autorisés (défense contre l'upload de
+# fichiers arbitraires — seules de vraies images, taille raisonnable) ---
+TAILLE_MAX_IMAGE_OCTETS = 5 * 1024 * 1024  # 5 Mo
+EXTENSIONS_IMAGE_AUTORISEES = {"jpg", "jpeg", "png", "webp"}
+NB_MAX_PHOTOS_PAROISSE = 3
+
+
+def valider_image(fichier):
+    """Validateur réutilisable (photo du chargé, photos de la paroisse) :
+    extension autorisée + taille raisonnable. Django valide déjà que le
+    contenu est une image exploitable via ImageField/Pillow ; ceci ajoute
+    des bornes explicites contre l'upload de fichiers trop lourds ou d'un
+    format non prévu (ex. SVG, potentiellement porteur de script)."""
+    nom = getattr(fichier, "name", "") or ""
+    extension = nom.rsplit(".", 1)[-1].lower() if "." in nom else ""
+    if extension not in EXTENSIONS_IMAGE_AUTORISEES:
+        raise forms.ValidationError(
+            f"« {nom} » : format non autorisé (jpg, jpeg, png ou webp uniquement)."
+        )
+    taille = getattr(fichier, "size", 0) or 0
+    if taille > TAILLE_MAX_IMAGE_OCTETS:
+        raise forms.ValidationError(
+            f"« {nom} » dépasse la taille maximale autorisée (5 Mo)."
+        )
+
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    """Champ fichier acceptant une sélection multiple — motif officiel
+    Django (doc « Uploading multiple files »), nécessaire tant qu'il n'y a
+    pas de champ multi-fichiers natif au niveau des ModelForm."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", MultipleFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_file_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            return [single_file_clean(d, initial) for d in data]
+        return single_file_clean(data, initial)
 
 # Classes Tailwind communes à tous les champs texte/nombre/textarea et selects.
 INPUT_CSS = (
@@ -91,6 +136,21 @@ class FicheParoisseForm(forms.ModelForm):
         }),
         label="Contact du chargé de paroisse",
     )
+    contact_informateur = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            "class": INPUT_CSS, "placeholder": "Ex : 01 96 35 56 21 ou +2290196355621",
+        }),
+        label="Contact de l'informateur",
+    )
+    photo_charge = forms.ImageField(
+        required=False,
+        validators=[valider_image],
+        widget=forms.ClearableFileInput(attrs={
+            "class": INPUT_CSS, "accept": "image/jpeg,image/png,image/webp",
+        }),
+        label="Photo du chargé de paroisse (facultative)",
+    )
     annee_fondation = forms.IntegerField(
         required=False,
         validators=[MinValueValidator(1900), MaxValueValidator(MAX_ANNEE_FONDATION)],
@@ -114,10 +174,11 @@ class FicheParoisseForm(forms.ModelForm):
             "region", "province", "district", "zone", "village",
             "nouvelle_localite_nom",
             "nom_paroisse", "annee_fondation",
-            "parish_shepherd", "contact_responsable",
+            "parish_shepherd", "contact_responsable", "photo_charge",
             "nombre_fideles_estime",
             "statut_batiment",
             "latitude", "longitude", "precision_gps",
+            "nom_informateur", "contact_informateur",
             "observations",
         ]
         widgets = {
@@ -134,10 +195,16 @@ class FicheParoisseForm(forms.ModelForm):
             "parish_shepherd": forms.TextInput(attrs={
                 "class": INPUT_CSS, "placeholder": "Nom complet du chargé de paroisse"
             }),
+            "photo_charge": forms.ClearableFileInput(attrs={
+                "class": INPUT_CSS, "accept": "image/jpeg,image/png,image/webp",
+            }),
             "statut_batiment": forms.Select(attrs={"class": SELECT_CSS}),
             "latitude": forms.HiddenInput(attrs={"id": "id_latitude"}),
             "longitude": forms.HiddenInput(attrs={"id": "id_longitude"}),
             "precision_gps": forms.HiddenInput(attrs={"id": "id_precision_gps"}),
+            "nom_informateur": forms.TextInput(attrs={
+                "class": INPUT_CSS, "placeholder": "Nom de la personne rencontrée sur place",
+            }),
             "observations": forms.Textarea(attrs={
                 "class": INPUT_CSS, "rows": 3, "maxlength": 2000,
                 "placeholder": "Toute information complémentaire utile...",
@@ -146,7 +213,10 @@ class FicheParoisseForm(forms.ModelForm):
         labels = {
             "nom_paroisse": "Nom de la paroisse",
             "parish_shepherd": "Chargé(e) de paroisse",
+            "photo_charge": "Photo du chargé de paroisse (facultative)",
             "statut_batiment": "État du bâtiment / lieu de culte",
+            "nom_informateur": "Nom de l'informateur",
+            "contact_informateur": "Contact de l'informateur",
             "observations": "Observations",
         }
 
@@ -171,6 +241,12 @@ class FicheParoisseForm(forms.ModelForm):
 
     def clean_contact_responsable(self):
         return valider_telephone_benin(self.cleaned_data.get("contact_responsable"))
+
+    def clean_contact_informateur(self):
+        return valider_telephone_benin(self.cleaned_data.get("contact_informateur"))
+
+    def clean_nom_informateur(self):
+        return (self.cleaned_data.get("nom_informateur") or "").strip()
 
     def clean_observations(self):
         value = (self.cleaned_data.get("observations") or "").strip()
@@ -308,7 +384,7 @@ class MotifModificationForm(forms.Form):
         max_length=1000,
         label="Motif de la modification",
         widget=forms.Textarea(attrs={
-            "class": INPUT_CSS, "rows": 3, "maxlength": 1000,
+            "class": INPUT_CSS, "rows": 3, "minlength": 10, "maxlength": 1000,
             "placeholder": "Expliquez pourquoi cette fiche doit être corrigée "
                            "(ex : nom du chargé de paroisse mal orthographié par l'agent)...",
         }),
@@ -318,3 +394,29 @@ class MotifModificationForm(forms.Form):
             "max_length": "Le motif est limité à 1000 caractères.",
         },
     )
+
+
+class PhotosParoisseForm(forms.Form):
+    """Photos du bâtiment/lieu de culte de la paroisse — jusqu'à 3,
+    entièrement facultatives. Formulaire séparé de FicheParoisseForm car il
+    ne correspond pas à un champ direct de FicheParoisse mais à des objets
+    PhotoParoisse liés, créés après l'enregistrement de la fiche."""
+
+    photos = MultipleFileField(
+        required=False,
+        label=f"Photos de la paroisse (jusqu'à {NB_MAX_PHOTOS_PAROISSE})",
+        widget=MultipleFileInput(attrs={
+            "class": INPUT_CSS, "accept": "image/jpeg,image/png,image/webp",
+        }),
+    )
+
+    def clean_photos(self):
+        photos = self.cleaned_data.get("photos") or []
+        if len(photos) > NB_MAX_PHOTOS_PAROISSE:
+            raise forms.ValidationError(
+                f"Vous ne pouvez ajouter que {NB_MAX_PHOTOS_PAROISSE} photos maximum "
+                f"({len(photos)} sélectionnées)."
+            )
+        for photo in photos:
+            valider_image(photo)
+        return photos

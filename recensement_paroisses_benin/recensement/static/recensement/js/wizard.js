@@ -27,8 +27,11 @@
       fieldsOf(step).forEach(function (el) {
         el.classList.remove("is-invalid");
       });
-      var msg = step.querySelector(".step-error");
-      if (msg) msg.remove();
+      // Retire TOUS les messages d'erreur d'étape précédemment ajoutés
+      // (plusieurs règles peuvent en ajouter un chacune à la même étape).
+      Array.prototype.slice.call(step.querySelectorAll(".step-error")).forEach(function (msg) {
+        msg.remove();
+      });
     }
 
     function showStepError(step, text) {
@@ -39,6 +42,29 @@
       msg.setAttribute("role", "alert");
       msg.textContent = text;
       body.appendChild(msg);
+    }
+
+    // Mêmes règles que recensement.forms.valider_telephone_benin (Python),
+    // portées en JS pour un retour immédiat sans aller-retour réseau —
+    // essentiel sur le terrain où la connexion peut être faible/absente.
+    // Le serveur reste la vérification faisant foi (défense en profondeur),
+    // mais l'utilisateur n'a plus à attendre la soumission finale pour
+    // savoir qu'un numéro est mal formaté.
+    var TELEPHONE_BENIN_REGEX = /^(\+229)?01\d{8}$/;
+
+    function telephoneValide(valeur) {
+      if (!valeur) return true; // facultatif : vide = valide, la présence est vérifiée ailleurs si besoin
+      var normalise = valeur.replace(/[\s.-]/g, "");
+      return TELEPHONE_BENIN_REGEX.test(normalise);
+    }
+
+    var TAILLE_MAX_IMAGE_OCTETS = 5 * 1024 * 1024; // 5 Mo, même limite que côté serveur
+
+    function fichiersTropLourds(input) {
+      if (!input || !input.files) return [];
+      return Array.prototype.filter.call(input.files, function (f) {
+        return f.size > TAILLE_MAX_IMAGE_OCTETS;
+      });
     }
 
     function validateStep(index) {
@@ -79,6 +105,40 @@
           if (!firstInvalid) firstInvalid = nouvelleLocalite;
         }
       }
+
+      // Formats de téléphone béninois (chargé de paroisse, informateur) :
+      // vérifiés dès cette étape, pas seulement à la soumission finale.
+      ["id_contact_responsable", "id_contact_informateur"].forEach(function (champId) {
+        var champ = step.querySelector("#" + champId);
+        if (champ && !telephoneValide(champ.value)) {
+          valid = false;
+          champ.classList.add("is-invalid");
+          showStepError(
+            step,
+            "Numéro de téléphone invalide. Formats acceptés : 0196355621 (10 chiffres "
+            + "commençant par 01) ou +2290196355621."
+          );
+          if (!firstInvalid) firstInvalid = champ;
+        }
+      });
+
+      // Taille des photos (paroisse + chargé) : même limite que côté
+      // serveur (5 Mo), vérifiée avant de laisser avancer plutôt que
+      // d'échouer silencieusement à la soumission finale.
+      ["id_photos", "id_photo_charge"].forEach(function (champId) {
+        var champ = step.querySelector("#" + champId);
+        var tropLourds = fichiersTropLourds(champ);
+        if (tropLourds.length > 0) {
+          valid = false;
+          champ.classList.add("is-invalid");
+          showStepError(
+            step,
+            "Fichier(s) trop volumineux (5 Mo max chacun) : "
+            + tropLourds.map(function (f) { return f.name; }).join(", ") + "."
+          );
+          if (!firstInvalid) firstInvalid = champ;
+        }
+      });
 
       if (firstInvalid) firstInvalid.focus();
       return valid;
@@ -140,9 +200,23 @@
       html += ligneRecap("Année de fondation", champTexte("id_annee_fondation"));
       html += ligneRecap("Statut du bâtiment", texteOptionSelectionnee(document.getElementById("id_statut_batiment")));
       html += ligneRecap("Nombre de fidèles estimé", champTexte("id_nombre_fideles_estime"));
+
+      var champPhotos = document.getElementById("id_photos");
+      var nbPhotos = champPhotos && champPhotos.files ? champPhotos.files.length : 0;
+      html += ligneRecap("Photos de la paroisse", nbPhotos + " photo(s) sélectionnée(s)");
+
       html += ligneRecap("Chargé de paroisse", champTexte("id_parish_shepherd"));
       html += ligneRecap("Contact du chargé", champTexte("id_contact_responsable"));
+
+      var champPhotoCharge = document.getElementById("id_photo_charge");
+      var aPhotoCharge = champPhotoCharge && champPhotoCharge.files && champPhotoCharge.files.length > 0;
+      html += ligneRecap("Photo du chargé", aPhotoCharge ? "Fournie" : "Non fournie");
+
       html += ligneRecap("Position GPS", gpsTexte);
+
+      html += ligneRecap("Nom de l'informateur", champTexte("id_nom_informateur") || "Non renseigné");
+      html += ligneRecap("Contact de l'informateur", champTexte("id_contact_informateur") || "Non renseigné");
+
       html += ligneRecap("Observations", champTexte("id_observations"));
 
       recapContent.innerHTML = html;
@@ -206,6 +280,30 @@
       }
     });
 
-    showStep(0);
+    // Si la page se recharge après une erreur de validation côté serveur
+    // (ex. doublon détecté, champ manquant), Django réaffiche le formulaire
+    // avec les messages d'erreur déjà dans le HTML — mais cachés dans une
+    // étape masquée par défaut. On ouvre directement la première étape qui
+    // en contient une, pour que l'utilisateur la voie immédiatement au lieu
+    // de devoir cliquer sur chaque étape pour la trouver.
+    function premiereEtapeEnErreur() {
+      // Source de vérité : l'index calculé côté serveur (voir
+      // views._premiere_etape_en_erreur), qui connaît réellement quels
+      // champs sont en erreur — pas de dépendance à une classe CSS précise.
+      if (typeof window.RECENSEMENT_ETAPE_ERREUR === "number") {
+        return window.RECENSEMENT_ETAPE_ERREUR;
+      }
+      // Filet de sécurité si jamais cette information n'est pas fournie
+      // par la vue (scan du DOM, classes utilisées par les deux types
+      // d'erreurs : champs Django ".text-red-600" et erreurs JS ".step-error").
+      for (var i = 0; i < steps.length; i++) {
+        if (steps[i].querySelector(".text-red-600, .step-error")) {
+          return i;
+        }
+      }
+      return 0;
+    }
+
+    showStep(premiereEtapeEnErreur());
   });
 })();

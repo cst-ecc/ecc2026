@@ -2,18 +2,18 @@
 {% if is_super_admin %}
   <a href="{% url 'recensement:dashboard' %}"
      class="flex items-center gap-2 px-3 py-2.5 rounded-lg font-medium mb-1
-     {% if request.resolver_match.url_name == 'dashboard' %}bg-brand-600 text-white{% else %}text-slate-200 hover:bg-slate-800{% endif %}">
+     {% if request.resolver_match.url_name == 'dashboard' %}bg-brand-600 text-white{% else %}text-brand-100 hover:bg-brand-800{% endif %}">
     <span aria-hidden="true">📊</span> Tableau de bord
   </a>
   <a href="{% url 'recensement:suivi_modifications' %}"
      class="flex items-center gap-2 px-3 py-2.5 rounded-lg font-medium mb-1
-     {% if request.resolver_match.url_name == 'suivi_modifications' %}bg-brand-600 text-white{% else %}text-slate-200 hover:bg-slate-800{% endif %}">
+     {% if request.resolver_match.url_name == 'suivi_modifications' %}bg-brand-600 text-white{% else %}text-brand-100 hover:bg-brand-800{% endif %}">
     <span aria-hidden="true">📝</span> Suivi de modification
   </a>
 {% endif %}
 
 <details class="group" open>
-  <summary class="cursor-pointer list-none flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-200 hover:bg-slate-800 font-medium select-none">
+  <summary class="cursor-pointer list-none flex items-center justify-between px-3 py-2.5 rounded-lg text-brand-100 hover:bg-brand-800 font-medium select-none">
     <span class="flex items-center gap-2">
       <span aria-hidden="true">🗂️</span> Recensement
     </span>
@@ -21,20 +21,20 @@
       <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
     </svg>
   </summary>
-  <div class="mt-1 ml-4 pl-3 border-l border-slate-700 space-y-1">
+  <div class="mt-1 ml-4 pl-3 border-l border-brand-700 space-y-1">
     <a href="{% url 'recensement:fiche_list' %}"
-       class="block px-3 py-2 rounded-lg text-sm {% if request.resolver_match.url_name == 'fiche_list' %}bg-brand-600 text-white{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+       class="block px-3 py-2 rounded-lg text-sm {% if request.resolver_match.url_name == 'fiche_list' %}bg-brand-600 text-white{% else %}text-brand-200 hover:bg-brand-800{% endif %}">
       Fiches recensées
     </a>
     {% if not is_agent %}
       <a href="{% url 'recensement:carte' %}"
-         class="block px-3 py-2 rounded-lg text-sm {% if request.resolver_match.url_name == 'carte' %}bg-brand-600 text-white{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+         class="block px-3 py-2 rounded-lg text-sm {% if request.resolver_match.url_name == 'carte' %}bg-brand-600 text-white{% else %}text-brand-200 hover:bg-brand-800{% endif %}">
         Carte des paroisses
       </a>
     {% endif %}
     {% if is_agent %}
       <a href="{% url 'recensement:fiche_create' %}"
-         class="block px-3 py-2 rounded-lg text-sm {% if request.resolver_match.url_name == 'fiche_create' %}bg-brand-600 text-white{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+         class="block px-3 py-2 rounded-lg text-sm {% if request.resolver_match.url_name == 'fiche_create' %}bg-brand-600 text-white{% else %}text-brand-200 hover:bg-brand-800{% endif %}">
         Nouvelle fiche
       </a>
     {% endif %}
@@ -44,12 +44,12 @@
 {% if is_superviseur or is_manager %}
   <a href="{% url 'recensement:fiche_a_valider' %}"
      class="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg font-medium mt-1
-     {% if request.resolver_match.url_name == 'fiche_a_valider' %}bg-brand-600 text-white{% else %}text-slate-200 hover:bg-slate-800{% endif %}">
+     {% if request.resolver_match.url_name == 'fiche_a_valider' %}bg-brand-600 text-white{% else %}text-brand-100 hover:bg-brand-800{% endif %}">
     <span class="flex items-center gap-2">
       <span aria-hidden="true">✅</span> À valider
     </span>
     {% if nb_a_valider %}
-      <span class="bg-amber-500 text-white text-xs font-bold rounded-full px-2 py-0.5">{{ nb_a_valider }}</span>
+      <span class="bg-accent-500 text-brand-900 text-xs font-bold rounded-full px-2 py-0.5">{{ nb_a_valider }}</span>
     {% endif %}
   </a>
 {% endif %}
@@ -57,12 +57,12 @@
 {% if is_super_admin %}
   <a href="{% url 'recensement:utilisateur_list' %}"
      class="flex items-center gap-2 px-3 py-2.5 rounded-lg font-medium mt-1
-     {% if request.resolver_match.url_name in 'utilisateur_list,utilisateur_create,utilisateur_update,utilisateur_delete,utilisateur_reset_password' %}bg-brand-600 text-white{% else %}text-slate-200 hover:bg-slate-800{% endif %}">
+     {% if request.resolver_match.url_name in 'utilisateur_list,utilisateur_create,utilisateur_update,utilisateur_delete,utilisateur_reset_password' %}bg-brand-600 text-white{% else %}text-brand-100 hover:bg-brand-800{% endif %}">
     <span aria-hidden="true">👤</span> Utilisateurs
   </a>
 
   <a href="/admin/" target="_blank" rel="noopener"
-     class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-slate-400 hover:bg-slate-800 hover:text-slate-200 mt-1">
+     class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-brand-300 hover:bg-brand-800 hover:text-brand-100 mt-1">
     <span aria-hidden="true">🌍</span> Référentiel géographique
   </a>
 {% endif %}

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import District, FicheParoisse, HistoriqueModification, Profil, Province, Region, Village, Zone
+from .models import District, FicheParoisse, HistoriqueModification, PhotoParoisse, Profil, Province, Region, Village, Zone
 
 
 class ProvinceInline(admin.TabularInline):
@@ -91,6 +91,12 @@ class ProfilAdmin(admin.ModelAdmin):
     list_select_related = ("user", "province", "district")
 
 
+class PhotoParoisseInline(admin.TabularInline):
+    model = PhotoParoisse
+    extra = 0
+    readonly_fields = ("date_ajout",)
+
+
 @admin.register(FicheParoisse)
 class FicheParoisseAdmin(admin.ModelAdmin):
     list_display = (
@@ -106,6 +112,7 @@ class FicheParoisseAdmin(admin.ModelAdmin):
     date_hierarchy = "date_recensement"
     readonly_fields = ("date_recensement",)
     autocomplete_fields = ["region", "province", "district", "zone", "village"]
+    inlines = [PhotoParoisseInline]
 
     fieldsets = (
         ("Rattachement ecclésial", {
@@ -115,10 +122,13 @@ class FicheParoisseAdmin(admin.ModelAdmin):
             "fields": ("nom_paroisse", "annee_fondation", "statut_batiment", "nombre_fideles_estime"),
         }),
         ("Chargé de paroisse", {
-            "fields": ("parish_shepherd", "contact_responsable"),
+            "fields": ("parish_shepherd", "contact_responsable", "photo_charge"),
         }),
         ("Géolocalisation", {
             "fields": ("latitude", "longitude", "precision_gps"),
+        }),
+        ("Informateur", {
+            "fields": ("nom_informateur", "contact_informateur"),
         }),
         ("Validation hiérarchique", {
             "fields": (

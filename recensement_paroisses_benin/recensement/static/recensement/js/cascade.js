@@ -197,19 +197,21 @@
         });
     }
 
-    if (window.RECENSEMENT_INITIAL) {
-      // Mode édition : on pré-sélectionne la cascade géographique actuelle
-      // de la fiche (région déjà correcte via le rendu Django, le reste
-      // est chargé et présélectionné en chaîne ici).
+    // État de base sûr, dans tous les cas : province/district/zone/village
+    // désactivés et vides tant qu'ils n'ont pas été explicitement remplis
+    // ci-dessous (évite d'afficher les listes complètes non filtrées de
+    // Django avant que l'utilisateur n'ait choisi une région).
+    resetSelect(provinceSelect, "— Choisissez d'abord une région —", true);
+    resetSelect(districtSelect, "— Choisissez d'abord une province —", true);
+    resetSelect(zoneSelect, "— Choisissez d'abord un district —", true);
+    resetSelect(villageSelect, "— Choisissez d'abord une zone —", true);
+
+    // Restauration : mode édition, OU réaffichage du formulaire de création
+    // après une erreur de validation (RECENSEMENT_INITIAL est alors rempli
+    // avec les valeurs déjà soumises, pour ne pas tout perdre).
+    if (window.RECENSEMENT_INITIAL && window.RECENSEMENT_INITIAL.region) {
       preselect(regionSelect, window.RECENSEMENT_INITIAL.region);
       preremplirDepuisFiche(window.RECENSEMENT_INITIAL);
-    } else {
-      // État initial (création) : on vide tout sauf la région, qui garde
-      // ses options complètes injectées par Django (queryset complet).
-      resetSelect(provinceSelect, "— Choisissez d'abord une région —", true);
-      resetSelect(districtSelect, "— Choisissez d'abord une province —", true);
-      resetSelect(zoneSelect, "— Choisissez d'abord un district —", true);
-      resetSelect(villageSelect, "— Choisissez d'abord une zone —", true);
     }
 
     regionSelect.addEventListener("change", onRegionChange);

@@ -21,7 +21,9 @@ sécurité du jeton de rafraîchissement :
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -32,15 +34,20 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from recensement.models import District, FicheParoisse, HistoriqueModification, Profil, Province, Region, Village, Zone
-from recensement.permissions import get_role, peut_modifier_fiche
+from recensement.models import (
+    District, FicheParoisse, HistoriqueModification, PhotoParoisse, Profil,
+    Province, Region, Village, Zone,
+)
+from recensement.permissions import get_role, peut_modifier_fiche, peut_valider_fiche
 from recensement.views import _fiches_visibles_pour, _snapshot_fiche
 
-from .permissions import EstAgentOuSuperAdmin, EstManagerOuSuperviseur
+from .permissions import EstAgentOuSuperAdmin, EstManagerOuSuperviseur, EstSuperAdmin
 from .serializers import (
     DistrictSerializer, FicheParoisseCreateSerializer, FicheParoisseDetailSerializer,
-    FicheParoisseEditSerializer, FicheParoisseListSerializer, ProvinceSerializer,
-    RegionSerializer, UtilisateurCourantSerializer, VillageSerializer, ZoneSerializer,
+    FicheParoisseEditSerializer, FicheParoisseListSerializer, HistoriqueModificationSerializer,
+    ProvinceSerializer, ReinitialiserMotDePasseSerializer, RegionSerializer,
+    UtilisateurCourantSerializer, UtilisateurCreationSerializer, UtilisateurUpdateSerializer,
+    VillageSerializer, ZoneSerializer,
 )
 
 COOKIE_NAME = settings.JWT_REFRESH_COOKIE_NAME
@@ -259,7 +266,7 @@ class FicheParoisseListView(generics.ListAPIView):
         if q:
             fiches = fiches.filter(nom_paroisse__icontains=q)
 
-        return fiches.order_by("-date_recensement")
+        return fiches.prefetch_related("photos").order_by("-date_recensement")
 
 
 class FicheParoisseDetailView(generics.RetrieveAPIView):
@@ -270,7 +277,7 @@ class FicheParoisseDetailView(generics.RetrieveAPIView):
     serializer_class = FicheParoisseDetailSerializer
 
     def get_queryset(self):
-        return _fiches_visibles_pour(self.request.user)
+        return _fiches_visibles_pour(self.request.user).prefetch_related("photos")
 
 
 class FicheParoisseCreateView(generics.CreateAPIView):
@@ -285,12 +292,22 @@ class FicheParoisseCreateView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(cree_par=request.user)
+
+        # "photos" n'est pas un champ du modèle FicheParoisse (c'est
+        # PhotoParoisse.image, sur des objets séparés) : on le retire avant
+        # save() puis on crée chaque photo une fois la fiche enregistrée.
+        photos = serializer.validated_data.pop("photos", [])
+        fiche = serializer.save(cree_par=request.user)
+        for photo in photos:
+            PhotoParoisse.objects.create(fiche=fiche, image=photo)
 
         # Réponse au format "détail complet" (plus riche que les seuls
         # champs acceptés en entrée), pratique pour que le frontend affiche
         # immédiatement la fiche créée sans requête supplémentaire.
-        detail = FicheParoisseDetailSerializer(serializer.instance)
+        # context={"request": request} : indispensable pour que les URLs
+        # d'image (photo_charge, photos) soient absolues, pas relatives —
+        # le frontend Next.js n'est pas sur le même serveur que l'API.
+        detail = FicheParoisseDetailSerializer(fiche, context={"request": request})
         headers = self.get_success_headers(detail.data)
         return Response(detail.data, status=status.HTTP_201_CREATED, headers=headers)
 
@@ -326,7 +343,7 @@ class FicheParoisseUpdateView(APIView):
             )
             return Response({"detail": detail}, status=status.HTTP_403_FORBIDDEN)
 
-        serializer = FicheParoisseEditSerializer(fiche, data=request.data)
+        serializer = FicheParoisseEditSerializer(fiche, data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         avant = _snapshot_fiche(fiche)
@@ -339,4 +356,337 @@ class FicheParoisseUpdateView(APIView):
             donnees_avant=avant, donnees_apres=apres,
         )
 
-        return Response(FicheParoisseDetailSerializer(fiche_modifiee).data, status=status.HTTP_200_OK)
+        return Response(
+            FicheParoisseDetailSerializer(fiche_modifiee, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Workflow de validation hiérarchique (miroir de recensement.views
+# fiche_a_valider/fiche_valider) : agent (crée) -> superviseur/chef de
+# district (valide) -> manager/chef de province (valide) -> "validée".
+# ---------------------------------------------------------------------------
+
+class FicheAValiderListView(generics.ListAPIView):
+    """File d'attente de validation, adaptée au rôle connecté :
+    - Superviseur : fiches de SON district en attente de SA validation.
+    - Manager     : fiches de SA province en attente de SA validation."""
+
+    serializer_class = FicheParoisseListSerializer
+    permission_classes = [IsAuthenticated, EstManagerOuSuperviseur]
+
+    def get_queryset(self):
+        role = get_role(self.request.user)
+        profil = getattr(self.request.user, "profil", None)
+
+        if role == Profil.Role.SUPERVISEUR:
+            fiches = FicheParoisse.objects.filter(
+                statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR,
+                district_id=profil.district_id if profil else None,
+            )
+        else:  # MANAGER
+            fiches = FicheParoisse.objects.filter(
+                statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER,
+                province_id=profil.province_id if profil else None,
+            )
+
+        return fiches.select_related(
+            "region", "province", "district", "zone", "village", "cree_par"
+        ).prefetch_related("photos").order_by("date_recensement")
+
+
+class FicheValiderView(APIView):
+    """Valide une fiche au palier correspondant au rôle connecté. Réutilise
+    peut_valider_fiche (recensement.permissions) — même règle que côté
+    templates : vérifie le palier ET le périmètre (district/province)
+    avant d'autoriser la transition. Ne modifie jamais la fiche elle-même,
+    uniquement son statut de validation et sa traçabilité."""
+
+    permission_classes = [IsAuthenticated, EstManagerOuSuperviseur]
+
+    def post(self, request, pk):
+        fiche = get_object_or_404(FicheParoisse, pk=pk)
+
+        if not peut_valider_fiche(request.user, fiche):
+            return Response(
+                {"detail": "Cette fiche n'est pas en attente de votre validation."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        role = get_role(request.user)
+        if role == Profil.Role.SUPERVISEUR:
+            fiche.statut_validation = FicheParoisse.StatutValidation.ATTENTE_MANAGER
+            fiche.valide_par_superviseur = request.user
+            fiche.date_validation_superviseur = timezone.now()
+        else:  # MANAGER
+            fiche.statut_validation = FicheParoisse.StatutValidation.VALIDEE
+            fiche.valide_par_manager = request.user
+            fiche.date_validation_manager = timezone.now()
+        fiche.save()
+
+        return Response(
+            FicheParoisseDetailSerializer(fiche, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class FicheParoisseDeleteView(generics.DestroyAPIView):
+    """Suppression d'une fiche — réservée au super admin. Contrairement à
+    la page de confirmation dédiée côté templates
+    (fiche_confirm_delete.html), l'API ne gère pas de confirmation
+    intermédiaire : DELETE supprime immédiatement dès l'appel. C'est au
+    frontend (Next.js) d'afficher une boîte de confirmation AVANT
+    d'appeler cet endpoint — l'API elle-même ne peut pas savoir si
+    l'utilisateur a "confirmé" ou non, seulement exécuter la demande reçue."""
+
+    queryset = FicheParoisse.objects.all()
+    permission_classes = [IsAuthenticated, EstSuperAdmin]
+
+    def delete(self, request, *args, **kwargs):
+        fiche = self.get_object()
+        nom = fiche.nom_paroisse
+        self.perform_destroy(fiche)
+        return Response(
+            {"detail": f"La fiche « {nom} » a été supprimée définitivement."},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Gestion des comptes utilisateurs — réservée au super admin (miroir de
+# recensement.views utilisateur_*). Remplace l'admin Django par défaut
+# pour cette tâche, exactement comme la page "Utilisateurs" côté templates.
+# ---------------------------------------------------------------------------
+
+class UtilisateurListView(generics.ListAPIView):
+    serializer_class = UtilisateurCourantSerializer
+    permission_classes = [IsAuthenticated, EstSuperAdmin]
+
+    def get_queryset(self):
+        return User.objects.select_related(
+            "profil", "profil__province", "profil__district"
+        ).order_by("username")
+
+
+class UtilisateurDetailView(generics.RetrieveAPIView):
+    serializer_class = UtilisateurCourantSerializer
+    permission_classes = [IsAuthenticated, EstSuperAdmin]
+    queryset = User.objects.select_related("profil", "profil__province", "profil__district")
+
+
+class UtilisateurCreateView(generics.CreateAPIView):
+    serializer_class = UtilisateurCreationSerializer
+    permission_classes = [IsAuthenticated, EstSuperAdmin]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        utilisateur = serializer.save()
+        detail = UtilisateurCourantSerializer(utilisateur)
+        headers = self.get_success_headers(detail.data)
+        return Response(detail.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class UtilisateurUpdateView(APIView):
+    permission_classes = [IsAuthenticated, EstSuperAdmin]
+
+    def put(self, request, pk):
+        utilisateur = get_object_or_404(User, pk=pk)
+        serializer = UtilisateurUpdateSerializer(utilisateur, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(UtilisateurCourantSerializer(utilisateur).data, status=status.HTTP_200_OK)
+
+
+class UtilisateurResetPasswordView(APIView):
+    """Réinitialisation de mot de passe — le super admin fixe un nouveau
+    mot de passe sans connaître l'ancien (miroir de TailwindSetPasswordForm)."""
+
+    permission_classes = [IsAuthenticated, EstSuperAdmin]
+
+    def post(self, request, pk):
+        utilisateur = get_object_or_404(User, pk=pk)
+        serializer = ReinitialiserMotDePasseSerializer(
+            data=request.data, context={"utilisateur": utilisateur},
+        )
+        serializer.is_valid(raise_exception=True)
+        utilisateur.set_password(serializer.validated_data["new_password1"])
+        utilisateur.save()
+        return Response(
+            {"detail": f"Mot de passe réinitialisé pour « {utilisateur.get_username()} »."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class UtilisateurToggleActifView(APIView):
+    permission_classes = [IsAuthenticated, EstSuperAdmin]
+
+    def post(self, request, pk):
+        utilisateur = get_object_or_404(User, pk=pk)
+        if utilisateur == request.user:
+            return Response(
+                {"detail": "Vous ne pouvez pas désactiver votre propre compte."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        utilisateur.is_active = not utilisateur.is_active
+        utilisateur.save()
+        etat = "réactivé" if utilisateur.is_active else "désactivé"
+        return Response(
+            {"detail": f"Compte « {utilisateur.get_username()} » {etat}.", "is_active": utilisateur.is_active},
+            status=status.HTTP_200_OK,
+        )
+
+
+class UtilisateurDeleteView(APIView):
+    permission_classes = [IsAuthenticated, EstSuperAdmin]
+
+    def delete(self, request, pk):
+        utilisateur = get_object_or_404(User, pk=pk)
+        if utilisateur == request.user:
+            return Response(
+                {"detail": "Vous ne pouvez pas supprimer votre propre compte."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        nom = utilisateur.get_username()
+        utilisateur.delete()
+        return Response(
+            {"detail": f"Le compte « {nom} » a été supprimé définitivement."},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Tableau de bord, carte, suivi de modification global — dernière brique de
+# la Phase 1. Toujours le même principe : réutiliser _fiches_visibles_pour
+# pour la carte (même périmètre que la liste), aucune nouvelle règle créée.
+# ---------------------------------------------------------------------------
+
+class TableauDeBordView(APIView):
+    """Compteurs globaux + détail de qui bloque quoi (par district/province),
+    pour que le super admin sache qui relancer. Miroir de
+    recensement.views.dashboard."""
+
+    permission_classes = [IsAuthenticated, EstSuperAdmin]
+
+    def get(self, request):
+        total_general = FicheParoisse.objects.count()
+        total_valide = FicheParoisse.objects.filter(
+            statut_validation=FicheParoisse.StatutValidation.VALIDEE
+        ).count()
+        total_attente_superviseur = FicheParoisse.objects.filter(
+            statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
+        ).count()
+        total_attente_manager = FicheParoisse.objects.filter(
+            statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER
+        ).count()
+
+        par_district = []
+        lignes_district = (
+            FicheParoisse.objects
+            .filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR)
+            .values("district_id", "district__nom")
+            .annotate(nb=Count("id"))
+            .order_by("-nb")
+        )
+        for ligne in lignes_district:
+            responsables = Profil.objects.filter(
+                role=Profil.Role.SUPERVISEUR, district_id=ligne["district_id"]
+            ).select_related("user")
+            par_district.append({
+                "district_id": ligne["district_id"],
+                "district_nom": ligne["district__nom"],
+                "nb": ligne["nb"],
+                "responsables": [
+                    (p.user.get_full_name() or p.user.get_username()) for p in responsables
+                ],
+            })
+
+        par_province = []
+        lignes_province = (
+            FicheParoisse.objects
+            .filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER)
+            .values("province_id", "province__nom")
+            .annotate(nb=Count("id"))
+            .order_by("-nb")
+        )
+        for ligne in lignes_province:
+            responsables = Profil.objects.filter(
+                role=Profil.Role.MANAGER, province_id=ligne["province_id"]
+            ).select_related("user")
+            par_province.append({
+                "province_id": ligne["province_id"],
+                "province_nom": ligne["province__nom"],
+                "nb": ligne["nb"],
+                "responsables": [
+                    (p.user.get_full_name() or p.user.get_username()) for p in responsables
+                ],
+            })
+
+        return Response({
+            "total_general": total_general,
+            "total_valide": total_valide,
+            "total_attente_superviseur": total_attente_superviseur,
+            "total_attente_manager": total_attente_manager,
+            "par_district": par_district,
+            "par_province": par_province,
+        })
+
+
+class FichesGeoJSONView(APIView):
+    """Fiches géolocalisées au format GeoJSON — miroir de
+    recensement.views.fiches_geojson. Réservée aux rôles de supervision
+    (pas les agents), même périmètre que /api/fiches/ (_fiches_visibles_pour).
+    ?statut=tous permet au super admin de voir aussi les fiches non
+    encore validées (par défaut : validées uniquement, même règle que la
+    liste)."""
+
+    permission_classes = [IsAuthenticated, (EstSuperAdmin | EstManagerOuSuperviseur)]
+
+    def get(self, request):
+        fiches = _fiches_visibles_pour(request.user).filter(
+            latitude__isnull=False, longitude__isnull=False,
+        ).select_related("region", "province", "district", "zone", "cree_par")
+        role = get_role(request.user)
+
+        statut_filtre = request.query_params.get("statut", "")
+        if role == Profil.Role.SUPER_ADMIN and statut_filtre != "tous":
+            fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.VALIDEE)
+
+        features = []
+        for f in fiches:
+            agent = f.cree_par.get_full_name() or f.cree_par.get_username() if f.cree_par else None
+            features.append({
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [float(f.longitude), float(f.latitude)]},
+                "properties": {
+                    "id": f.pk,
+                    "nom": f.nom_paroisse,
+                    "localite": f.localite,
+                    "zone": f.zone.nom,
+                    "district": f.district.nom,
+                    "province": f.province.nom,
+                    "region": f.region.nom,
+                    "charge_paroisse": f.parish_shepherd,
+                    "agent": agent,
+                    "statut_code": f.statut_validation,
+                    "statut_label": f.get_statut_validation_display(),
+                    "precision_gps": f.precision_gps,
+                },
+            })
+
+        return Response({"type": "FeatureCollection", "features": features})
+
+
+class SuiviModificationsListView(generics.ListAPIView):
+    """Liste globale de toutes les modifications de fiches (qui, quand,
+    pourquoi) — miroir de recensement.views.suivi_modifications, réservée
+    au super admin."""
+
+    serializer_class = HistoriqueModificationSerializer
+    permission_classes = [IsAuthenticated, EstSuperAdmin]
+
+    def get_queryset(self):
+        return HistoriqueModification.objects.select_related(
+            "fiche", "modifie_par"
+        ).order_by("-date_modification")[:500]
