@@ -21,4 +21,5 @@ urlpatterns = [
     path("fiches/", views.FicheParoisseListView.as_view(), name="fiche_list"),
     path("fiches/creer/", views.FicheParoisseCreateView.as_view(), name="fiche_create"),
     path("fiches/<int:pk>/", views.FicheParoisseDetailView.as_view(), name="fiche_detail"),
+    path("fiches/<int:pk>/modifier/", views.FicheParoisseUpdateView.as_view(), name="fiche_update"),
 ]

@@ -21,6 +21,7 @@ sécurité du jeton de rafraîchissement :
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -31,15 +32,15 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from recensement.models import District, FicheParoisse, Profil, Province, Region, Village, Zone
-from recensement.permissions import get_role
-from recensement.views import _fiches_visibles_pour
+from recensement.models import District, FicheParoisse, HistoriqueModification, Profil, Province, Region, Village, Zone
+from recensement.permissions import get_role, peut_modifier_fiche
+from recensement.views import _fiches_visibles_pour, _snapshot_fiche
 
-from .permissions import EstAgentOuSuperAdmin
+from .permissions import EstAgentOuSuperAdmin, EstManagerOuSuperviseur
 from .serializers import (
     DistrictSerializer, FicheParoisseCreateSerializer, FicheParoisseDetailSerializer,
-    FicheParoisseListSerializer, ProvinceSerializer, RegionSerializer,
-    UtilisateurCourantSerializer, VillageSerializer, ZoneSerializer,
+    FicheParoisseEditSerializer, FicheParoisseListSerializer, ProvinceSerializer,
+    RegionSerializer, UtilisateurCourantSerializer, VillageSerializer, ZoneSerializer,
 )
 
 COOKIE_NAME = settings.JWT_REFRESH_COOKIE_NAME
@@ -292,3 +293,50 @@ class FicheParoisseCreateView(generics.CreateAPIView):
         detail = FicheParoisseDetailSerializer(serializer.instance)
         headers = self.get_success_headers(detail.data)
         return Response(detail.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class FicheParoisseUpdateView(APIView):
+    """Édition d'une fiche — réservée au superviseur de son district et au
+    manager de sa province, et UNIQUEMENT tant qu'ils n'ont pas déjà validé
+    cette fiche eux-mêmes (peut_modifier_fiche, réutilisée telle quelle
+    depuis recensement.permissions — même verrou que côté templates : une
+    fois validée à son niveau, plus personne à ce niveau ne peut la
+    modifier). Motif obligatoire, tracé dans HistoriqueModification avec un
+    instantané avant/après (_snapshot_fiche, réutilisée depuis
+    recensement.views). La modification n'affecte PAS le statut de
+    validation en cours."""
+
+    permission_classes = [IsAuthenticated, EstManagerOuSuperviseur]
+
+    def put(self, request, pk):
+        fiche = get_object_or_404(FicheParoisse, pk=pk)
+
+        if not peut_modifier_fiche(request.user, fiche):
+            role = get_role(request.user)
+            profil = getattr(request.user, "profil", None)
+            hors_perimetre = (
+                (role == Profil.Role.SUPERVISEUR and (not profil or profil.district_id != fiche.district_id))
+                or (role == Profil.Role.MANAGER and (not profil or profil.province_id != fiche.province_id))
+            )
+            detail = (
+                "Cette fiche n'est pas dans votre périmètre (district/province)."
+                if hors_perimetre else
+                "Cette fiche a déjà été validée à votre niveau et ne peut plus être "
+                "modifiée — elle relève désormais du palier suivant."
+            )
+            return Response({"detail": detail}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = FicheParoisseEditSerializer(fiche, data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        avant = _snapshot_fiche(fiche)
+        motif = serializer.validated_data.pop("motif")
+        fiche_modifiee = serializer.save()
+        apres = _snapshot_fiche(fiche_modifiee)
+
+        HistoriqueModification.objects.create(
+            fiche=fiche_modifiee, modifie_par=request.user, motif=motif,
+            donnees_avant=avant, donnees_apres=apres,
+        )
+
+        return Response(FicheParoisseDetailSerializer(fiche_modifiee).data, status=status.HTTP_200_OK)

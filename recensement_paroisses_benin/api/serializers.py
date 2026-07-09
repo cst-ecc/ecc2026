@@ -155,13 +155,12 @@ class FicheParoisseDetailSerializer(serializers.ModelSerializer):
         return _info_utilisateur(obj.valide_par_manager)
 
 
-class FicheParoisseCreateSerializer(serializers.ModelSerializer):
-    """Création d'une fiche (agent/super admin). Reproduit EXACTEMENT les
-    règles de recensement.forms.FicheParoisseForm — mêmes validateurs
-    réutilisés (téléphone béninois, bornes année/fidèles), même contrôle
-    de cohérence de cascade, même anti-doublon. `cree_par` n'est pas un
-    champ du sérialiseur : la vue l'assigne elle-même depuis request.user
-    (jamais fourni par le client, pour ne pas pouvoir usurper un agent)."""
+class FicheParoisseBaseSerializer(serializers.ModelSerializer):
+    """Base commune à la création ET à l'édition — mêmes validateurs, même
+    contrôle de cascade, même anti-doublon. Reproduit EXACTEMENT les règles
+    de recensement.forms.FicheParoisseForm (validateur téléphone béninois
+    réutilisé, pas dupliqué). `cree_par` n'est pas un champ du sérialiseur :
+    toujours assigné côté vue depuis request.user."""
 
     class Meta:
         model = FicheParoisse
@@ -259,3 +258,26 @@ class FicheParoisseCreateSerializer(serializers.ModelSerializer):
                 })
 
         return attrs
+
+
+class FicheParoisseCreateSerializer(FicheParoisseBaseSerializer):
+    """Création (agent/super admin) — aucun champ supplémentaire par
+    rapport à la base commune."""
+
+
+class FicheParoisseEditSerializer(FicheParoisseBaseSerializer):
+    """Édition (manager/superviseur) — ajoute le motif obligatoire, retiré
+    de validated_data avant sauvegarde par la vue (ce n'est pas un champ du
+    modèle FicheParoisse, juste une donnée destinée à HistoriqueModification)."""
+
+    motif = serializers.CharField(
+        write_only=True, required=True, min_length=10, max_length=1000,
+        error_messages={
+            "required": "Le motif de la modification est obligatoire.",
+            "min_length": "Merci de détailler un peu plus le motif (au moins 10 caractères).",
+            "max_length": "Le motif est limité à 1000 caractères.",
+        },
+    )
+
+    class Meta(FicheParoisseBaseSerializer.Meta):
+        fields = FicheParoisseBaseSerializer.Meta.fields + ["motif"]
