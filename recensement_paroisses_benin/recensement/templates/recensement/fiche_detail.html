@@ -74,8 +74,29 @@
     <dl class="p-5 grid grid-cols-3 gap-y-2 text-sm">
       <dt class="col-span-1 text-slate-500">Nom</dt><dd class="col-span-2">{{ fiche.parish_shepherd }}</dd>
       <dt class="col-span-1 text-slate-500">Contact</dt><dd class="col-span-2">{{ fiche.contact_responsable|default:"—" }}</dd>
+      {% if fiche.photo_charge %}
+        <dt class="col-span-1 text-slate-500">Photo</dt>
+        <dd class="col-span-2">
+          <a href="{{ fiche.photo_charge.url }}" target="_blank" rel="noopener">
+            <img src="{{ fiche.photo_charge.url }}" alt="Photo du chargé de paroisse" class="h-20 w-20 object-cover rounded-lg border border-slate-200">
+          </a>
+        </dd>
+      {% endif %}
     </dl>
   </div>
+
+  {% if fiche.photos.all %}
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Photos de la paroisse</div>
+    <div class="p-5 flex flex-wrap gap-3">
+      {% for photo in fiche.photos.all %}
+        <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
+          <img src="{{ photo.image.url }}" alt="Photo de la paroisse" class="h-24 w-24 object-cover rounded-lg border border-slate-200">
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Géolocalisation</div>
@@ -104,6 +125,10 @@
         <dt class="col-span-1 text-slate-500">Agent recenseur</dt>
         <dd class="col-span-2">{{ fiche.cree_par.get_full_name|default:fiche.cree_par.get_username|default:"—" }}</dd>
         <dt class="col-span-1 text-slate-500">Date du recensement</dt><dd class="col-span-2">{{ fiche.date_recensement|date:"d/m/Y H:i" }}</dd>
+        {% if fiche.nom_informateur %}
+          <dt class="col-span-1 text-slate-500">Informateur</dt><dd class="col-span-2">{{ fiche.nom_informateur }}</dd>
+          <dt class="col-span-1 text-slate-500">Contact informateur</dt><dd class="col-span-2">{{ fiche.contact_informateur|default:"—" }}</dd>
+        {% endif %}
       </dl>
       {% if fiche.observations %}
         <p class="text-sm border-t border-slate-100 pt-3 mt-3">{{ fiche.observations|linebreaks }}</p>

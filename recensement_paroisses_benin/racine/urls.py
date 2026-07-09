@@ -1,6 +1,8 @@
 """
 URL configuration for racine project.
 """
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
@@ -21,5 +23,14 @@ urlpatterns = [
     # compte : la première URL qui correspond gagne).
     path('accounts/login/', RateLimitedLoginView.as_view(), name='login'),
     path('accounts/', include('django.contrib.auth.urls')),      # fournit 'logout', 'password_change', etc.
+
 ]
+
+# Fichiers média (photos uploadées) : Django ne les sert lui-même qu'en
+# développement (DEBUG=True). En production, un serveur web dédié
+# (Nginx, ou un stockage objet type S3) doit s'en charger — à prévoir en
+# Phase 3 du projet de séparation frontend/backend.
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
 
