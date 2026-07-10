@@ -24,5 +24,7 @@ urlpatterns = [
 
     # API (Phase 1 — séparation frontend/backend)
     path('api/', include('api.urls')),
+    path('api/v2/parishes/', include('parishes.urls')),
+    path('api/v2/census-submissions/', include('census.urls')),
 ]
 

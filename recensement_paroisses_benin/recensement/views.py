@@ -4,7 +4,6 @@ import json
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.contrib.auth.views import LoginView
 from django.core.cache import cache
 from django.db.models import Count
 from django.http import HttpResponse, JsonResponse
@@ -12,6 +11,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
+
+from accounts.views.auth import RateLimitedLoginView  # noqa: F401  (ré-export, compatibilité — voir Phase R3)
 
 from .forms import (
     FicheParoisseForm, MotifModificationForm, PhotosParoisseForm, ProfilForm,
@@ -125,50 +126,6 @@ def _fiches_visibles_pour(user):
 
     # Agent (ou profil incomplet/absent) : uniquement ses propres fiches.
     return qs.filter(cree_par=user)
-
-
-class RateLimitedLoginView(LoginView):
-    """Identique à la vue de connexion standard de Django, avec une limite
-    de tentatives (anti-bruteforce) : au-delà de 5 échecs pour un même
-    identifiant + IP, la connexion est bloquée 15 minutes. Utilise le cache
-    Django (aucune dépendance supplémentaire ni migration nécessaire).
-
-    Limite connue : avec le cache local par défaut (LocMemCache), le
-    compteur est propre à chaque processus serveur — sur un déploiement à
-    plusieurs workers, la protection est donc affaiblie proportionnellement
-    au nombre de workers. Pour une robustesse complète en production,
-    configurez un cache partagé (Redis/Memcached) dans CACHES."""
-
-    template_name = "registration/login.html"
-    max_tentatives = 5
-    duree_blocage_secondes = 15 * 60
-
-    def _cle_cache(self, request):
-        ip = request.META.get("REMOTE_ADDR", "inconnu")
-        identifiant = (request.POST.get("username") or "").strip().lower()
-        return f"login_tentatives:{ip}:{identifiant}"
-
-    def post(self, request, *args, **kwargs):
-        cle = self._cle_cache(request)
-        tentatives = cache.get(cle, 0)
-
-        if tentatives >= self.max_tentatives:
-            messages.error(
-                request,
-                "Trop de tentatives de connexion avec cet identifiant. "
-                "Réessayez dans quelques minutes.",
-            )
-            return redirect("login")
-
-        response = super().post(request, *args, **kwargs)
-
-        # LoginView ré-affiche le formulaire (statut 200) en cas d'échec ;
-        # en cas de succès, elle redirige (statut 302).
-        if response.status_code == 200:
-            cache.set(cle, tentatives + 1, self.duree_blocage_secondes)
-        else:
-            cache.delete(cle)
-        return response
 
 
 def landing(request):

@@ -1,39 +1,27 @@
 """
-Authentification API par JWT, avec une attention particulière à la
-sécurité du jeton de rafraîchissement :
+Vues API des fiches, du référentiel géographique, du tableau de bord et
+du suivi de modification.
 
-- Le jeton d'ACCÈS (courte durée, ex. 15 min) est renvoyé dans le corps de
-  la réponse JSON. Le frontend le garde en mémoire (jamais dans
-  localStorage/sessionStorage, qui sont lisibles par n'importe quel script
-  injecté en cas de faille XSS).
-- Le jeton de RAFRAÎCHISSEMENT (longue durée, ex. 7 jours) n'est JAMAIS
-  renvoyé au JavaScript du frontend : il est posé directement en cookie
-  httpOnly par le serveur. Un script malveillant côté frontend ne peut
-  donc pas le lire, même en cas de faille XSS sur le frontend Next.js.
-- Rotation + liste noire activées (voir SIMPLE_JWT dans settings.py) :
-  chaque rafraîchissement invalide l'ancien jeton, limitant la fenêtre
-  d'exploitation en cas de vol malgré tout.
-- Limitation de débit sur la connexion (même logique que
-  recensement.views.RateLimitedLoginView, dupliquée ici car c'est un point
-  d'entrée distinct — l'API n'utilise pas les vues Django classiques).
+L'authentification (LoginView, RefreshView, LogoutView, MeView) et la
+gestion des comptes utilisateurs (UtilisateurListView et consorts) vivent
+maintenant dans `accounts` (Phase R3 de la refactorisation) — ré-exportées
+ci-dessous pour ne casser aucun import existant (api/urls.py continue de
+référencer `views.LoginView.as_view()` etc. sans aucun changement).
 """
 
-from django.conf import settings
-from django.contrib.auth.models import User
-from django.core.cache import cache
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
-from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from accounts.views.auth import LoginView, LogoutView, MeView, RefreshView  # noqa: F401  (ré-export, compatibilité)
+from accounts.views.utilisateurs import (  # noqa: F401  (ré-export, compatibilité)
+    UtilisateurCreateView, UtilisateurDeleteView, UtilisateurDetailView, UtilisateurListView,
+    UtilisateurResetPasswordView, UtilisateurToggleActifView, UtilisateurUpdateView,
+)
 from recensement.models import (
     District, FicheParoisse, HistoriqueModification, PhotoParoisse, Profil,
     Province, Region, Village, Zone,
@@ -45,140 +33,8 @@ from .permissions import EstAgentOuSuperAdmin, EstManagerOuSuperviseur, EstSuper
 from .serializers import (
     DistrictSerializer, FicheParoisseCreateSerializer, FicheParoisseDetailSerializer,
     FicheParoisseEditSerializer, FicheParoisseListSerializer, HistoriqueModificationSerializer,
-    ProvinceSerializer, ReinitialiserMotDePasseSerializer, RegionSerializer,
-    UtilisateurCourantSerializer, UtilisateurCreationSerializer, UtilisateurUpdateSerializer,
-    VillageSerializer, ZoneSerializer,
+    ProvinceSerializer, RegionSerializer, VillageSerializer, ZoneSerializer,
 )
-
-COOKIE_NAME = settings.JWT_REFRESH_COOKIE_NAME
-MAX_TENTATIVES_CONNEXION = 5
-DUREE_BLOCAGE_SECONDES = 15 * 60
-
-
-def _cookie_kwargs():
-    return dict(
-        httponly=True,
-        secure=not settings.DEBUG,
-        samesite=settings.JWT_REFRESH_COOKIE_SAMESITE,
-        path="/api/auth/",  # cookie envoyé uniquement vers les endpoints d'auth, jamais vers le reste de l'API
-    )
-
-
-def _duree_refresh_secondes():
-    return int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
-
-
-class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Ajoute le rôle et le nom complet directement dans le jeton d'accès :
-    le frontend peut afficher/adapter l'interface sans appel supplémentaire
-    à /api/auth/me/ au premier chargement."""
-
-    @classmethod
-    def get_token(cls, user):
-        token = super().get_token(user)
-        token["role"] = get_role(user)
-        token["full_name"] = user.get_full_name() or user.get_username()
-        return token
-
-
-class LoginView(TokenObtainPairView):
-    """POST {username, password} -> {access: "..."} + cookie httpOnly
-    contenant le jeton de rafraîchissement."""
-
-    serializer_class = CustomTokenObtainPairSerializer
-    permission_classes = [AllowAny]
-
-    def _cle_cache(self, request):
-        ip = request.META.get("REMOTE_ADDR", "inconnu")
-        identifiant = (request.data.get("username") or "").strip().lower()
-        return f"api_login_tentatives:{ip}:{identifiant}"
-
-    def post(self, request, *args, **kwargs):
-        cle = self._cle_cache(request)
-        tentatives = cache.get(cle, 0)
-        if tentatives >= MAX_TENTATIVES_CONNEXION:
-            return Response(
-                {"detail": "Trop de tentatives de connexion. Réessayez dans quelques minutes."},
-                status=status.HTTP_429_TOO_MANY_REQUESTS,
-            )
-
-        serializer = self.get_serializer(data=request.data)
-        try:
-            # IMPORTANT : TokenObtainPairSerializer.validate() lève
-            # AuthenticationFailed directement en cas d'identifiants
-            # invalides — cette exception traverse is_valid() sans jamais
-            # le faire retourner False. Il faut donc l'intercepter ici,
-            # sinon le compteur de tentatives n'est jamais incrémenté.
-            serializer.is_valid(raise_exception=True)
-        except (AuthenticationFailed, TokenError):
-            cache.set(cle, tentatives + 1, DUREE_BLOCAGE_SECONDES)
-            raise  # DRF renvoie la 401 standard, comportement inchangé pour l'appelant
-
-        cache.delete(cle)
-        data = serializer.validated_data
-        response = Response({"access": data["access"]}, status=status.HTTP_200_OK)
-        response.set_cookie(COOKIE_NAME, str(data["refresh"]), max_age=_duree_refresh_secondes(), **_cookie_kwargs())
-        return response
-
-
-class RefreshView(TokenRefreshView):
-    """Renouvelle le jeton d'accès à partir du cookie httpOnly — jamais du
-    corps de la requête, pour que le frontend n'ait jamais à manipuler le
-    jeton de rafraîchissement lui-même."""
-
-    permission_classes = [AllowAny]
-
-    def post(self, request, *args, **kwargs):
-        raw_token = request.COOKIES.get(COOKIE_NAME)
-        if not raw_token:
-            return Response({"detail": "Aucune session active."}, status=status.HTTP_401_UNAUTHORIZED)
-
-        serializer = self.get_serializer(data={"refresh": raw_token})
-        try:
-            serializer.is_valid(raise_exception=True)
-        except TokenError:
-            response = Response({"detail": "Session expirée, reconnexion nécessaire."}, status=status.HTTP_401_UNAUTHORIZED)
-            response.delete_cookie(COOKIE_NAME, path="/api/auth/")
-            return response
-
-        data = serializer.validated_data
-        response = Response({"access": data["access"]}, status=status.HTTP_200_OK)
-
-        nouveau_refresh = data.get("refresh")  # présent car ROTATE_REFRESH_TOKENS=True
-        if nouveau_refresh:
-            response.set_cookie(COOKIE_NAME, str(nouveau_refresh), max_age=_duree_refresh_secondes(), **_cookie_kwargs())
-        return response
-
-
-class LogoutView(APIView):
-    """Met le jeton de rafraîchissement en liste noire (ne peut plus jamais
-    être réutilisé, même volé) et supprime le cookie."""
-
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        raw_token = request.COOKIES.get(COOKIE_NAME)
-        if raw_token:
-            try:
-                RefreshToken(raw_token).blacklist()
-            except TokenError:
-                pass  # déjà invalide/expiré : rien de plus à faire
-
-        response = Response({"detail": "Déconnecté."}, status=status.HTTP_200_OK)
-        response.delete_cookie(COOKIE_NAME, path="/api/auth/")
-        return response
-
-
-class MeView(APIView):
-    """Profil de la personne connectée (rôle, périmètre) — le frontend
-    l'appelle après connexion et à chaque rechargement de page pour
-    adapter l'interface selon les droits réels côté serveur (jamais faire
-    confiance uniquement au contenu du jeton côté client)."""
-
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        return Response(UtilisateurCourantSerializer(request.user).data)
 
 
 # ---------------------------------------------------------------------------
@@ -451,110 +307,6 @@ class FicheParoisseDeleteView(generics.DestroyAPIView):
             {"detail": f"La fiche « {nom} » a été supprimée définitivement."},
             status=status.HTTP_200_OK,
         )
-
-
-# ---------------------------------------------------------------------------
-# Gestion des comptes utilisateurs — réservée au super admin (miroir de
-# recensement.views utilisateur_*). Remplace l'admin Django par défaut
-# pour cette tâche, exactement comme la page "Utilisateurs" côté templates.
-# ---------------------------------------------------------------------------
-
-class UtilisateurListView(generics.ListAPIView):
-    serializer_class = UtilisateurCourantSerializer
-    permission_classes = [IsAuthenticated, EstSuperAdmin]
-
-    def get_queryset(self):
-        return User.objects.select_related(
-            "profil", "profil__province", "profil__district"
-        ).order_by("username")
-
-
-class UtilisateurDetailView(generics.RetrieveAPIView):
-    serializer_class = UtilisateurCourantSerializer
-    permission_classes = [IsAuthenticated, EstSuperAdmin]
-    queryset = User.objects.select_related("profil", "profil__province", "profil__district")
-
-
-class UtilisateurCreateView(generics.CreateAPIView):
-    serializer_class = UtilisateurCreationSerializer
-    permission_classes = [IsAuthenticated, EstSuperAdmin]
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        utilisateur = serializer.save()
-        detail = UtilisateurCourantSerializer(utilisateur)
-        headers = self.get_success_headers(detail.data)
-        return Response(detail.data, status=status.HTTP_201_CREATED, headers=headers)
-
-
-class UtilisateurUpdateView(APIView):
-    permission_classes = [IsAuthenticated, EstSuperAdmin]
-
-    def put(self, request, pk):
-        utilisateur = get_object_or_404(User, pk=pk)
-        serializer = UtilisateurUpdateSerializer(utilisateur, data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(UtilisateurCourantSerializer(utilisateur).data, status=status.HTTP_200_OK)
-
-
-class UtilisateurResetPasswordView(APIView):
-    """Réinitialisation de mot de passe — le super admin fixe un nouveau
-    mot de passe sans connaître l'ancien (miroir de TailwindSetPasswordForm)."""
-
-    permission_classes = [IsAuthenticated, EstSuperAdmin]
-
-    def post(self, request, pk):
-        utilisateur = get_object_or_404(User, pk=pk)
-        serializer = ReinitialiserMotDePasseSerializer(
-            data=request.data, context={"utilisateur": utilisateur},
-        )
-        serializer.is_valid(raise_exception=True)
-        utilisateur.set_password(serializer.validated_data["new_password1"])
-        utilisateur.save()
-        return Response(
-            {"detail": f"Mot de passe réinitialisé pour « {utilisateur.get_username()} »."},
-            status=status.HTTP_200_OK,
-        )
-
-
-class UtilisateurToggleActifView(APIView):
-    permission_classes = [IsAuthenticated, EstSuperAdmin]
-
-    def post(self, request, pk):
-        utilisateur = get_object_or_404(User, pk=pk)
-        if utilisateur == request.user:
-            return Response(
-                {"detail": "Vous ne pouvez pas désactiver votre propre compte."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        utilisateur.is_active = not utilisateur.is_active
-        utilisateur.save()
-        etat = "réactivé" if utilisateur.is_active else "désactivé"
-        return Response(
-            {"detail": f"Compte « {utilisateur.get_username()} » {etat}.", "is_active": utilisateur.is_active},
-            status=status.HTTP_200_OK,
-        )
-
-
-class UtilisateurDeleteView(APIView):
-    permission_classes = [IsAuthenticated, EstSuperAdmin]
-
-    def delete(self, request, pk):
-        utilisateur = get_object_or_404(User, pk=pk)
-        if utilisateur == request.user:
-            return Response(
-                {"detail": "Vous ne pouvez pas supprimer votre propre compte."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        nom = utilisateur.get_username()
-        utilisateur.delete()
-        return Response(
-            {"detail": f"Le compte « {nom} » a été supprimé définitivement."},
-            status=status.HTTP_200_OK,
-        )
-
 
 # ---------------------------------------------------------------------------
 # Tableau de bord, carte, suivi de modification global — dernière brique de

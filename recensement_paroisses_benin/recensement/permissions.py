@@ -1,43 +1,20 @@
 """
-Utilitaires de contrôle d'accès par rôle.
+get_role() et role_required() vivent maintenant dans `accounts`
+(Phase R3 de la refactorisation) — ce fichier les ré-exporte pour ne
+casser aucun import existant (`from .permissions import get_role`
+continue de fonctionner partout dans recensement/).
 
-Un compte Django superuser est TOUJOURS traité comme "super_admin", qu'il ait
-ou non un Profil explicite — filet de sécurité pour ne jamais bloquer
-l'administrateur technique du site hors de ses propres données.
+peut_modifier_fiche()/peut_valider_fiche() restent ICI pour l'instant :
+ce sont des règles d'autorisation propres au domaine "fiche de
+recensement", qui migreront vers la future app `census` en Phase R4 (en
+même temps que FicheParoisse elle-même) — inutile de les déplacer deux
+fois pour repartir presque aussitôt.
 """
 
-from functools import wraps
-
-from django.core.exceptions import PermissionDenied
+from accounts.permissions import role_required  # noqa: F401  (ré-export, compatibilité)
+from accounts.selectors import get_role  # noqa: F401  (ré-export, compatibilité)
 
 from .models import Profil
-
-
-def get_role(user):
-    """Retourne le rôle effectif de l'utilisateur (une valeur de Profil.Role),
-    ou None si l'utilisateur n'est pas connecté."""
-    if not user.is_authenticated:
-        return None
-    if user.is_superuser:
-        return Profil.Role.SUPER_ADMIN
-    profil = getattr(user, "profil", None)
-    return profil.role if profil else Profil.Role.AGENT
-
-
-def role_required(*allowed_roles):
-    """Décorateur de vue : n'autorise l'accès qu'aux rôles listés.
-    Renvoie une 403 (PermissionDenied) sinon — à utiliser après @login_required,
-    qui gère déjà le cas "non connecté"."""
-    def decorator(view_func):
-        @wraps(view_func)
-        def _wrapped(request, *args, **kwargs):
-            if get_role(request.user) not in allowed_roles:
-                raise PermissionDenied(
-                    "Vous n'avez pas les droits nécessaires pour accéder à cette page."
-                )
-            return view_func(request, *args, **kwargs)
-        return _wrapped
-    return decorator
 
 
 def peut_modifier_fiche(user, fiche):

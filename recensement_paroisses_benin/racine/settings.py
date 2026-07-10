@@ -48,6 +48,10 @@ INSTALLED_APPS = [
     "recensement",
     "api",
     "core",
+    "geography",
+    "accounts",
+    "parishes",
+    "census",
 ]
 
 MIDDLEWARE = [

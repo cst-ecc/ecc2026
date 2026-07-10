@@ -129,6 +129,25 @@ class Profil(models.Model):
         help_text="Obligatoire si le rôle est Superviseur (définit le district supervisé).",
     )
 
+    # --- Pont vers le nouvel arbre géographique générique (Phase R2/R4b) ---
+    # Champs AJOUTÉS, en plus de province/district ci-dessus (jamais retirés
+    # tant que le site/API n'ont pas basculé dessus). Peuplés par une
+    # migration de données (recensement 0006) à partir des champs existants.
+    # Utilisés par census.permissions (R4b) pour comparer le périmètre d'un
+    # superviseur/manager à la localisation d'une CensusSubmission — la
+    # comparaison directe province==province n'est plus possible depuis que
+    # Parish pointe vers geography.UniteGeographique, un modèle différent.
+    province_unite = models.ForeignKey(
+        "geography.UniteGeographique", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="managers_profil",
+        help_text="Équivalent de `province`, sous forme d'UniteGeographique (rang province).",
+    )
+    district_unite = models.ForeignKey(
+        "geography.UniteGeographique", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="superviseurs_profil",
+        help_text="Équivalent de `district`, sous forme d'UniteGeographique (rang district).",
+    )
+
     class Meta:
         verbose_name = "Profil utilisateur"
         verbose_name_plural = "Profils utilisateurs"
