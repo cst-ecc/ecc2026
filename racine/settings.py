@@ -135,7 +135,8 @@ SESSION_COOKIE_HTTPONLY = True       # idem pour le cookie de session (comportem
 # ---------------------------------------------------------------------------
 if not DEBUG:
     SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT")
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE")
+    CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE")
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 7  # 1 semaine, à augmenter progressivement
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS")
