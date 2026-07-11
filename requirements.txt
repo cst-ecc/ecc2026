@@ -9,8 +9,3 @@ Pillow>=10.4,<11.0               # obligatoire pour les champs ImageField (photo
 djangorestframework>=3.15,<3.16
 djangorestframework-simplejwt>=5.3,<5.4
 django-cors-headers>=4.4,<4.5
-
-# Décommentez si vous préférez MySQL à la place de PostgreSQL :
-# mysqlclient>=2.2,<3.0
-
-# whitenoise>=6.7,<7.0           # à activer en Phase 3 pour servir les statiques sans Nginx

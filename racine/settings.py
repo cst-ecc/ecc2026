@@ -104,13 +104,13 @@ USE_TZ = True
 # ---------------------------------------------------------------------------
 # Fichiers statiques
 # ---------------------------------------------------------------------------
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"  # utilisé par `collectstatic` en production
 
 # ---------------------------------------------------------------------------
 # Fichiers médias (photos de bâtiments, etc. — si ajoutés plus tard)
 # ---------------------------------------------------------------------------
-MEDIA_URL = "media/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

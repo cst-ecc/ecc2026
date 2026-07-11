@@ -1,0 +1,141 @@
+services:
+  # -----------------------------------------------------------------------------
+  # PostgreSQL database service.
+  #
+  # The service is intentionally named "personal" to follow the ECC internal
+  # infrastructure naming convention. It is the PostgreSQL database backing the
+  # ECC Portal application.
+  #
+  # IMPORTANT:
+  # - DATABASE_URL in .env MUST use "personal" as the hostname.
+  # - This service is NOT exposed to the Internet.
+  # - Only the "portal" service can access it through the Docker network.
+  # -----------------------------------------------------------------------------
+  personal:
+    image: postgres:16.9-alpine
+    container_name: ecc-personal
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      - personal_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+    security_opt:
+      - no-new-privileges:true
+
+    networks:
+      - ecc_network
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    stop_grace_period: 30s
+    mem_limit: 512m
+    cpus: "0.50"
+  
+  # Django application served by Gunicorn.
+  portal:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: ecc-portal:latest
+    container_name: ecc-portal
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    depends_on:
+      personal:
+        condition: service_healthy
+
+    volumes:
+      - static_data:/app/staticfiles
+      - media_data:/app/media
+
+    expose:
+      - "8000"
+
+    security_opt:
+      - no-new-privileges:true
+
+    networks:
+      - ecc_network
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    mem_limit: 1g
+    cpus: "1.0"
+
+  # Reverse proxy.
+  #
+  # The shield service is the only container exposed to the Internet.
+  # It proxies requests to the internal Gunicorn application and serves
+  # static/media files directly.
+  shield:
+    build:
+      context: ./docker/nginx
+    image: ecc-shield:latest
+    container_name: ecc-shield
+
+    restart: unless-stopped
+
+    depends_on:
+      - portal
+
+    ports:
+      - "80:80"
+
+    volumes:
+      - static_data:/static:ro
+      - media_data:/media:ro
+
+    security_opt:
+      - no-new-privileges:true
+
+    networks:
+      - ecc_network
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    
+    mem_limit: 128m
+    cpus: "0.25"
+
+
+volumes:
+  personal_data:
+  static_data:
+  media_data:
+
+
+networks:
+  ecc_network:
+    driver: bridge
