@@ -7,7 +7,7 @@ services:
   # ECC Portal application.
   #
   # IMPORTANT:
-  # - DATABASE_URL in .env MUST use "personal" as the hostname.
+  # - DATABASE_URL in .env.prod MUST use "personal" as the hostname.
   # - This service is NOT exposed to the Internet.
   # - Only the "portal" service can access it through the Docker network.
   # -----------------------------------------------------------------------------
@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
 
     env_file:
-      - .env
+      - .env.prod
 
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -64,7 +64,7 @@ services:
     restart: unless-stopped
 
     env_file:
-      - .env
+      - .env.prod
 
     depends_on:
       personal:
