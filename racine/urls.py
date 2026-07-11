@@ -7,7 +7,6 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
 
-from recensement.views import RateLimitedLoginView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -21,7 +20,6 @@ urlpatterns = [
 
     # Vue de connexion anti-bruteforce, AVANT l'include ci-dessous (l'ordre
     # compte : la première URL qui correspond gagne).
-    path('accounts/login/', RateLimitedLoginView.as_view(), name='login'),
     path('accounts/', include('django.contrib.auth.urls')),      # fournit 'logout', 'password_change', etc.
 
 ]

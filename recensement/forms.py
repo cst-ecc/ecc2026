@@ -212,7 +212,7 @@ class FicheParoisseForm(forms.ModelForm):
         }
         labels = {
             "nom_paroisse": "Nom de la paroisse",
-            "parish_shepherd": "Chargé(e) de paroisse",
+            "parish_shepherd": "Chargé de paroisse",
             "photo_charge": "Photo du chargé de paroisse (facultative)",
             "statut_batiment": "État du bâtiment / lieu de culte",
             "nom_informateur": "Nom de l'informateur",

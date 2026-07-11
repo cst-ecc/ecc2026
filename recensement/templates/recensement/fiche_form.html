@@ -278,6 +278,10 @@
   // saisies si la page se rouvre après une erreur de validation (POST) —
   // évite de perdre la cascade géographique et de devoir tout recommencer.
   window.RECENSEMENT_INITIAL = {{ initial_ids_json|safe }};
+  // Index (base 0) de la première étape contenant une erreur, calculé
+  // côté serveur — null si aucune erreur. Bien plus fiable qu'un scan JS
+  // du DOM à la recherche d'une classe CSS.
+  window.RECENSEMENT_ETAPE_ERREUR = {{ etape_erreur_json|safe }};
 </script>
 <script src="{% static 'recensement/js/cascade.js' %}"></script>
 <script src="{% static 'recensement/js/geolocation.js' %}"></script>

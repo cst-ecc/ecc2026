@@ -287,8 +287,17 @@
     // en contient une, pour que l'utilisateur la voie immédiatement au lieu
     // de devoir cliquer sur chaque étape pour la trouver.
     function premiereEtapeEnErreur() {
+      // Source de vérité : l'index calculé côté serveur (voir
+      // views._premiere_etape_en_erreur), qui connaît réellement quels
+      // champs sont en erreur — pas de dépendance à une classe CSS précise.
+      if (typeof window.RECENSEMENT_ETAPE_ERREUR === "number") {
+        return window.RECENSEMENT_ETAPE_ERREUR;
+      }
+      // Filet de sécurité si jamais cette information n'est pas fournie
+      // par la vue (scan du DOM, classes utilisées par les deux types
+      // d'erreurs : champs Django ".text-red-600" et erreurs JS ".step-error").
       for (var i = 0; i < steps.length; i++) {
-        if (steps[i].querySelector(".text-red-600")) {
+        if (steps[i].querySelector(".text-red-600, .step-error")) {
           return i;
         }
       }

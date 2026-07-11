@@ -58,19 +58,24 @@
 
     function applyPosition(position) {
       var coords = position.coords;
-      latInput.value = coords.latitude;
-      lngInput.value = coords.longitude;
-      precInput.value = coords.accuracy;
+
+      latInput.value = Number(coords.latitude).toFixed(7);
+      lngInput.value = Number(coords.longitude).toFixed(7);
+      precInput.value = Number(coords.accuracy).toFixed(2);
+
       return coords;
     }
 
     function finish(position, extraNote) {
       var coords = applyPosition(position);
+
       stopWatch();
       setSearchingUI(false);
+
       setStatus(
         "✅ Position enregistrée : " +
-          coords.latitude.toFixed(6) + ", " + coords.longitude.toFixed(6) +
+          Number(coords.latitude).toFixed(7) + ", " +
+          Number(coords.longitude).toFixed(7) +
           " (précision ≈ " + Math.round(coords.accuracy) + " m)" +
           (extraNote || ""),
         "success"

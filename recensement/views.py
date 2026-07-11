@@ -4,7 +4,6 @@ import json
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.contrib.auth.views import LoginView
 from django.core.cache import cache
 from django.db.models import Count
 from django.http import HttpResponse, JsonResponse
@@ -12,6 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
+
 
 from .forms import (
     FicheParoisseForm, MotifModificationForm, PhotosParoisseForm, ProfilForm,
@@ -40,6 +40,36 @@ def _csv_safe(value):
     if text.startswith(_CSV_FORMULA_PREFIXES):
         return "'" + text
     return text
+
+
+# Associe chaque champ du wizard à son étape (index JS, base 0). Calculé
+# côté serveur — bien plus fiable qu'un scan JS du DOM à la recherche
+# d'une classe CSS, qui peut rater une erreur si la structure HTML change
+# ou si une classe est mal reprise quelque part.
+_CHAMP_VERS_ETAPE = {
+    "region": 0, "province": 0, "district": 0, "zone": 0, "village": 0,
+    "nouvelle_localite_nom": 0,
+    "nom_paroisse": 1, "annee_fondation": 1, "statut_batiment": 1, "nombre_fideles_estime": 1,
+    "photos": 1,  # champ du formulaire séparé PhotosParoisseForm, mais affiché à l'étape 1
+    "parish_shepherd": 2, "contact_responsable": 2, "photo_charge": 2,
+    "latitude": 3, "longitude": 3, "precision_gps": 3, "observations": 3,
+    "nom_informateur": 4, "contact_informateur": 4,
+}
+
+
+def _premiere_etape_en_erreur(form, photos_form=None):
+    """Renvoie l'index (base 0) de la première étape du wizard contenant
+    une erreur, en se basant sur les champs réellement en erreur — pas sur
+    une recherche de motif dans le HTML rendu. Retourne None si aucune
+    erreur (permet au template de ne rien forcer côté JS)."""
+    etapes = set()
+    for champ in form.errors:
+        etapes.add(_CHAMP_VERS_ETAPE.get(champ, 0))
+    if form.non_field_errors():
+        etapes.add(0)
+    if photos_form is not None and photos_form.errors:
+        etapes.add(_CHAMP_VERS_ETAPE.get("photos", 1))
+    return min(etapes) if etapes else None
 
 
 def _snapshot_fiche(fiche):
@@ -97,50 +127,6 @@ def _fiches_visibles_pour(user):
     return qs.filter(cree_par=user)
 
 
-class RateLimitedLoginView(LoginView):
-    """Identique à la vue de connexion standard de Django, avec une limite
-    de tentatives (anti-bruteforce) : au-delà de 5 échecs pour un même
-    identifiant + IP, la connexion est bloquée 15 minutes. Utilise le cache
-    Django (aucune dépendance supplémentaire ni migration nécessaire).
-
-    Limite connue : avec le cache local par défaut (LocMemCache), le
-    compteur est propre à chaque processus serveur — sur un déploiement à
-    plusieurs workers, la protection est donc affaiblie proportionnellement
-    au nombre de workers. Pour une robustesse complète en production,
-    configurez un cache partagé (Redis/Memcached) dans CACHES."""
-
-    template_name = "registration/login.html"
-    max_tentatives = 5
-    duree_blocage_secondes = 15 * 60
-
-    def _cle_cache(self, request):
-        ip = request.META.get("REMOTE_ADDR", "inconnu")
-        identifiant = (request.POST.get("username") or "").strip().lower()
-        return f"login_tentatives:{ip}:{identifiant}"
-
-    def post(self, request, *args, **kwargs):
-        cle = self._cle_cache(request)
-        tentatives = cache.get(cle, 0)
-
-        if tentatives >= self.max_tentatives:
-            messages.error(
-                request,
-                "Trop de tentatives de connexion avec cet identifiant. "
-                "Réessayez dans quelques minutes.",
-            )
-            return redirect("login")
-
-        response = super().post(request, *args, **kwargs)
-
-        # LoginView ré-affiche le formulaire (statut 200) en cas d'échec ;
-        # en cas de succès, elle redirige (statut 302).
-        if response.status_code == 200:
-            cache.set(cle, tentatives + 1, self.duree_blocage_secondes)
-        else:
-            cache.delete(cle)
-        return response
-
-
 def landing(request):
     """Page d'accueil publique : aucune donnée, juste une présentation et un
     accès à la connexion. Si déjà connecté, on redirige vers la page utile
@@ -166,6 +152,7 @@ def fiche_create(request):
     """Formulaire de saisie terrain. Réservé aux agents et au super admin.
     L'identité de l'agent recenseur n'est plus saisie à la main : elle vient
     du compte connecté (`cree_par`)."""
+    etape_erreur = None
     if request.method == "POST":
         form = FicheParoisseForm(request.POST, request.FILES)
         photos_form = PhotosParoisseForm(request.POST, request.FILES)
@@ -181,6 +168,7 @@ def fiche_create(request):
                 "district. Vous pouvez recenser une autre paroisse.",
             )
             return redirect("recensement:fiche_create")
+        etape_erreur = _premiere_etape_en_erreur(form, photos_form)
         messages.error(
             request,
             "La fiche n'a pas pu être enregistrée : le formulaire s'est rouvert directement "
@@ -206,6 +194,7 @@ def fiche_create(request):
         "form": form,
         "photos_form": photos_form,
         "initial_ids_json": json.dumps(initial_ids),
+        "etape_erreur_json": json.dumps(etape_erreur),
     })
 
 
