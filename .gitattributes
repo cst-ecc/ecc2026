@@ -1,0 +1,9 @@
+# Empêche Git/Windows de réintroduire des fins de ligne CRLF dans les
+# scripts shell -- indispensable pour tout fichier exécuté DANS un
+# conteneur Linux (docker/entrypoint.sh en particulier). Sans ceci, un
+# simple `git clone`/`git pull` sur Windows peut suffire à casser à
+# nouveau l'entrypoint (selon la config core.autocrlf de la personne).
+* text=auto eol=lf
+
+*.sh text eol=lf
+docker/entrypoint.sh text eol=lf

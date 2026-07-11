@@ -58,9 +58,14 @@
 
     function applyPosition(position) {
       var coords = position.coords;
-      latInput.value = coords.latitude;
-      lngInput.value = coords.longitude;
-      precInput.value = coords.accuracy;
+      // Arrondi à 7 décimales : c'est la limite exacte du champ modèle
+      // (DecimalField max_digits=10, decimal_places=7). Sans cet arrondi,
+      // la précision brute du GPS (15+ chiffres) fait échouer la validation
+      // Django -- silencieusement, car ces champs cachés n'ont pas de bloc
+      // d'affichage d'erreur dans le template (voir fiche_form.html).
+      latInput.value = Number(coords.latitude).toFixed(7);
+      lngInput.value = Number(coords.longitude).toFixed(7);
+      precInput.value = Number(coords.accuracy).toFixed(2);
       return coords;
     }
 
@@ -70,7 +75,7 @@
       setSearchingUI(false);
       setStatus(
         "✅ Position enregistrée : " +
-          coords.latitude.toFixed(6) + ", " + coords.longitude.toFixed(6) +
+          Number(coords.latitude).toFixed(7) + ", " + Number(coords.longitude).toFixed(7) +
           " (précision ≈ " + Math.round(coords.accuracy) + " m)" +
           (extraNote || ""),
         "success"
