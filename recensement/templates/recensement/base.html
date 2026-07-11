@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -8,7 +9,7 @@
   <div class="flex min-h-screen">
     <!-- Sidebar (desktop : fixe ; mobile : masquée, ouverte via le bouton du bandeau) -->
     <aside id="sidebar"
-           class="hidden md:flex md:flex-col w-64 bg-brand-900 fixed md:static inset-y-0 left-0 z-40">
+       class="hidden flex-col w-72 max-w-[85vw] bg-brand-900 fixed inset-y-0 left-0 z-40 md:flex md:w-64 md:max-w-none md:static">
       <div class="h-14 flex items-center px-4 font-semibold text-white border-b border-brand-700 gap-2">
         <a href="{% url 'recensement:fiche_list' %}" class="truncate">Recensement</a>
       </div>
@@ -87,13 +88,14 @@
 
       function closeSidebar() {
         sidebar.classList.add("hidden");
+        sidebar.classList.remove("flex", "fixed");
         overlay.classList.add("hidden");
         toggleBtn.setAttribute("aria-expanded", "false");
       }
 
       function openSidebar() {
         sidebar.classList.remove("hidden");
-        sidebar.classList.add("flex", "fixed");
+        sidebar.classList.add("flex", "flex-col", "fixed");
         overlay.classList.remove("hidden");
         toggleBtn.setAttribute("aria-expanded", "true");
       }
@@ -119,6 +121,8 @@
       }
     });
   </script>
+  <script src="{% static 'recensement/js/manager_change_guard.js' %}"></script>
+  <script src="{% static 'recensement/js/export_preview.js' %}"></script>
   {% block extra_js %}{% endblock %}
 </body>
 </html>

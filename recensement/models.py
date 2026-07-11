@@ -213,7 +213,7 @@ class FicheParoisse(models.Model):
 
     # --- Chargé de paroisse ---
     parish_shepherd = models.CharField(max_length=200)
-    contact_responsable = models.CharField(max_length=30, blank=True)
+    contact_responsable = models.CharField(max_length=30, null=True, blank=True)
     photo_charge = models.ImageField(
         upload_to="paroisses/charges/%Y/%m/", blank=True, null=True,
         help_text="Photo du chargé de paroisse (facultative).",
@@ -269,7 +269,7 @@ class FicheParoisse(models.Model):
     # --- Informateur (personne ayant renseigné l'agent sur place, si
     #     différente du chargé de paroisse) — entièrement facultatif ---
     nom_informateur = models.CharField(max_length=200, blank=True)
-    contact_informateur = models.CharField(max_length=30, blank=True)
+    contact_informateur = models.CharField(max_length=30, null=True, blank=True)
 
     observations = models.TextField(blank=True)
     date_recensement = models.DateTimeField(auto_now_add=True)

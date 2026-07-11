@@ -289,67 +289,153 @@ def fiche_delete(request, pk):
 @login_required
 @require_GET
 def fiche_list(request):
-    """Liste des fiches, automatiquement filtrée selon le rôle de la personne
-    connectée (voir _fiches_visibles_pour). Pour le super admin, ne montre
-    par défaut que les fiches VALIDÉES ; ?statut=tous/attente_superviseur/
-    attente_manager permet de voir les autres paliers — utilisé notamment
-    par les boutons du tableau de bord pour "voir la liste" d'un compteur."""
+    """Liste des fiches.
+
+    - Super admin : accès aux filtres hiérarchiques et aux filtres de statut.
+    - Autres rôles : aucun filtre URL n'est appliqué. Les fiches restent
+      uniquement limitées par _fiches_visibles_pour(request.user).
+    """
     fiches = _fiches_visibles_pour(request.user)
     role = get_role(request.user)
 
-    statut_filtre = request.GET.get("statut", "")
+    # Valeurs par défaut : utiles pour le template, même si l'utilisateur
+    # n'est pas super admin.
+    statut_filtre = ""
+    region_id = None
+    province_id = None
+    district_id = None
+    zone_id = None
+    paroisse = ""
+
+    regions = Region.objects.none()
+    provinces = Province.objects.none()
+    districts = District.objects.none()
+    zones = Zone.objects.none()
+    paroisses = []
+
+    # Les filtres de statut, de région, province, district, zone et paroisse
+    # sont réservés exclusivement au super admin.
     if role == Profil.Role.SUPER_ADMIN:
+        statut_filtre = request.GET.get("statut", "")
+
         if statut_filtre == "attente_superviseur":
-            fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR)
+            fiches = fiches.filter(
+                statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
+            )
         elif statut_filtre == "attente_manager":
-            fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER)
+            fiches = fiches.filter(
+                statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER
+            )
         elif statut_filtre == "tous":
-            pass  # aucun filtre de statut
+            pass
         else:
-            fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.VALIDEE)
+            fiches = fiches.filter(
+                statut_validation=FicheParoisse.StatutValidation.VALIDEE
+            )
             statut_filtre = "validees"
 
-    # `region` doit être un entier valide correspondant à une région existante ;
-    # toute valeur invalide (texte, injection, id inexistant) est simplement
-    # ignorée plutôt que de provoquer une erreur serveur.
-    region_id_raw = request.GET.get("region", "")
-    region_id = None
-    if region_id_raw.strip().isdigit():
-        region_id = int(region_id_raw)
-        if not Region.objects.filter(pk=region_id).exists():
-            region_id = None
+        def get_valid_id(param_name, model):
+            value = (request.GET.get(param_name) or "").strip()
+            if value.isdigit() and model.objects.filter(pk=int(value)).exists():
+                return int(value)
+            return None
 
-    if region_id:
-        fiches = fiches.filter(region_id=region_id)
+        region_id = get_valid_id("region", Region)
+        province_id = get_valid_id("province", Province)
+        district_id = get_valid_id("district", District)
+        zone_id = get_valid_id("zone", Zone)
+        paroisse = (request.GET.get("paroisse") or "").strip()[:100]
 
-    # Filtres district/province : utilisés par les liens de drill-down du
-    # tableau de bord ("qui bloque quoi"), sans lien avec un <select> dans
-    # cette page — de simples paramètres d'URL, validés comme `region`.
-    district_id_raw = request.GET.get("district", "")
-    if district_id_raw.strip().isdigit():
-        fiches = fiches.filter(district_id=int(district_id_raw))
+        # Application réelle des filtres uniquement pour le super admin.
+        if region_id:
+            fiches = fiches.filter(region_id=region_id)
 
-    province_id_raw = request.GET.get("province", "")
-    if province_id_raw.strip().isdigit():
-        fiches = fiches.filter(province_id=int(province_id_raw))
+        if province_id:
+            fiches = fiches.filter(province_id=province_id)
 
-    # Recherche texte : bornée en longueur par précaution (l'ORM Django
-    # paramètre déjà la requête, donc aucune injection SQL n'est possible ici,
-    # mais on évite les requêtes inutilement coûteuses sur des chaînes énormes).
-    q = (request.GET.get("q") or "").strip()[:100]
-    if q:
-        fiches = fiches.filter(nom_paroisse__icontains=q)
+        if district_id:
+            fiches = fiches.filter(district_id=district_id)
+
+        if zone_id:
+            fiches = fiches.filter(zone_id=zone_id)
+
+        if paroisse:
+            fiches = fiches.filter(nom_paroisse__icontains=paroisse)
+
+        # Listes proposées dans les filtres hiérarchiques.
+        regions = Region.objects.all().order_by("nom")
+
+        provinces = Province.objects.all().order_by("nom")
+        if region_id:
+            provinces = provinces.filter(region_id=region_id)
+
+        districts = District.objects.all().order_by("nom")
+        if province_id:
+            districts = districts.filter(province_id=province_id)
+        elif region_id:
+            districts = districts.filter(province__region_id=region_id)
+
+        zones = Zone.objects.all().order_by("nom")
+        if district_id:
+            zones = zones.filter(district_id=district_id)
+        elif province_id:
+            zones = zones.filter(district__province_id=province_id)
+        elif region_id:
+            zones = zones.filter(district__province__region_id=region_id)
+
+        # Liste des paroisses proposée dans le filtre Paroisse.
+        paroisses_qs = _fiches_visibles_pour(request.user)
+
+        if statut_filtre == "attente_superviseur":
+            paroisses_qs = paroisses_qs.filter(
+                statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
+            )
+        elif statut_filtre == "attente_manager":
+            paroisses_qs = paroisses_qs.filter(
+                statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER
+            )
+        elif statut_filtre == "tous":
+            pass
+        else:
+            paroisses_qs = paroisses_qs.filter(
+                statut_validation=FicheParoisse.StatutValidation.VALIDEE
+            )
+
+        if zone_id:
+            paroisses_qs = paroisses_qs.filter(zone_id=zone_id)
+        elif district_id:
+            paroisses_qs = paroisses_qs.filter(district_id=district_id)
+        elif province_id:
+            paroisses_qs = paroisses_qs.filter(province_id=province_id)
+        elif region_id:
+            paroisses_qs = paroisses_qs.filter(region_id=region_id)
+
+        paroisses = (
+            paroisses_qs
+            .order_by("nom_paroisse")
+            .values_list("nom_paroisse", flat=True)
+            .distinct()
+        )
 
     context = {
-        "fiches": fiches[:500],  # garde-fou simple contre les listes trop longues
-        "regions": Region.objects.all(),
+        "fiches": fiches.select_related(
+            "region", "province", "district", "zone", "cree_par"
+        )[:500],
+        "regions": regions,
+        "provinces": provinces,
+        "districts": districts,
+        "zones": zones,
+        "paroisses": paroisses,
         "region_id": region_id,
-        "q": q,
+        "province_id": province_id,
+        "district_id": district_id,
+        "zone_id": zone_id,
+        "paroisse": paroisse,
         "total": fiches.count(),
         "statut_filtre": statut_filtre,
     }
-    return render(request, "recensement/fiche_list.html", context)
 
+    return render(request, "recensement/fiche_list.html", context)
 
 @login_required
 @require_GET
@@ -368,40 +454,157 @@ def fiche_detail(request, pk):
 
 
 @login_required
+@role_required(Profil.Role.SUPER_ADMIN)
 @require_GET
-def fiche_export_csv(request):
-    """Export CSV des fiches visibles par la personne connectée (filtrable
-    par région), utile pour le suivi et pour ré-importer dans un tableur/SIG."""
-    fiches = _fiches_visibles_pour(request.user)
-    region_id_raw = request.GET.get("region", "")
-    if region_id_raw.strip().isdigit():
-        fiches = fiches.filter(region_id=int(region_id_raw))
+def fiche_export_preview(request):
+    """
+    Prévisualisation des données qui seront exportées en Excel.
+    Cette étape permet à l'utilisateur de vérifier les filtres, le nombre
+    de paroisses et le regroupement hiérarchique avant téléchargement.
+    """
+    fiches = _fiches_export_filtrees(request)
 
-    response = HttpResponse(content_type="text/csv; charset=utf-8")
-    response["Content-Disposition"] = 'attachment; filename="fiches_paroisses.csv"'
-    writer = csv.writer(response)
-    writer.writerow([
-        "Région", "Province", "District", "Zone", "Localité",
-        "Nom paroisse", "Année fondation", "Chargé de paroisse", "Contact chargé de paroisse",
-        "Nombre fidèles estimé", "Statut bâtiment",
-        "Latitude", "Longitude", "Précision GPS (m)",
-        "Nom informateur", "Contact informateur",
-        "Agent recenseur", "Statut de validation", "Observations", "Date recensement",
-    ])
-    for f in fiches:
-        agent = f.cree_par.get_full_name() or f.cree_par.get_username() if f.cree_par else "—"
-        writer.writerow([
-            f.region.nom, f.province.nom, f.district.nom, f.zone.nom, _csv_safe(f.localite),
-            _csv_safe(f.nom_paroisse), f.annee_fondation or "", _csv_safe(f.parish_shepherd),
-            _csv_safe(f.contact_responsable),
-            f.nombre_fideles_estime or "", f.get_statut_batiment_display(),
-            f.latitude or "", f.longitude or "", f.precision_gps or "",
-            _csv_safe(f.nom_informateur), _csv_safe(f.contact_informateur),
-            _csv_safe(agent), f.get_statut_validation_display(), _csv_safe(f.observations),
-            f.date_recensement.strftime("%d/%m/%Y %H:%M"),
+    total = fiches.count()
+
+    # Regroupement hiérarchique pour affichage lisible dans la prévisualisation.
+    hierarchy = {}
+
+    for fiche in fiches:
+        region_nom = fiche.region.nom if fiche.region else "—"
+        province_nom = fiche.province.nom if fiche.province else "—"
+        district_nom = fiche.district.nom if fiche.district else "—"
+        zone_nom = fiche.zone.nom if fiche.zone else "—"
+
+        hierarchy.setdefault(region_nom, {})
+        hierarchy[region_nom].setdefault(province_nom, {})
+        hierarchy[region_nom][province_nom].setdefault(district_nom, {})
+        hierarchy[region_nom][province_nom][district_nom].setdefault(zone_nom, [])
+        hierarchy[region_nom][province_nom][district_nom][zone_nom].append(fiche)
+
+    region = Region.objects.filter(pk=request.GET.get("region")).first() if request.GET.get("region", "").isdigit() else None
+    province = Province.objects.filter(pk=request.GET.get("province")).first() if request.GET.get("province", "").isdigit() else None
+    district = District.objects.filter(pk=request.GET.get("district")).first() if request.GET.get("district", "").isdigit() else None
+    zone = Zone.objects.filter(pk=request.GET.get("zone")).first() if request.GET.get("zone", "").isdigit() else None
+
+    filters = {
+        "statut": request.GET.get("statut", ""),
+        "region": region.nom if region else "",
+        "province": province.nom if province else "",
+        "district": district.nom if district else "",
+        "zone": zone.nom if zone else "",
+        "paroisse": request.GET.get("paroisse", ""),
+    }
+
+    return render(request, "recensement/fiche_export_preview.html", {
+        "hierarchy": hierarchy,
+        "total": total,
+        "filters": filters,
+        "query_string": request.GET.urlencode(),
+    })
+
+@login_required
+@role_required(Profil.Role.SUPER_ADMIN)
+@require_GET
+def fiche_export_excel(request):
+    """
+    Export Excel uniquement.
+    Colonnes exportées :
+    Région, Province, District, Zone, Paroisse.
+
+    Les données sont ordonnées selon la hiérarchie ecclésiale.
+    """
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    fiches = _fiches_export_filtrees(request)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Paroisses"
+
+    headers = ["Région", "Province", "District", "Zone", "Paroisse"]
+    ws.append(headers)
+
+    # Style de l'en-tête
+    header_fill = PatternFill("solid", fgColor="1F2937")
+    header_font = Font(color="FFFFFF", bold=True)
+    border = Border(
+        left=Side(style="thin", color="E5E7EB"),
+        right=Side(style="thin", color="E5E7EB"),
+        top=Side(style="thin", color="E5E7EB"),
+        bottom=Side(style="thin", color="E5E7EB"),
+    )
+
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+
+    # Écriture des données
+    for fiche in fiches:
+        ws.append([
+            fiche.region.nom if fiche.region else "",
+            fiche.province.nom if fiche.province else "",
+            fiche.district.nom if fiche.district else "",
+            fiche.zone.nom if fiche.zone else "",
+            fiche.nom_paroisse or "",
         ])
-    return response
 
+    # Mise en forme du contenu
+    for row in ws.iter_rows(min_row=2):
+        for cell in row:
+            cell.border = border
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+
+    # Largeur des colonnes
+    widths = {
+        "A": 24,  # Région
+        "B": 28,  # Province
+        "C": 30,  # District
+        "D": 32,  # Zone
+        "E": 40,  # Paroisse
+    }
+
+    for col, width in widths.items():
+        ws.column_dimensions[col].width = width
+
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
+    # Feuille de synthèse
+    recap = wb.create_sheet("Synthèse")
+    recap["A1"] = "Prévisualisation de l'export"
+    recap["A1"].font = Font(bold=True, size=14)
+
+    recap["A3"] = "Nombre de paroisses concernées"
+    recap["B3"] = fiches.count()
+
+    recap["A5"] = "Organisation des colonnes"
+    recap["B5"] = "Région → Province → District → Zone → Paroisse"
+
+    recap["A7"] = "Colonnes exclues"
+    recap["B7"] = "Statut du bâtiment, GPS, Agent, Statut, Date, Actions"
+
+    recap.column_dimensions["A"].width = 32
+    recap.column_dimensions["B"].width = 80
+
+    for row in recap.iter_rows():
+        for cell in row:
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    response = HttpResponse(
+        output.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = 'attachment; filename="paroisses_hierarchie.xlsx"'
+    return response
 
 # ---------------------------------------------------------------------------
 # Workflow de validation hiérarchique :
@@ -763,3 +966,64 @@ def utilisateur_delete(request, pk):
         return redirect("recensement:utilisateur_list")
 
     return render(request, "recensement/utilisateur_confirm_delete.html", {"utilisateur": utilisateur})
+
+
+def _fiches_export_filtrees(request):
+    """
+    Retourne les fiches visibles par l'utilisateur, avec les mêmes filtres
+    que le tableau : statut, région, province, district, zone, paroisse.
+    """
+    fiches = _fiches_visibles_pour(request.user)
+    role = get_role(request.user)
+
+    statut_filtre = request.GET.get("statut", "")
+    if role == Profil.Role.SUPER_ADMIN:
+        if statut_filtre == "attente_superviseur":
+            fiches = fiches.filter(
+                statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
+            )
+        elif statut_filtre == "attente_manager":
+            fiches = fiches.filter(
+                statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER
+            )
+        elif statut_filtre == "tous":
+            pass
+        else:
+            fiches = fiches.filter(
+                statut_validation=FicheParoisse.StatutValidation.VALIDEE
+            )
+
+    def valid_id(param_name):
+        value = (request.GET.get(param_name) or "").strip()
+        return int(value) if value.isdigit() else None
+
+    region_id = valid_id("region")
+    province_id = valid_id("province")
+    district_id = valid_id("district")
+    zone_id = valid_id("zone")
+    paroisse = (request.GET.get("paroisse") or "").strip()[:100]
+
+    if region_id:
+        fiches = fiches.filter(region_id=region_id)
+
+    if province_id:
+        fiches = fiches.filter(province_id=province_id)
+
+    if district_id:
+        fiches = fiches.filter(district_id=district_id)
+
+    if zone_id:
+        fiches = fiches.filter(zone_id=zone_id)
+
+    if paroisse:
+        fiches = fiches.filter(nom_paroisse__icontains=paroisse)
+
+    return fiches.select_related(
+        "region", "province", "district", "zone"
+    ).order_by(
+        "region__nom",
+        "province__nom",
+        "district__nom",
+        "zone__nom",
+        "nom_paroisse",
+    )

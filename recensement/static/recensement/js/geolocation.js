@@ -1,164 +1,154 @@
 /**
- * Capture de la position GPS de l'agent recenseur.
- *
- * Comportement :
- * - Au clic, on suit la position en continu (watchPosition, haute précision)
- *   jusqu'à obtenir une précision <= TARGET_ACCURACY_METERS.
- * - Dès qu'une première position est reçue, un bouton "Utiliser cette
- *   position quand même" apparaît, pour ne pas bloquer l'agent si la cible
- *   de précision n'est jamais atteinte (bâtiment, signal faible, etc.).
- * - Un bouton "Annuler la recherche" permet d'arrêter sans rien enregistrer.
- * - La position retenue (automatique ou acceptée manuellement) est
- *   enregistrée telle quelle, sans retouche.
+ * Géolocalisation avec états visibles : recherche en cours, position trouvée,
+ * précision insuffisante, interruption, erreur et possibilité de relancer.
  */
 (function () {
   "use strict";
 
   var TARGET_ACCURACY_METERS = 5;
-  var WATCH_TIMEOUT_MS = 30000; // délai max entre deux mises à jour GPS
+  var WATCH_TIMEOUT_MS = 30000;
+  var watchId = null;
+  var bestPosition = null;
+  var timeoutId = null;
 
-  document.addEventListener("DOMContentLoaded", function () {
-    var btnSearch = document.getElementById("btn-gps");
-    var btnAccept = document.getElementById("btn-gps-accept");
-    var btnCancel = document.getElementById("btn-gps-cancel");
-    var statusEl = document.getElementById("gps-status");
-    var latInput = document.getElementById("id_latitude");
-    var lngInput = document.getElementById("id_longitude");
-    var precInput = document.getElementById("id_precision_gps");
+  function $(id) { return document.getElementById(id); }
 
-    if (!btnSearch || !latInput || !lngInput || !precInput) {
+  function setButtons(state) {
+    var btnSearch = $("btn-gps");
+    var btnAccept = $("btn-gps-accept");
+    var btnCancel = $("btn-gps-cancel");
+    if (!btnSearch || !btnAccept || !btnCancel) return;
+
+    btnSearch.classList.toggle("hidden", state === "searching");
+    btnAccept.classList.toggle("hidden", !(state === "insufficient" && bestPosition));
+    btnCancel.classList.toggle("hidden", state !== "searching");
+
+    if (state === "retry" || state === "error" || state === "cancelled") {
+      btnSearch.textContent = "🔄 Rechercher à nouveau";
+    } else {
+      btnSearch.textContent = "📍 Rechercher ma position (précision ≤ 5 m)";
+    }
+  }
+
+  function renderStatus(state, message, details) {
+    var status = $("gps-status");
+    if (!status) return;
+    status.dataset.state = state;
+    status.className = "gps-status text-sm";
+
+    var spinner = state === "searching" ? '<span class="gps-spinner" aria-hidden="true"></span>' : "";
+    status.innerHTML =
+      '<div class="gps-status-card gps-' + state + '">' +
+      spinner +
+      '<div><p class="font-medium">' + message + '</p>' +
+      (details ? '<p class="text-xs mt-1">' + details + '</p>' : "") +
+      '</div></div>';
+    setButtons(state);
+  }
+
+  function stopWatch() {
+    if (watchId !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchId);
+    }
+    watchId = null;
+    if (timeoutId) window.clearTimeout(timeoutId);
+    timeoutId = null;
+  }
+
+  function storePosition(position) {
+    var lat = $("id_latitude");
+    var lng = $("id_longitude");
+    var acc = $("id_precision_gps");
+    if (lat) lat.value = position.coords.latitude;
+    if (lng) lng.value = position.coords.longitude;
+    if (acc) acc.value = position.coords.accuracy;
+  }
+
+  function detailsFor(position) {
+    if (!position) return "";
+    return "Latitude : " + position.coords.latitude.toFixed(6) +
+      " — Longitude : " + position.coords.longitude.toFixed(6) +
+      " — Précision : environ " + Math.round(position.coords.accuracy) + " m.";
+  }
+
+  function acceptBestPosition() {
+    if (!bestPosition) return;
+    stopWatch();
+    storePosition(bestPosition);
+    renderStatus(
+      "found",
+      "Position retenue.",
+      detailsFor(bestPosition) + " La position a été acceptée malgré une précision supérieure à " + TARGET_ACCURACY_METERS + " m."
+    );
+  }
+
+  function startSearch() {
+    if (!navigator.geolocation) {
+      renderStatus("error", "Erreur de localisation.", "La géolocalisation n’est pas disponible sur cet appareil ou ce navigateur.");
       return;
     }
 
-    var watchId = null;
-    var bestPosition = null;
+    stopWatch();
+    bestPosition = null;
+    renderStatus("searching", "Recherche de votre position en cours…", "Veuillez rester immobile quelques instants.");
 
-    function setStatus(message, type) {
-      statusEl.textContent = message;
-      statusEl.className = "small text-" + (type || "muted");
-    }
-
-    function setSearchingUI(isSearching) {
-      btnSearch.disabled = isSearching;
-      btnSearch.textContent = isSearching
-        ? "🔎 Recherche en cours..."
-        : "📍 Rechercher ma position (précision ≤ " + TARGET_ACCURACY_METERS + " m)";
-      btnCancel.classList.toggle("hidden", !isSearching);
-      if (!isSearching) {
-        btnAccept.classList.add("hidden");
-      }
-    }
-
-    function stopWatch() {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-      }
-    }
-
-    function applyPosition(position) {
-      var coords = position.coords;
-
-      latInput.value = Number(coords.latitude).toFixed(7);
-      lngInput.value = Number(coords.longitude).toFixed(7);
-      precInput.value = Number(coords.accuracy).toFixed(2);
-
-      return coords;
-    }
-
-    function finish(position, extraNote) {
-      var coords = applyPosition(position);
-
+    timeoutId = window.setTimeout(function () {
       stopWatch();
-      setSearchingUI(false);
+      if (bestPosition) {
+        renderStatus(
+          "insufficient",
+          "Précision insuffisante.",
+          detailsFor(bestPosition) + " Vous pouvez utiliser cette position quand même ou relancer la recherche."
+        );
+      } else {
+        renderStatus("retry", "Recherche interrompue.", "Aucune position exploitable n’a été reçue dans le délai prévu. Vous pouvez rechercher à nouveau.");
+      }
+    }, WATCH_TIMEOUT_MS);
 
-      setStatus(
-        "✅ Position enregistrée : " +
-          Number(coords.latitude).toFixed(7) + ", " +
-          Number(coords.longitude).toFixed(7) +
-          " (précision ≈ " + Math.round(coords.accuracy) + " m)" +
-          (extraNote || ""),
-        "success"
-      );
-    }
-
-    function onUpdate(position) {
+    watchId = navigator.geolocation.watchPosition(function (position) {
       if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
         bestPosition = position;
       }
 
-      var accuracy = Math.round(position.coords.accuracy);
-
-      // Une première position est disponible : on autorise l'acceptation manuelle.
-      btnAccept.classList.remove("hidden");
-
       if (position.coords.accuracy <= TARGET_ACCURACY_METERS) {
-        finish(position, "");
-        return;
+        stopWatch();
+        storePosition(position);
+        renderStatus("found", "Position trouvée.", detailsFor(position));
+      } else {
+        renderStatus(
+          "insufficient",
+          "Recherche en cours : précision encore insuffisante.",
+          detailsFor(position) + " Objectif : précision inférieure ou égale à " + TARGET_ACCURACY_METERS + " m."
+        );
+        setButtons("searching");
+        var accept = $("btn-gps-accept");
+        if (accept) accept.classList.remove("hidden");
       }
-
-      setStatus(
-        "📡 Précision actuelle : ≈ " + accuracy + " m — recherche d'une meilleure " +
-          "précision (cible ≤ " + TARGET_ACCURACY_METERS + " m). " +
-          "Déplacez-vous à l'extérieur si possible, ou utilisez la position actuelle.",
-        "muted"
-      );
-    }
-
-    function onError(error) {
-      var message;
-      switch (error.code) {
-        case error.PERMISSION_DENIED:
-          message = "❌ Localisation refusée. Autorisez l'accès à la position dans les réglages du navigateur.";
-          break;
-        case error.POSITION_UNAVAILABLE:
-          message = "❌ Position indisponible pour le moment (signal GPS faible). Réessayez.";
-          break;
-        case error.TIMEOUT:
-          message = "❌ Délai dépassé pour obtenir la position. Réessayez, si possible en extérieur.";
-          break;
-        default:
-          message = "❌ Impossible de récupérer la position GPS.";
-      }
-      setStatus(message, "danger");
+    }, function (error) {
       stopWatch();
-      setSearchingUI(false);
-
-      // Si on a tout de même une position antérieure, on garde la possibilité
-      // de l'utiliser manuellement plutôt que de tout perdre.
-      if (bestPosition) {
-        btnAccept.classList.remove("hidden");
-      }
-    }
-
-    btnSearch.addEventListener("click", function () {
-      if (!("geolocation" in navigator)) {
-        setStatus("❌ La géolocalisation n'est pas supportée par cet appareil/navigateur.", "danger");
-        return;
-      }
-      bestPosition = null;
-      setSearchingUI(true);
-      setStatus("⏳ Localisation en cours... assurez-vous d'être à l'extérieur si possible.", "muted");
-
-      watchId = navigator.geolocation.watchPosition(onUpdate, onError, {
-        enableHighAccuracy: true,
-        timeout: WATCH_TIMEOUT_MS,
-        maximumAge: 0,
-      });
+      var message = "Erreur de localisation.";
+      if (error.code === error.PERMISSION_DENIED) message = "Autorisation de localisation refusée.";
+      if (error.code === error.POSITION_UNAVAILABLE) message = "Position indisponible.";
+      if (error.code === error.TIMEOUT) message = "Délai de recherche dépassé.";
+      renderStatus("error", message, "Vérifiez l’autorisation GPS, la connexion et l’accès à la localisation, puis relancez la recherche.");
+    }, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: WATCH_TIMEOUT_MS
     });
+  }
 
-    btnAccept.addEventListener("click", function () {
-      if (!bestPosition) return;
-      finish(
-        bestPosition,
-        " — précision cible non atteinte, position acceptée manuellement."
-      );
-    });
+  document.addEventListener("DOMContentLoaded", function () {
+    var btnSearch = $("btn-gps");
+    var btnAccept = $("btn-gps-accept");
+    var btnCancel = $("btn-gps-cancel");
+    if (!btnSearch) return;
 
-    btnCancel.addEventListener("click", function () {
+    btnSearch.addEventListener("click", startSearch);
+    btnAccept && btnAccept.addEventListener("click", acceptBestPosition);
+    btnCancel && btnCancel.addEventListener("click", function () {
       stopWatch();
-      setSearchingUI(false);
-      setStatus("Recherche annulée. Aucune position n'a été enregistrée.", "muted");
+      renderStatus("cancelled", "Recherche interrompue.", "Aucune nouvelle position n’a été enregistrée. Vous pouvez rechercher à nouveau.");
     });
   });
 })();

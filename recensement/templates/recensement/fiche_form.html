@@ -128,10 +128,16 @@
             {% for error in form.nombre_fideles_estime.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
           </div>
         </div>
-        <div class="pt-2 border-t border-slate-100">
+        <div class="pt-2 border-t border-slate-100 photo-field" data-photo-field data-max-photos="3">
           <label for="id_photos" class="block text-sm font-medium text-slate-700 mb-1">{{ photos_form.photos.label }}</label>
+          <div class="flex flex-wrap gap-2 mb-2">
+            <button type="button" class="js-photo-camera border border-brand-600 text-brand-700 hover:bg-brand-50 font-medium px-4 py-2 rounded-lg min-h-[44px]">📷 Prendre une photo</button>
+            <button type="button" class="js-photo-upload border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium px-4 py-2 rounded-lg min-h-[44px]">🖼️ Téléverser une photo</button>
+            <button type="button" class="js-photo-clear hidden border border-red-600 text-red-700 hover:bg-red-50 font-medium px-4 py-2 rounded-lg min-h-[44px]">Supprimer la sélection</button>
+          </div>
           {{ photos_form.photos }}
-          <p class="text-xs text-slate-400 mt-1">Facultatif — jusqu'à 3 photos du bâtiment/lieu de culte (jpg, png ou webp, 5 Mo max chacune).</p>
+          <div class="photo-preview-grid mt-3" aria-live="polite"></div>
+          <p class="text-xs text-slate-400 mt-1">Facultatif — jusqu'à 3 photos du bâtiment/lieu de culte (jpg, png ou webp, 5 Mo max chacune). Vous pouvez prendre une nouvelle photo ou choisir une photo existante, puis la vérifier avant validation.</p>
           {% for error in photos_form.photos.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
         </div>
       </div>
@@ -152,15 +158,39 @@
           {{ form.parish_shepherd }}
           {% for error in form.parish_shepherd.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
         </div>
-        <div>
+        <div class="phone-field" data-phone-field>
           <label for="{{ form.contact_responsable.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.contact_responsable.label }}</label>
-          {{ form.contact_responsable }}
+          <div class="grid grid-cols-[120px_1fr] gap-2">
+            <select class="js-phone-prefix rounded-lg border-slate-300 text-sm" aria-label="Indicatif du pays" data-phone-target="id_contact_responsable">
+              <option value="+229" selected>Bénin +229</option>
+              <option value="+234">Nigeria +234</option>
+              <option value="+228">Togo +228</option>
+              <option value="+225">Côte d’Ivoire +225</option>
+              <option value="+33">France +33</option>
+              <option value="+1">États-Unis/Canada +1</option>
+              <option value="+44">Royaume-Uni +44</option>
+              <option value="+237">Cameroun +237</option>
+              <option value="+242">Congo +242</option>
+              <option value="+243">RDC +243</option>
+              <option value="+241">Gabon +241</option>
+              <option value="+221">Sénégal +221</option>
+              <option value="+233">Ghana +233</option>
+            </select>
+            {{ form.contact_responsable }}
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Sélectionnez l’indicatif du pays puis saisissez le numéro. L’indicatif du Bénin est proposé par défaut mais reste modifiable.</p>
           {% for error in form.contact_responsable.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
         </div>
-        <div class="sm:col-span-2">
+        <div class="sm:col-span-2 photo-field" data-photo-field data-max-photos="1">
           <label for="{{ form.photo_charge.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.photo_charge.label }}</label>
+          <div class="flex flex-wrap gap-2 mb-2">
+            <button type="button" class="js-photo-camera border border-brand-600 text-brand-700 hover:bg-brand-50 font-medium px-4 py-2 rounded-lg min-h-[44px]">📷 Prendre une photo</button>
+            <button type="button" class="js-photo-upload border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium px-4 py-2 rounded-lg min-h-[44px]">🖼️ Téléverser une photo</button>
+            <button type="button" class="js-photo-clear hidden border border-red-600 text-red-700 hover:bg-red-50 font-medium px-4 py-2 rounded-lg min-h-[44px]">Supprimer la sélection</button>
+          </div>
           {{ form.photo_charge }}
-          <p class="text-xs text-slate-400 mt-1">Facultatif (jpg, png ou webp, 5 Mo max).</p>
+          <div class="photo-preview-grid mt-3" aria-live="polite"></div>
+          <p class="text-xs text-slate-400 mt-1">Facultatif (jpg, png ou webp, 5 Mo max). La photo peut être prise directement ou téléversée depuis l’appareil.</p>
           {% for error in form.photo_charge.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
         </div>
       </div>
@@ -193,7 +223,7 @@
             ✖ Annuler la recherche
           </button>
         </div>
-        <div id="gps-status" class="text-sm"></div>
+        <div id="gps-status" class="gps-status text-sm" aria-live="polite" data-state="idle"></div>
         {{ form.latitude }}
         {{ form.longitude }}
         {{ form.precision_gps }}
@@ -226,9 +256,27 @@
             {{ form.nom_informateur }}
             {% for error in form.nom_informateur.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
           </div>
-          <div>
+            <div class="phone-field" data-phone-field>
             <label for="{{ form.contact_informateur.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.contact_informateur.label }}</label>
-            {{ form.contact_informateur }}
+            <div class="grid grid-cols-[120px_1fr] gap-2">
+              <select class="js-phone-prefix rounded-lg border-slate-300 text-sm" aria-label="Indicatif du pays" data-phone-target="id_contact_informateur">
+                <option value="+229" selected>Bénin +229</option>
+                <option value="+234">Nigeria +234</option>
+                <option value="+228">Togo +228</option>
+                <option value="+225">Côte d’Ivoire +225</option>
+                <option value="+33">France +33</option>
+                <option value="+1">États-Unis/Canada +1</option>
+                <option value="+44">Royaume-Uni +44</option>
+                <option value="+237">Cameroun +237</option>
+                <option value="+242">Congo +242</option>
+                <option value="+243">RDC +243</option>
+                <option value="+241">Gabon +241</option>
+                <option value="+221">Sénégal +221</option>
+                <option value="+233">Ghana +233</option>
+              </select>
+              {{ form.contact_informateur }}
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Sélectionnez l’indicatif du pays puis saisissez le numéro.</p>
             {% for error in form.contact_informateur.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
           </div>
         </div>
@@ -285,6 +333,8 @@
 </script>
 <script src="{% static 'recensement/js/cascade.js' %}"></script>
 <script src="{% static 'recensement/js/geolocation.js' %}"></script>
+<script src="{% static 'recensement/js/phone_country.js' %}"></script>
+<script src="{% static 'recensement/js/photo_preview.js' %}"></script>
 <script src="{% static 'recensement/js/wizard.js' %}"></script>
 <script>
   // Garde-fou côté client : au-delà de 3 photos sélectionnées pour la

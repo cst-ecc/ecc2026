@@ -3,9 +3,9 @@ import re
 from django import forms
 from django.contrib.auth.forms import SetPasswordForm, UserCreationForm
 from django.contrib.auth.models import User
-from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 
-from .models import District, FicheParoisse, PhotoParoisse, Profil, Province, Region, Village, Zone
+from .models import District, FicheParoisse, Profil, Province, Region, Village, Zone
 
 # Numérotation béninoise (réforme 2021) : tous les numéros commencent par
 # "01" suivi de 8 chiffres (10 chiffres au total), avec ou sans l'indicatif
@@ -15,19 +15,30 @@ from .models import District, FicheParoisse, PhotoParoisse, Profil, Province, Re
 BENIN_PHONE_REGEX = re.compile(r"^(\+229)?01\d{8}$")
 
 
-def valider_telephone_benin(value):
-    """Nettoie (espaces/tirets/points retirés) et valide un numéro béninois.
-    Lève une ValidationError si le format ne correspond pas ; retourne sinon
-    la version normalisée (sans séparateurs), à utiliser comme valeur stockée."""
-    normalise = re.sub(r"[\s.\-]", "", value or "")
-    if not normalise:
-        return ""
-    if not BENIN_PHONE_REGEX.match(normalise):
-        raise forms.ValidationError(
-            "Numéro béninois invalide. Formats acceptés : 0196355621 "
-            "(10 chiffres commençant par 01) ou +2290196355621."
+def valider_telephone_international(value):
+    if not value:
+        return
+
+    import re
+    from django.core.exceptions import ValidationError
+
+    numero = str(value).strip()
+    numero_normalise = re.sub(r"[\s\-.()]", "", numero)
+
+    if numero_normalise.startswith("+"):
+        chiffres = numero_normalise[1:]
+    else:
+        chiffres = numero_normalise
+
+    if not chiffres.isdigit():
+        raise ValidationError(
+            "Numéro de téléphone invalide. Saisissez un numéro valide avec ou sans indicatif international."
         )
-    return normalise
+
+    if len(chiffres) < 6 or len(chiffres) > 15:
+        raise ValidationError(
+            "Numéro de téléphone invalide. Le numéro doit contenir entre 6 et 15 chiffres."
+        )
 
 
 MAX_ANNEE_FONDATION = 2100  # borne haute large et fixe
@@ -240,10 +251,14 @@ class FicheParoisseForm(forms.ModelForm):
         return (self.cleaned_data.get("nouvelle_localite_nom") or "").strip()
 
     def clean_contact_responsable(self):
-        return valider_telephone_benin(self.cleaned_data.get("contact_responsable"))
+        value = (self.cleaned_data.get("contact_responsable") or "").strip()
+        valider_telephone_international(value)
+        return re.sub(r"[\s\-.()]", "", value)
 
     def clean_contact_informateur(self):
-        return valider_telephone_benin(self.cleaned_data.get("contact_informateur"))
+        value = (self.cleaned_data.get("contact_informateur") or "").strip()
+        valider_telephone_international(value)
+        return re.sub(r"[\s\-.()]", "", value)
 
     def clean_nom_informateur(self):
         return (self.cleaned_data.get("nom_informateur") or "").strip()

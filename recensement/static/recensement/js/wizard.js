@@ -44,18 +44,20 @@
       body.appendChild(msg);
     }
 
-    // Mêmes règles que recensement.forms.valider_telephone_benin (Python),
-    // portées en JS pour un retour immédiat sans aller-retour réseau —
-    // essentiel sur le terrain où la connexion peut être faible/absente.
-    // Le serveur reste la vérification faisant foi (défense en profondeur),
-    // mais l'utilisateur n'a plus à attendre la soumission finale pour
-    // savoir qu'un numéro est mal formaté.
-    var TELEPHONE_BENIN_REGEX = /^(\+229)?01\d{8}$/;
+    // Numéros internationaux : le champ doit contenir un numéro complet
+    // avec indicatif international. La sélection de l’indicatif est gérée
+    // par phone_country.js, puis cette validation contrôle le format final.
 
     function telephoneValide(valeur) {
-      if (!valeur) return true; // facultatif : vide = valide, la présence est vérifiée ailleurs si besoin
-      var normalise = valeur.replace(/[\s.-]/g, "");
-      return TELEPHONE_BENIN_REGEX.test(normalise);
+      if (!valeur) return true;
+
+      var normalise = valeur.trim().replace(/[\s\-.()]/g, "");
+
+      if (normalise.charAt(0) === "+") {
+        normalise = normalise.slice(1);
+      }
+
+      return /^\d{6,15}$/.test(normalise);
     }
 
     var TAILLE_MAX_IMAGE_OCTETS = 5 * 1024 * 1024; // 5 Mo, même limite que côté serveur
@@ -115,8 +117,8 @@
           champ.classList.add("is-invalid");
           showStepError(
             step,
-            "Numéro de téléphone invalide. Formats acceptés : 0196355621 (10 chiffres "
-            + "commençant par 01) ou +2290196355621."
+            "Numéro de téléphone invalide. Sélectionnez l’indicatif du pays et saisissez "
+            + "un numéro complet au format international, par exemple +2290196355621."
           );
           if (!firstInvalid) firstInvalid = champ;
         }
