@@ -128,17 +128,119 @@
             {% for error in form.nombre_fideles_estime.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
           </div>
         </div>
-        <div class="pt-2 border-t border-slate-100 photo-field" data-photo-field data-max-photos="3">
-          <label for="id_photos" class="block text-sm font-medium text-slate-700 mb-1">{{ photos_form.photos.label }}</label>
-          <div class="flex flex-wrap gap-2 mb-2">
-            <button type="button" class="js-photo-camera border border-brand-600 text-brand-700 hover:bg-brand-50 font-medium px-4 py-2 rounded-lg min-h-[44px]">📷 Prendre une photo</button>
-            <button type="button" class="js-photo-upload border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium px-4 py-2 rounded-lg min-h-[44px]">🖼️ Téléverser une photo</button>
-            <button type="button" class="js-photo-clear hidden border border-red-600 text-red-700 hover:bg-red-50 font-medium px-4 py-2 rounded-lg min-h-[44px]">Supprimer la sélection</button>
+        <div
+          id="photos-widget"
+          class="pt-4 border-t border-slate-100"
+          data-max-photos="3"
+        >
+          <div class="mb-3">
+            <h2 class="text-sm font-medium text-slate-700">
+              {{ photos_form.photos.label }}
+            </h2>
+
+            <p class="text-xs text-slate-500 mt-1">
+              Vous pouvez prendre successivement jusqu’à trois photos avec l’appareil
+              ou sélectionner une à trois photos existantes dans la galerie.
+            </p>
           </div>
-          {{ photos_form.photos }}
-          <div class="photo-preview-grid mt-3" aria-live="polite"></div>
-          <p class="text-xs text-slate-400 mt-1">Facultatif — jusqu'à 3 photos du bâtiment/lieu de culte (jpg, png ou webp, 5 Mo max chacune). Vous pouvez prendre une nouvelle photo ou choisir une photo existante, puis la vérifier avant validation.</p>
-          {% for error in photos_form.photos.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+
+          <!-- Champ utilisé uniquement pour ouvrir l’appareil photo.
+              Une photo est prise à chaque ouverture. -->
+          <input
+            type="file"
+            id="camera-input"
+            accept="image/jpeg,image/png,image/webp"
+            capture="environment"
+            class="hidden"
+            aria-hidden="true"
+            tabindex="-1"
+          >
+
+          <!-- Champ utilisé pour sélectionner une ou plusieurs photos existantes. -->
+          <input
+            type="file"
+            id="gallery-input"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            class="hidden"
+            aria-hidden="true"
+            tabindex="-1"
+          >
+
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              id="take-photo"
+              class="inline-flex items-center justify-center gap-2 border border-brand-600
+                    text-brand-700 hover:bg-brand-50 disabled:opacity-50
+                    disabled:cursor-not-allowed font-medium px-4 py-2.5 rounded-lg
+                    min-h-[44px]"
+            >
+              <span aria-hidden="true">📷</span>
+              <span>Prendre une photo</span>
+            </button>
+
+            <button
+              type="button"
+              id="choose-photos"
+              class="inline-flex items-center justify-center gap-2 border border-slate-300
+                    text-slate-700 hover:bg-slate-50 disabled:opacity-50
+                    disabled:cursor-not-allowed font-medium px-4 py-2.5 rounded-lg
+                    min-h-[44px]"
+            >
+              <span aria-hidden="true">🖼️</span>
+              <span>Choisir dans la galerie</span>
+            </button>
+          </div>
+
+          <div
+            class="mt-3 flex items-center justify-between gap-3"
+            aria-live="polite"
+          >
+            <p
+              id="photo-counter"
+              class="text-sm font-medium text-slate-600"
+            >
+              0 photo sur 3
+            </p>
+
+            <p class="text-xs text-slate-400">
+              JPEG, PNG ou WebP — 5 Mo maximum par photo
+            </p>
+          </div>
+
+          <div
+            id="photo-error"
+            class="hidden mt-3 rounded-lg border border-red-200 bg-red-50
+                  px-3 py-2 text-sm text-red-700"
+            role="alert"
+            aria-live="assertive"
+          ></div>
+
+          <!-- Aperçus générés par photos.js -->
+          <div
+            id="photo-preview"
+            class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            aria-live="polite"
+          ></div>
+
+          <!-- Champ Django réellement envoyé au serveur.
+              Il est alimenté automatiquement par DataTransfer dans photos.js. -->
+          <div class="hidden" aria-hidden="true">
+            {{ photos_form.photos }}
+          </div>
+
+          {% for error in photos_form.photos.errors %}
+            <p class="text-red-600 text-sm mt-2">{{ error }}</p>
+          {% endfor %}
+
+          <div class="mt-4 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
+            <p class="text-xs text-blue-800">
+              Chaque nouvelle photo prise sera ajoutée aux précédentes. Vous pourrez
+              supprimer une photo avant l’enregistrement de la fiche. Les boutons seront
+              automatiquement désactivés lorsque trois photos auront été ajoutées.
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -182,16 +284,52 @@
           {% for error in form.contact_responsable.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
         </div>
         <div class="sm:col-span-2 photo-field" data-photo-field data-max-photos="1">
-          <label for="{{ form.photo_charge.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.photo_charge.label }}</label>
+          <label for="{{ form.photo_charge.id_for_label }}"
+                class="block text-sm font-medium text-slate-700 mb-1">
+            {{ form.photo_charge.label }}
+          </label>
+
           <div class="flex flex-wrap gap-2 mb-2">
-            <button type="button" class="js-photo-camera border border-brand-600 text-brand-700 hover:bg-brand-50 font-medium px-4 py-2 rounded-lg min-h-[44px]">📷 Prendre une photo</button>
-            <button type="button" class="js-photo-upload border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium px-4 py-2 rounded-lg min-h-[44px]">🖼️ Téléverser une photo</button>
-            <button type="button" class="js-photo-clear hidden border border-red-600 text-red-700 hover:bg-red-50 font-medium px-4 py-2 rounded-lg min-h-[44px]">Supprimer la sélection</button>
+            <button
+              type="button"
+              class="js-photo-camera border border-brand-600 text-brand-700
+                    hover:bg-brand-50 font-medium px-4 py-2 rounded-lg min-h-[44px]"
+            >
+              📷 Prendre une photo
+            </button>
+
+            <button
+              type="button"
+              class="js-photo-upload border border-slate-300 text-slate-700
+                    hover:bg-slate-50 font-medium px-4 py-2 rounded-lg min-h-[44px]"
+            >
+              🖼️ Téléverser une photo
+            </button>
+
+            <button
+              type="button"
+              class="js-photo-clear hidden border border-red-600 text-red-700
+                    hover:bg-red-50 font-medium px-4 py-2 rounded-lg min-h-[44px]"
+            >
+              Supprimer la sélection
+            </button>
           </div>
+
           {{ form.photo_charge }}
-          <div class="photo-preview-grid mt-3" aria-live="polite"></div>
-          <p class="text-xs text-slate-400 mt-1">Facultatif (jpg, png ou webp, 5 Mo max). La photo peut être prise directement ou téléversée depuis l’appareil.</p>
-          {% for error in form.photo_charge.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+
+          <div
+            class="photo-preview-grid mt-3"
+            aria-live="polite"
+          ></div>
+
+          <p class="text-xs text-slate-400 mt-1">
+            Facultatif — une seule photo du chargé de paroisse, au format JPEG, PNG
+            ou WebP, avec une taille maximale de 5 Mo.
+          </p>
+
+          {% for error in form.photo_charge.errors %}
+            <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+          {% endfor %}
         </div>
       </div>
     </div>
@@ -315,40 +453,60 @@
 
 {% block extra_js %}
 <script>
-  // Templates d'URL AJAX générés par Django (pk=0 remplacé dynamiquement en JS)
+  /*
+   * Modèles d’URL AJAX générés côté Django.
+   * La valeur 0 sera remplacée dynamiquement par l’identifiant sélectionné.
+   */
   window.RECENSEMENT_AJAX_URLS = {
     provinces: "{% url 'recensement:ajax_provinces' 0 %}",
     districts: "{% url 'recensement:ajax_districts' 0 %}",
     zones: "{% url 'recensement:ajax_zones' 0 %}",
     villages: "{% url 'recensement:ajax_villages' 0 %}"
   };
-  // Vide au premier chargement (GET) ; rempli avec les valeurs déjà
-  // saisies si la page se rouvre après une erreur de validation (POST) —
-  // évite de perdre la cascade géographique et de devoir tout recommencer.
+
+  /*
+   * Valeurs déjà sélectionnées.
+   * Elles permettent de restaurer la cascade géographique lorsque le
+   * formulaire est réaffiché après une erreur de validation.
+   */
   window.RECENSEMENT_INITIAL = {{ initial_ids_json|safe }};
-  // Index (base 0) de la première étape contenant une erreur, calculé
-  // côté serveur — null si aucune erreur. Bien plus fiable qu'un scan JS
-  // du DOM à la recherche d'une classe CSS.
+
+  /*
+   * Première étape contenant une erreur.
+   * null lorsqu’aucune erreur de validation n’existe.
+   */
   window.RECENSEMENT_ETAPE_ERREUR = {{ etape_erreur_json|safe }};
 </script>
-<script src="{% static 'recensement/js/cascade.js' %}"></script>
-<script src="{% static 'recensement/js/geolocation.js' %}"></script>
-<script src="{% static 'recensement/js/phone_country.js' %}"></script>
-<script src="{% static 'recensement/js/photo_preview.js' %}"></script>
-<script src="{% static 'recensement/js/wizard.js' %}"></script>
-<script>
-  // Garde-fou côté client : au-delà de 3 photos sélectionnées pour la
-  // paroisse, on vide la sélection et on prévient — le serveur reste la
-  // vérification faisant foi (voir PhotosParoisseForm.clean_photos).
-  (function () {
-    var champPhotos = document.getElementById("id_photos");
-    if (!champPhotos) return;
-    champPhotos.addEventListener("change", function () {
-      if (this.files.length > 3) {
-        window.alert("Vous ne pouvez sélectionner que 3 photos maximum.");
-        this.value = "";
-      }
-    });
-  })();
-</script>
+
+<script
+  src="{% static 'recensement/js/cascade.js' %}"
+  defer
+></script>
+
+<script
+  src="{% static 'recensement/js/geolocation.js' %}"
+  defer
+></script>
+
+<script
+  src="{% static 'recensement/js/phone_country.js' %}"
+  defer
+></script>
+
+<!-- Gestion de la photo unique du chargé de paroisse -->
+<script
+  src="{% static 'recensement/js/photo_preview.js' %}"
+  defer
+></script>
+
+<!-- Gestion cumulative des trois photos de la paroisse -->
+<script
+  src="{% static 'recensement/js/photos.js' %}"
+  defer
+></script>
+
+<script
+  src="{% static 'recensement/js/wizard.js' %}"
+  defer
+></script>
 {% endblock %}

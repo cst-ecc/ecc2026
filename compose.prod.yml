@@ -53,6 +53,23 @@ services:
     mem_limit: 512m
     cpus: "0.50"
   
+  volume_init:
+    image: ecc-portal:latest
+    container_name: ecc-volume-init
+    user: root
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mkdir -p /app/media/paroisses /app/staticfiles
+        chown -R eccparishatlast:eccparishatlast /app/media /app/staticfiles
+        chmod -R u+rwX,g+rX,o-rwx /app/media
+        chmod -R u+rwX,g+rX,o+rX /app/staticfiles
+    volumes:
+      - static_data:/app/staticfiles
+      - media_data:/app/media
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
   # Django application served by Gunicorn.
   portal:
     build:
@@ -69,6 +86,8 @@ services:
     depends_on:
       personal:
         condition: service_healthy
+      volume_init:
+        condition: service_completed_successfully
 
     volumes:
       - static_data:/app/staticfiles

@@ -411,27 +411,37 @@ class MotifModificationForm(forms.Form):
     )
 
 
-class PhotosParoisseForm(forms.Form):
-    """Photos du bâtiment/lieu de culte de la paroisse — jusqu'à 3,
-    entièrement facultatives. Formulaire séparé de FicheParoisseForm car il
-    ne correspond pas à un champ direct de FicheParoisse mais à des objets
-    PhotoParoisse liés, créés après l'enregistrement de la fiche."""
+class MultipleImageInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
 
-    photos = MultipleFileField(
+
+class MultipleImageField(forms.ImageField):
+    widget = MultipleImageInput
+
+    def clean(self, data, initial=None):
+        if not data:
+            return []
+
+        files = data if isinstance(data, (list, tuple)) else [data]
+
+        if len(files) > 3:
+            raise forms.ValidationError(
+                "Vous ne pouvez ajouter que trois photos au maximum."
+            )
+
+        cleaned_files = []
+
+        for uploaded_file in files:
+            cleaned_file = super().clean(uploaded_file, initial)
+            valider_image(cleaned_file)
+            cleaned_files.append(cleaned_file)
+
+        return cleaned_files
+
+
+class PhotosParoisseForm(forms.Form):
+    photos = MultipleImageField(
         required=False,
-        label=f"Photos de la paroisse (jusqu'à {NB_MAX_PHOTOS_PAROISSE})",
-        widget=MultipleFileInput(attrs={
-            "class": INPUT_CSS, "accept": "image/jpeg,image/png,image/webp",
-        }),
+        label="Photos de la paroisse",
     )
 
-    def clean_photos(self):
-        photos = self.cleaned_data.get("photos") or []
-        if len(photos) > NB_MAX_PHOTOS_PAROISSE:
-            raise forms.ValidationError(
-                f"Vous ne pouvez ajouter que {NB_MAX_PHOTOS_PAROISSE} photos maximum "
-                f"({len(photos)} sélectionnées)."
-            )
-        for photo in photos:
-            valider_image(photo)
-        return photos
