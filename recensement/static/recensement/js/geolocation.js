@@ -59,9 +59,80 @@
     var lat = $("id_latitude");
     var lng = $("id_longitude");
     var acc = $("id_precision_gps");
-    if (lat) lat.value = position.coords.latitude;
-    if (lng) lng.value = position.coords.longitude;
-    if (acc) acc.value = position.coords.accuracy;
+
+    if (!position || !position.coords) {
+      renderStatus(
+        "error",
+        "Position GPS invalide.",
+        "Aucune coordonnée exploitable n’a été reçue. Veuillez relancer la recherche."
+      );
+      return false;
+    }
+
+    var latitude = Number(position.coords.latitude);
+    var longitude = Number(position.coords.longitude);
+    var accuracy = Number(position.coords.accuracy);
+
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude) ||
+      !Number.isFinite(accuracy)
+    ) {
+      renderStatus(
+        "error",
+        "Position GPS invalide.",
+        "Le navigateur a retourné une position inexploitable. Veuillez relancer la recherche."
+      );
+      return false;
+    }
+
+    if (latitude < -90 || latitude > 90) {
+      renderStatus(
+        "error",
+        "Latitude invalide.",
+        "La latitude reçue est hors de la plage géographique autorisée."
+      );
+      return false;
+    }
+
+    if (longitude < -180 || longitude > 180) {
+      renderStatus(
+        "error",
+        "Longitude invalide.",
+        "La longitude reçue est hors de la plage géographique autorisée."
+      );
+      return false;
+    }
+
+    if (accuracy < 0) {
+      renderStatus(
+        "error",
+        "Précision GPS invalide.",
+        "La précision reçue est incohérente. Veuillez relancer la recherche."
+      );
+      return false;
+    }
+
+    /*
+     * Normalisation automatique :
+     * - latitude et longitude : 7 décimales ;
+     * - précision : 2 décimales.
+     *
+     * L'utilisateur n'a aucune opération technique à effectuer.
+     */
+    if (lat) {
+      lat.value = latitude.toFixed(7);
+    }
+
+    if (lng) {
+      lng.value = longitude.toFixed(7);
+    }
+
+    if (acc) {
+      acc.value = accuracy.toFixed(2);
+    }
+
+    return true;
   }
 
   function detailsFor(position) {
@@ -72,13 +143,23 @@
   }
 
   function acceptBestPosition() {
-    if (!bestPosition) return;
+    if (!bestPosition) {
+      return;
+    }
+
     stopWatch();
-    storePosition(bestPosition);
+
+    if (!storePosition(bestPosition)) {
+      return;
+    }
+
     renderStatus(
       "found",
       "Position retenue.",
-      detailsFor(bestPosition) + " La position a été acceptée malgré une précision supérieure à " + TARGET_ACCURACY_METERS + " m."
+      detailsFor(bestPosition) +
+      " La position a été acceptée malgré une précision supérieure à " +
+      TARGET_ACCURACY_METERS +
+      " m."
     );
   }
 
@@ -112,8 +193,16 @@
 
       if (position.coords.accuracy <= TARGET_ACCURACY_METERS) {
         stopWatch();
-        storePosition(position);
-        renderStatus("found", "Position trouvée.", detailsFor(position));
+
+        if (!storePosition(position)) {
+          return;
+        }
+
+        renderStatus(
+          "found",
+          "Position trouvée.",
+          detailsFor(position)
+        );
       } else {
         renderStatus(
           "insufficient",

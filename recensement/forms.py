@@ -6,6 +6,10 @@ from django.contrib.auth.models import User
 from django.core.validators import MaxValueValidator, MinValueValidator
 
 from .models import District, FicheParoisse, Profil, Province, Region, Village, Zone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+
+from django import forms
+from django.core.exceptions import ValidationError
 
 # Numérotation béninoise (réforme 2021) : tous les numéros commencent par
 # "01" suivi de 8 chiffres (10 chiffres au total), avec ou sans l'indicatif
@@ -67,6 +71,40 @@ def valider_image(fichier):
         raise forms.ValidationError(
             f"« {nom} » dépasse la taille maximale autorisée (5 Mo)."
         )
+
+class GPSDecimalField(forms.DecimalField):
+    """
+    Champ décimal qui normalise automatiquement une valeur GPS avant que
+    Django applique les contraintes max_digits et decimal_places.
+
+    Les valeurs envoyées par le navigateur peuvent contenir de nombreuses
+    décimales. Elles sont arrondies côté serveur sans intervention de
+    l'utilisateur.
+    """
+
+    def __init__(self, *args, precision=7, **kwargs):
+        self.gps_precision = precision
+        self.quantizer = Decimal("1").scaleb(-precision)
+        super().__init__(*args, **kwargs)
+
+    def to_python(self, value):
+        decimal_value = super().to_python(value)
+
+        if decimal_value is None:
+            return None
+
+        try:
+            return decimal_value.quantize(
+                self.quantizer,
+                rounding=ROUND_HALF_UP,
+            )
+        except (InvalidOperation, ValueError, TypeError):
+            raise ValidationError(
+                "La position GPS reçue n’est pas exploitable. "
+                "Veuillez relancer la géolocalisation.",
+                code="invalid_gps",
+            )
+
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -188,6 +226,81 @@ class FicheParoisseForm(forms.ModelForm):
         }),
         label="Nombre de fidèles estimé",
     )
+    latitude = GPSDecimalField(
+        required=False,
+        precision=7,
+        max_digits=10,
+        decimal_places=7,
+        min_value=Decimal("-90"),
+        max_value=Decimal("90"),
+        widget=forms.HiddenInput(attrs={"id": "id_latitude"}),
+        error_messages={
+            "invalid": (
+                "La latitude reçue n’est pas valide. "
+                "Veuillez relancer la géolocalisation."
+            ),
+            "max_digits": (
+                "La latitude GPS n’a pas pu être normalisée. "
+                "Veuillez relancer la géolocalisation."
+            ),
+            "max_decimal_places": (
+                "La latitude GPS n’a pas pu être normalisée. "
+                "Veuillez relancer la géolocalisation."
+            ),
+            "min_value": "La latitude reçue est hors de la zone autorisée.",
+            "max_value": "La latitude reçue est hors de la zone autorisée.",
+        },
+    )
+
+    longitude = GPSDecimalField(
+        required=False,
+        precision=7,
+        max_digits=10,
+        decimal_places=7,
+        min_value=Decimal("-180"),
+        max_value=Decimal("180"),
+        widget=forms.HiddenInput(attrs={"id": "id_longitude"}),
+        error_messages={
+            "invalid": (
+                "La longitude reçue n’est pas valide. "
+                "Veuillez relancer la géolocalisation."
+            ),
+            "max_digits": (
+                "La longitude GPS n’a pas pu être normalisée. "
+                "Veuillez relancer la géolocalisation."
+            ),
+            "max_decimal_places": (
+                "La longitude GPS n’a pas pu être normalisée. "
+                "Veuillez relancer la géolocalisation."
+            ),
+            "min_value": "La longitude reçue est hors de la zone autorisée.",
+            "max_value": "La longitude reçue est hors de la zone autorisée.",
+        },
+    )
+
+    precision_gps = GPSDecimalField(
+        required=False,
+        precision=2,
+        max_digits=8,
+        decimal_places=2,
+        min_value=Decimal("0"),
+        widget=forms.HiddenInput(attrs={"id": "id_precision_gps"}),
+        error_messages={
+            "invalid": (
+                "La précision GPS reçue n’est pas valide. "
+                "Veuillez relancer la géolocalisation."
+            ),
+            "max_digits": (
+                "La précision GPS reçue est inexploitable. "
+                "Veuillez relancer la géolocalisation."
+            ),
+            "max_decimal_places": (
+                "La précision GPS reçue est inexploitable. "
+                "Veuillez relancer la géolocalisation."
+            ),
+            "min_value": "La précision GPS ne peut pas être négative.",
+        },
+    )
 
     class Meta:
         model = FicheParoisse
@@ -220,9 +333,6 @@ class FicheParoisseForm(forms.ModelForm):
                 "class": INPUT_CSS, "accept": "image/jpeg,image/png,image/webp",
             }),
             "statut_batiment": forms.Select(attrs={"class": SELECT_CSS}),
-            "latitude": forms.HiddenInput(attrs={"id": "id_latitude"}),
-            "longitude": forms.HiddenInput(attrs={"id": "id_longitude"}),
-            "precision_gps": forms.HiddenInput(attrs={"id": "id_precision_gps"}),
             "nom_informateur": forms.TextInput(attrs={
                 "class": INPUT_CSS, "placeholder": "Nom de la personne rencontrée sur place",
             }),
@@ -309,6 +419,30 @@ class FicheParoisseForm(forms.ModelForm):
         if village and zone and village.zone_id != zone.id:
             self.add_error("village", "Ce village n'appartient pas à la zone sélectionnée.")
 
+        latitude = cleaned_data.get("latitude")
+        longitude = cleaned_data.get("longitude")
+        precision_gps = cleaned_data.get("precision_gps")
+
+        gps_values = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "precision_gps": precision_gps,
+        }
+
+        values_present = {
+            name: value is not None
+            for name, value in gps_values.items()
+        }
+
+        if any(values_present.values()) and not all(values_present.values()):
+            message = (
+                "La position GPS reçue est incomplète. "
+                "Veuillez relancer la géolocalisation."
+            )
+
+            for field_name, is_present in values_present.items():
+                if not is_present:
+                    self.add_error(field_name, message)
         # Anti-doublon : une même paroisse (même nom + même chargé) ne doit
         # pas être enregistrée deux fois dans la même zone — que ce soit par
         # le même agent ou par deux agents différents envoyés sur le terrain.

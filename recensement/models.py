@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 # ---------------------------------------------------------------------------
 # Référentiel géo-ecclésial (importé depuis le fichier Excel de cartographie)
@@ -268,10 +268,39 @@ class FicheParoisse(models.Model):
     statut_batiment = models.CharField(max_length=20, choices=StatutBatiment.choices)
 
     # --- Géolocalisation (capturée via le téléphone de l'agent) ---
-    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
-    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
-    precision_gps = models.FloatField(
-        null=True, blank=True, help_text="Précision de la capture GPS, en mètres.",
+    latitude = models.DecimalField(
+        max_digits=10,
+        decimal_places=7,
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(-90),
+            MaxValueValidator(90),
+        ],
+        verbose_name="Latitude",
+    )
+
+    longitude = models.DecimalField(
+        max_digits=10,
+        decimal_places=7,
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(-180),
+            MaxValueValidator(180),
+        ],
+        verbose_name="Longitude",
+    )
+
+    precision_gps = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(0),
+        ],
+        verbose_name="Précision GPS",
     )
 
     # --- Traçabilité : qui a créé cette fiche (détermine sa visibilité pour
