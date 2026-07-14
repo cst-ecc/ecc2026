@@ -95,15 +95,25 @@ INPUT_CSS = (
 )
 SELECT_CSS = INPUT_CSS + " bg-white"
 
+class RegionModelChoiceField(forms.ModelChoiceField):
+    """Affiche le libellé institutionnel sans modifier la valeur enregistrée."""
+
+    def label_from_instance(self, obj):
+        return obj.libelle_selection
+
+
 
 class FicheParoisseForm(forms.ModelForm):
     # On garde les querysets complets (et non filtrés) pour la validation,
     # car les <option> réelles sont injectées dynamiquement par le JS
     # (cascade region -> province -> district -> zone -> village).
-    region = forms.ModelChoiceField(
+    region = RegionModelChoiceField(
         queryset=Region.objects.all(),
         label="Région ecclésiale",
-        widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_region"}),
+        widget=forms.Select(attrs={
+            "class": SELECT_CSS,
+            "id": "id_region",
+        }),
     )
     province = forms.ModelChoiceField(
         queryset=Province.objects.all(),

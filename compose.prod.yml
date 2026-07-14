@@ -1,20 +1,7 @@
 services:
-  # -----------------------------------------------------------------------------
-  # PostgreSQL database service.
-  #
-  # The service is intentionally named "personal" to follow the ECC internal
-  # infrastructure naming convention. It is the PostgreSQL database backing the
-  # ECC Portal application.
-  #
-  # IMPORTANT:
-  # - DATABASE_URL in .env.prod MUST use "personal" as the hostname.
-  # - This service is NOT exposed to the Internet.
-  # - Only the "portal" service can access it through the Docker network.
-  # -----------------------------------------------------------------------------
   personal:
     image: postgres:16.9-alpine
     container_name: ecc-personal
-
     restart: unless-stopped
 
     env_file:
@@ -49,28 +36,37 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+
     stop_grace_period: 30s
     mem_limit: 512m
     cpus: "0.50"
-  
+
   volume_init:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
     image: ecc-portal:latest
     container_name: ecc-volume-init
+
     user: root
     entrypoint: ["/bin/sh", "-c"]
+
     command:
       - |
         mkdir -p /app/media/paroisses /app/staticfiles
         chown -R eccparishatlast:eccparishatlast /app/media /app/staticfiles
         chmod -R u+rwX,g+rX,o-rwx /app/media
         chmod -R u+rwX,g+rX,o+rX /app/staticfiles
+
     volumes:
       - static_data:/app/staticfiles
       - media_data:/app/media
+
     security_opt:
       - no-new-privileges:true
+
     restart: "no"
-  # Django application served by Gunicorn.
+
   portal:
     build:
       context: .
@@ -107,14 +103,10 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+
     mem_limit: 1g
     cpus: "1.0"
 
-  # Reverse proxy.
-  #
-  # The shield service is the only container exposed to the Internet.
-  # It proxies requests to the internal Gunicorn application and serves
-  # static/media files directly.
   shield:
     build:
       context: ./docker/nginx
@@ -128,10 +120,13 @@ services:
 
     ports:
       - "80:80"
+      - "443:443"
 
     volumes:
       - static_data:/static:ro
       - media_data:/media:ro
+      - certbot_webroot:/var/www/certbot:ro
+      - letsencrypt:/etc/letsencrypt:ro
 
     security_opt:
       - no-new-privileges:true
@@ -144,17 +139,34 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
-    
+
     mem_limit: 128m
     cpus: "0.25"
 
+  certbot:
+    image: certbot/certbot:latest
+    container_name: ecc-certbot
+
+    volumes:
+      - certbot_webroot:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+
+    entrypoint: ["certbot"]
+
+    networks:
+      - ecc_network
+
+    profiles:
+      - certificates
 
 volumes:
   personal_data:
   static_data:
   media_data:
-
+  certbot_webroot:
+  letsencrypt:
 
 networks:
   ecc_network:
     driver: bridge
+

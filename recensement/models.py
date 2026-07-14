@@ -11,15 +11,55 @@ from django.dispatch import receiver
 # ---------------------------------------------------------------------------
 
 class Region(models.Model):
-    """Région ecclésiale (ex: PORTO-NOVO, BORGOU-ALIBORI...)."""
+    """Région ecclésiale du référentiel territorial."""
 
     nom = models.CharField(max_length=150, unique=True)
-    ordre = models.PositiveIntegerField(default=0, help_text="Ordre d'affichage")
+    ordre = models.PositiveIntegerField(
+        default=0,
+        help_text="Ordre d'affichage",
+    )
 
     class Meta:
         ordering = ["ordre", "nom"]
         verbose_name = "Région ecclésiale"
         verbose_name_plural = "Régions ecclésiales"
+
+    @property
+    def libelle_selection(self):
+        """
+        Libellé destiné aux listes déroulantes.
+
+        Exemples :
+        - Région mère (PORTO-NOVO)
+        - Deuxième Région (ALIBORI-BORGOU)
+
+        Le nom réel enregistré en base reste inchangé.
+        """
+        nom = self.nom.strip()
+        nom_normalise = nom.upper()
+
+        if nom_normalise == "PORTO-NOVO":
+            return f"1ère: Région mère ({nom})"
+
+        libelles = {
+            1: "1ère Région",
+            2: "2ème Région",
+            3: "3ème Région",
+            4: "4ème Région",
+            5: "5ème Région",
+            6: "6ème Région",
+            7: "7ème Région",
+            8: "8ème Région",
+            9: "9ème Région",
+            10: "10ème Région",
+        }
+
+        libelle = libelles.get(
+            self.ordre,
+            f"Région {self.ordre}" if self.ordre else "Région",
+        )
+
+        return f"{libelle} ({nom})"
 
     def __str__(self):
         return self.nom

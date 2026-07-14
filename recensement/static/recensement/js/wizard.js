@@ -197,7 +197,7 @@
       html += ligneRecap("Province", texteOptionSelectionnee(document.getElementById("id_province")));
       html += ligneRecap("District", texteOptionSelectionnee(document.getElementById("id_district")));
       html += ligneRecap("Zone", texteOptionSelectionnee(document.getElementById("id_zone")));
-      html += ligneRecap("Village / localité", localite);
+      html += ligneRecap("Village / Quartier", localite);
       html += ligneRecap("Nom de la paroisse", champTexte("id_nom_paroisse"));
       html += ligneRecap("Année de fondation", champTexte("id_annee_fondation"));
       html += ligneRecap("Statut du bâtiment", texteOptionSelectionnee(document.getElementById("id_statut_batiment")));
