@@ -140,6 +140,13 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 7  # 1 semaine, à augmenter progressivement
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS")
+    # Nginx termine la connexion HTTPS puis transmet la requête à Django en HTTP
+    # sur le réseau Docker. Cet en-tête permet à Django de reconnaître que la
+    # requête d'origine était sécurisée.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+    # Nginx transmet également X-Forwarded-Host.
+    USE_X_FORWARDED_HOST = True
 
 
 LOGGING = {
