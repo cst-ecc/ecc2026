@@ -20,6 +20,10 @@ niveau, le reste étant hérité du dernier niveau parent rencontré) :
             avant le dernier élément) — uniquement présent dans la feuille
             "Cartographie avec villes ".
     Col F : nombre de villages (contrôle de cohérence, informatif)
+
+Après l'import, les codes courts (R01, P01, D01, Z001…) sont générés
+automatiquement sur les entités qui n'en ont pas encore, pour permettre
+la génération des identifiants utilisateurs.
 """
 
 import re
@@ -34,6 +38,10 @@ from recensement.models import District, Province, Region, Village, Zone
 DEFAULT_SHEET = "Cartographie avec villes "
 DEFAULT_FILE = settings.BASE_DIR / "recensement" / "data" / "cartographie_benin.xlsx"
 
+
+# ---------------------------------------------------------------------------
+# Fonctions de nettoyage du texte brut de la feuille Excel
+# ---------------------------------------------------------------------------
 
 def clean_region(text):
     """'BORGOU-ALIBORI (2ème Région ecclésiale)' -> ('BORGOU-ALIBORI', 2)"""
@@ -100,10 +108,77 @@ def split_villages(raw):
     return out
 
 
+# ---------------------------------------------------------------------------
+# Génération des codes courts après import
+# ---------------------------------------------------------------------------
+
+def _generer_codes(stdout, style):
+    """
+    Génère ou complète les codes courts (R01, P01, D01, Z001…) sur toutes
+    les entités qui n'en ont pas encore.
+
+    Ces codes sont essentiels pour la génération des identifiants utilisateurs
+    (format R01-P01-D02-Z003-AG001). Ils sont stables une fois attribués :
+    si un code existe déjà, il n'est PAS modifié.
+    """
+    modifies = {"regions": 0, "provinces": 0, "districts": 0, "zones": 0}
+
+    # --- Régions : code basé sur l'ordre ecclésial ---
+    for region in Region.objects.filter(code="").order_by("ordre", "nom"):
+        if region.ordre:
+            region.code = f"R{region.ordre:02d}"
+        else:
+            # Fallback : ordre de création en base
+            seq = Region.objects.filter(code__startswith="R").count() + 1
+            region.code = f"R{seq:02d}"
+        region.save(update_fields=["code"])
+        modifies["regions"] += 1
+
+    # --- Provinces : numérotation séquentielle au sein de chaque région ---
+    for region in Region.objects.order_by("ordre", "nom"):
+        compteur = 1
+        for province in Province.objects.filter(region=region, code="").order_by("nom"):
+            province.code = f"P{compteur:02d}"
+            province.save(update_fields=["code"])
+            modifies["provinces"] += 1
+            compteur += 1
+
+    # --- Districts : numérotation séquentielle au sein de chaque province ---
+    for province in Province.objects.order_by("region__ordre", "nom"):
+        compteur = 1
+        for district in District.objects.filter(province=province, code="").order_by("nom"):
+            district.code = f"D{compteur:02d}"
+            district.save(update_fields=["code"])
+            modifies["districts"] += 1
+            compteur += 1
+
+    # --- Zones : numérotation séquentielle au sein de chaque district ---
+    for district in District.objects.order_by("province__region__ordre", "province__nom", "nom"):
+        compteur = 1
+        for zone in Zone.objects.filter(district=district, code="").order_by("nom"):
+            zone.code = f"Z{compteur:03d}"
+            zone.save(update_fields=["code"])
+            modifies["zones"] += 1
+            compteur += 1
+
+    stdout.write(style.SUCCESS(
+        "Codes courts générés :\n"
+        f"  Régions    : {modifies['regions']}\n"
+        f"  Provinces  : {modifies['provinces']}\n"
+        f"  Districts  : {modifies['districts']}\n"
+        f"  Zones      : {modifies['zones']}"
+    ))
+
+
+# ---------------------------------------------------------------------------
+# Commande Django
+# ---------------------------------------------------------------------------
+
 class Command(BaseCommand):
     help = (
         "Importe le référentiel géo-ecclésial du Bénin (région > province > "
-        "district > zone > village) depuis le fichier Excel de cartographie."
+        "district > zone > village) depuis le fichier Excel de cartographie, "
+        "puis génère les codes courts (R01, P01…) nécessaires aux identifiants."
     )
 
     def add_arguments(self, parser):
@@ -119,11 +194,24 @@ class Command(BaseCommand):
             "--dry-run", action="store_true",
             help="Analyse le fichier et affiche le résumé sans rien écrire en base.",
         )
+        parser.add_argument(
+            "--codes-seulement", action="store_true",
+            help=(
+                "Ne relance pas l'import Excel : génère uniquement les codes courts "
+                "sur les entités existantes qui n'en ont pas encore."
+            ),
+        )
 
     def handle(self, *args, **options):
+        dry_run = options["dry_run"]
+
+        # Mode codes-seulement : pas besoin du fichier Excel
+        if options["codes_seulement"]:
+            _generer_codes(self.stdout, self.style)
+            return
+
         filepath = options["file"]
         sheet_name = options["sheet"]
-        dry_run = options["dry_run"]
 
         try:
             wb = openpyxl.load_workbook(filepath, data_only=True)
@@ -149,7 +237,6 @@ class Command(BaseCommand):
             sid = transaction.savepoint()
 
             for i, row in enumerate(ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=True), start=1):
-                # On ne lit que les 6 premières colonnes utiles (A-F)
                 a, b, c, d, e, f = (list(row) + [None] * 6)[:6]
 
                 try:
@@ -162,6 +249,9 @@ class Command(BaseCommand):
                         region_obj, created = Region.objects.get_or_create(
                             nom=nom, defaults={"ordre": ordre}
                         )
+                        if not created and region_obj.ordre != ordre and ordre:
+                            region_obj.ordre = ordre
+                            region_obj.save(update_fields=["ordre"])
                         if created:
                             stats["regions"] += 1
                         current_region = region_obj
@@ -228,7 +318,7 @@ class Command(BaseCommand):
                                 stats["villages"] += 1
                         continue
 
-                except Exception as exc:  # pragma: no cover - garde-fou d'import
+                except Exception as exc:  # pragma: no cover
                     self.stderr.write(
                         self.style.WARNING(f"Ligne {i} ignorée ({exc}) : {row}")
                     )
@@ -251,3 +341,8 @@ class Command(BaseCommand):
             f"  Villages ajoutés   : {stats['villages']}\n"
             f"  Lignes ignorées    : {stats['lignes_ignorees']}"
         ))
+
+        # Génération des codes courts (idempotente — ne touche pas les codes déjà renseignés)
+        if not dry_run:
+            self.stdout.write("\nGénération des codes courts…")
+            _generer_codes(self.stdout, self.style)

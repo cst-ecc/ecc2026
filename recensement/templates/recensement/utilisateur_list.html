@@ -11,6 +11,55 @@
   </a>
 </div>
 
+{# ---- Filtres (super admin uniquement) ---- #}
+{% if request.user.is_superuser or request.user.profil.is_super_admin %}
+<form method="get" class="mb-4 bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+  <div class="grid sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Rôle</label>
+      <select name="role"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">— Tous les rôles —</option>
+        {% for value, label in roles %}
+          <option value="{{ value }}" {% if filtre_role == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Région</label>
+      <select name="region"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">— Toutes —</option>
+        {% for r in regions %}
+          <option value="{{ r.pk }}" {% if filtre_region == r.pk|stringformat:"d" %}selected{% endif %}>{{ r.nom }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Province</label>
+      <select name="province"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">— Toutes —</option>
+        {% for p in provinces %}
+          <option value="{{ p.pk }}" {% if filtre_province == p.pk|stringformat:"d" %}selected{% endif %}>{{ p.nom }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="flex items-end gap-2 sm:col-span-2">
+      <button type="submit"
+              class="flex-1 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+        Filtrer
+      </button>
+      <a href="{% url 'recensement:utilisateur_list' %}"
+         class="flex-1 text-center border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg">
+        Réinitialiser
+      </a>
+    </div>
+  </div>
+</form>
+{% endif %}
+
+{# ---- Tableau ---- #}
 <div class="overflow-x-auto bg-white rounded-2xl border border-slate-200 shadow-sm">
   <table class="min-w-full text-sm">
     <thead class="bg-slate-800 text-white text-left">
@@ -19,6 +68,8 @@
         <th class="px-4 py-3 font-medium">Nom</th>
         <th class="px-4 py-3 font-medium">Rôle</th>
         <th class="px-4 py-3 font-medium">Périmètre</th>
+        <th class="px-4 py-3 font-medium">Créé par</th>
+        <th class="px-4 py-3 font-medium">Date création</th>
         <th class="px-4 py-3 font-medium text-center">Statut</th>
         <th class="px-4 py-3 font-medium">Actions</th>
       </tr>
@@ -26,16 +77,70 @@
     <tbody class="divide-y divide-slate-100">
       {% for u in utilisateurs %}
       <tr class="hover:bg-slate-50">
-        <td class="px-4 py-3 font-medium">{{ u.username }}{% if u == request.user %} <span class="text-xs text-slate-400">(vous)</span>{% endif %}</td>
+
+        {# Identifiant #}
+        <td class="px-4 py-3 font-mono text-xs font-medium">
+          {{ u.username }}
+          {% if u == request.user %}<span class="text-slate-400 text-xs normal-case font-sans"> (vous)</span>{% endif %}
+        </td>
+
+        {# Nom #}
         <td class="px-4 py-3">{{ u.get_full_name|default:"—" }}</td>
+
+        {# Rôle #}
         <td class="px-4 py-3">
-          {% if u.is_superuser %}Super administrateur{% else %}{{ u.profil.get_role_display }}{% endif %}
+          {% if u.is_superuser %}
+            <span class="inline-block px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-medium">
+              Super administrateur
+            </span>
+          {% else %}
+            {% with role=u.profil.role %}
+              {% if role == "super_admin" %}
+                <span class="inline-block px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-medium">SA</span>
+              {% elif role == "op_province" %}
+                <span class="inline-block px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">OP PROVINCE</span>
+              {% elif role == "op_district" %}
+                <span class="inline-block px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-medium">OP DISTRICT</span>
+              {% elif role == "op_zone" %}
+                <span class="inline-block px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 text-xs font-medium">OP ZONE</span>
+              {% elif role == "agent" %}
+                <span class="inline-block px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">Agent</span>
+              {% else %}
+                <span class="text-slate-400 text-xs">{{ u.profil.get_role_display }}</span>
+              {% endif %}
+            {% endwith %}
+          {% endif %}
         </td>
-        <td class="px-4 py-3">
-          {% if u.profil.province %}{{ u.profil.province.nom }}
-          {% elif u.profil.district %}{{ u.profil.district.nom }}
-          {% else %}—{% endif %}
+
+        {# Périmètre #}
+        <td class="px-4 py-3 text-slate-600">
+          {% if not u.is_superuser and u.profil %}
+            {{ u.profil.perimetre_display }}
+          {% else %}
+            <span class="text-slate-400">Accès global</span>
+          {% endif %}
         </td>
+
+        {# Créé par (traçabilité) #}
+        <td class="px-4 py-3 text-slate-600">
+          {% if u.profil.cree_par %}
+            <span class="font-mono text-xs">{{ u.profil.cree_par.username }}</span>
+          {% else %}
+            <span class="text-slate-400">—</span>
+          {% endif %}
+        </td>
+
+        {# Date de création #}
+        <td class="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
+          {% if u.profil.date_creation %}
+            {{ u.profil.date_creation|date:"d/m/Y" }}<br>
+            <span class="text-slate-400">{{ u.profil.date_creation|time:"H\hi" }}</span>
+          {% else %}
+            —
+          {% endif %}
+        </td>
+
+        {# Statut #}
         <td class="px-4 py-3 text-center">
           {% if u.is_active %}
             <span class="inline-block px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-medium">Actif</span>
@@ -43,6 +148,8 @@
             <span class="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-medium">Désactivé</span>
           {% endif %}
         </td>
+
+        {# Actions #}
         <td class="px-4 py-3 whitespace-nowrap space-x-1">
           <a href="{% url 'recensement:utilisateur_update' u.pk %}" class="text-brand-600 hover:underline">Modifier</a>
           <span class="text-slate-300">·</span>
@@ -55,13 +162,17 @@
                 {% if u.is_active %}Désactiver{% else %}Réactiver{% endif %}
               </button>
             </form>
-            <span class="text-slate-300">·</span>
-            <a href="{% url 'recensement:utilisateur_delete' u.pk %}" class="text-red-600 hover:underline">Supprimer</a>
+            {% if request.user.is_superuser %}
+              <span class="text-slate-300">·</span>
+              <a href="{% url 'recensement:utilisateur_delete' u.pk %}" class="text-red-600 hover:underline">Supprimer</a>
+            {% endif %}
           {% endif %}
         </td>
       </tr>
       {% empty %}
-      <tr><td colspan="6" class="text-center text-slate-400 py-8">Aucun compte pour le moment.</td></tr>
+      <tr>
+        <td colspan="8" class="text-center text-slate-400 py-8">Aucun compte pour le moment.</td>
+      </tr>
       {% endfor %}
     </tbody>
   </table>

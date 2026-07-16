@@ -1,0 +1,40 @@
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4">
+  <div class="flex items-start justify-between gap-3 flex-wrap">
+    <div>
+      <h2 class="text-sm font-semibold text-slate-800">Codification officielle</h2>
+      <p class="text-xs text-slate-500 mt-0.5">
+        Code unique attribué après validation complète de la paroisse.
+      </p>
+    </div>
+
+    {% if fiche.code_officiel %}
+      <span class="inline-flex items-center rounded-full bg-green-50 text-green-700 px-3 py-1 text-xs font-semibold">
+        Code généré
+      </span>
+    {% else %}
+      <span class="inline-flex items-center rounded-full bg-amber-50 text-amber-700 px-3 py-1 text-xs font-semibold">
+        En attente de validation complète
+      </span>
+    {% endif %}
+  </div>
+
+  <div class="mt-4">
+    {% if fiche.code_officiel %}
+      <div class="text-xs text-slate-500 mb-1">Code officiel</div>
+      <div class="font-mono text-lg font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 inline-block">
+        {{ fiche.code_officiel }}
+      </div>
+
+      <div class="text-xs text-slate-500 mt-3">
+        Généré le {{ fiche.date_generation_code|date:"d/m/Y à H:i" }}
+        {% if fiche.genere_par %}
+          par {{ fiche.genere_par.get_full_name|default:fiche.genere_par.get_username }}
+        {% endif %}
+      </div>
+    {% else %}
+      <p class="text-sm text-slate-600">
+        Code officiel en attente de validation complète.
+      </p>
+    {% endif %}
+  </div>
+</div>

@@ -11,12 +11,23 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 # ---------------------------------------------------------------------------
 
 class Region(models.Model):
-    """Région ecclésiale du référentiel territorial."""
+    """Région ecclésiale du référentiel territorial.
+
+    Le champ `code` (ex : "R01") est utilisé dans la génération automatique
+    des identifiants utilisateurs. Il est unique et stable dans le temps.
+    """
 
     nom = models.CharField(max_length=150, unique=True)
     ordre = models.PositiveIntegerField(
         default=0,
         help_text="Ordre d'affichage",
+    )
+    code = models.CharField(
+        max_length=10,
+        unique=True,
+        blank=True,
+        help_text="Code court stable pour les identifiants (ex : R01, R02…). "
+                  "Généré automatiquement si laissé vide.",
     )
 
     class Meta:
@@ -61,21 +72,46 @@ class Region(models.Model):
 
         return f"{libelle} ({nom})"
 
+    def save(self, *args, **kwargs):
+        """Génère le code automatiquement à partir de l'ordre si non fourni."""
+        if not self.code and self.ordre:
+            self.code = f"R{self.ordre:02d}"
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.nom
 
 
 class Province(models.Model):
-    """Province ecclésiale, rattachée à une région."""
+    """Province ecclésiale, rattachée à une région.
+
+    Le champ `code` (ex : "P01") est relatif à la région (numérotation interne).
+    """
 
     region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name="provinces")
     nom = models.CharField(max_length=150)
+    code = models.CharField(
+        max_length=10,
+        blank=True,
+        help_text="Code court stable pour les identifiants (ex : P01, P02…). "
+                  "Généré automatiquement si laissé vide.",
+    )
 
     class Meta:
         unique_together = ("region", "nom")
         ordering = ["nom"]
         verbose_name = "Province ecclésiale"
         verbose_name_plural = "Provinces ecclésiales"
+
+    def save(self, *args, **kwargs):
+        """Génère le code séquentiel au sein de la région si non fourni."""
+        if not self.code:
+            # On compte les provinces existantes dans cette région pour numéroter.
+            existantes = Province.objects.filter(region=self.region)
+            if self.pk:
+                existantes = existantes.exclude(pk=self.pk)
+            self.code = f"P{existantes.count() + 1:02d}"
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.nom} ({self.region.nom})"
@@ -86,12 +122,26 @@ class District(models.Model):
 
     province = models.ForeignKey(Province, on_delete=models.CASCADE, related_name="districts")
     nom = models.CharField(max_length=150)
+    code = models.CharField(
+        max_length=10,
+        blank=True,
+        help_text="Code court stable pour les identifiants (ex : D01, D02…). "
+                  "Généré automatiquement si laissé vide.",
+    )
 
     class Meta:
         unique_together = ("province", "nom")
         ordering = ["nom"]
         verbose_name = "District ecclésial"
         verbose_name_plural = "Districts ecclésiaux"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            existants = District.objects.filter(province=self.province)
+            if self.pk:
+                existants = existants.exclude(pk=self.pk)
+            self.code = f"D{existants.count() + 1:02d}"
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nom
@@ -105,12 +155,26 @@ class Zone(models.Model):
 
     district = models.ForeignKey(District, on_delete=models.CASCADE, related_name="zones")
     nom = models.CharField(max_length=200)
+    code = models.CharField(
+        max_length=10,
+        blank=True,
+        help_text="Code court stable pour les identifiants (ex : Z001, Z002…). "
+                  "Généré automatiquement si laissé vide.",
+    )
 
     class Meta:
         unique_together = ("district", "nom")
         ordering = ["nom"]
         verbose_name = "Zone ecclésiale"
         verbose_name_plural = "Zones ecclésiales"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            existantes = Zone.objects.filter(district=self.district)
+            if self.pk:
+                existantes = existantes.exclude(pk=self.pk)
+            self.code = f"Z{existantes.count() + 1:03d}"
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nom
@@ -119,18 +183,39 @@ class Zone(models.Model):
 class Village(models.Model):
     """Village / quartier déjà répertorié à l'intérieur d'une zone.
 
-    Ce référentiel n'est pas forcément exhaustif : le formulaire de terrain
-    permet de déclarer une localité absente de cette liste.
+    Le champ `code` est utilisé dans la codification officielle des paroisses
+    (segment QQ). Il est stable une fois généré.
     """
 
     zone = models.ForeignKey(Zone, on_delete=models.CASCADE, related_name="villages")
     nom = models.CharField(max_length=200)
+    code = models.CharField(
+        max_length=10,
+        blank=True,
+        help_text="Code court stable pour composition des codes officiels "
+                  "(ex : Q001, Q002…). Généré automatiquement si laissé vide.",
+    )
 
     class Meta:
         unique_together = ("zone", "nom")
         ordering = ["nom"]
         verbose_name = "Village / Quartier"
         verbose_name_plural = "Villages / Quartiers"
+
+    def save(self, *args, **kwargs):
+        """Génère un code Qxxx séquentiel dans la zone si absent."""
+        if not self.code and self.zone_id:
+            existants = Village.objects.filter(zone_id=self.zone_id).exclude(code="")
+            if self.pk:
+                existants = existants.exclude(pk=self.pk)
+
+            max_num = 0
+            for code in existants.values_list("code", flat=True):
+                if code and code.startswith("Q") and code[1:].isdigit():
+                    max_num = max(max_num, int(code[1:]))
+
+            self.code = f"Q{max_num + 1:03d}"
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nom
@@ -142,31 +227,81 @@ class Village(models.Model):
 
 class Profil(models.Model):
     """Profil applicatif attaché à chaque compte Django (User), déterminant
-    ce que la personne peut voir/faire dans l'application :
+    ce que la personne peut voir/faire dans l'application.
 
-    - super_admin  : voit tout, peut modifier/supprimer n'importe quelle fiche.
-    - manager      : chef de province — voit les fiches de SA province.
-    - superviseur  : chef de district — voit les fiches de SON district.
+    Hiérarchie des rôles (du plus restreint au plus large) :
     - agent        : voit uniquement les fiches QU'IL a lui-même enregistrées.
+                     Rattaché à une zone.
+    - op_zone      : OP ZONE — voit les fiches de SA zone. Peut créer des agents
+                     dans sa zone.
+    - op_district  : OP DISTRICT — voit les fiches de SON district. Peut créer
+                     des OP ZONE et des agents dans son district.
+    - op_province  : OP PROVINCE — voit les fiches de SA province. Peut créer
+                     des OP DISTRICT, OP ZONE et agents dans sa province.
+    - super_admin  : voit tout, peut modifier/supprimer n'importe quelle fiche.
+                     Peut créer tous les types d'utilisateurs.
+
+    MIGRATION des anciens rôles :
+    - 'superviseur' (chef de district) → 'op_district'
+    - 'manager' (chef de province)     → 'op_province'
+    Ces valeurs sont conservées dans la migration 0008 pour préserver
+    l'historique et les données existantes.
     """
 
     class Role(models.TextChoices):
-        SUPER_ADMIN = "super_admin", "Super administrateur"
-        MANAGER = "manager", "Manager (chef de province)"
-        SUPERVISEUR = "superviseur", "Superviseur (chef de district)"
-        AGENT = "agent", "Agent recenseur"
+        SUPER_ADMIN  = "super_admin",  "Super administrateur"
+        OP_PROVINCE  = "op_province",  "OP PROVINCE (chef de province)"
+        OP_DISTRICT  = "op_district",  "OP DISTRICT (chef de district)"
+        OP_ZONE      = "op_zone",      "OP ZONE (chef de zone)"
+        AGENT        = "agent",        "Agent recenseur"
+
+    # -----------------------------------------------------------------------
+    # Constantes de migration : anciennes valeurs encore présentes en base
+    # jusqu'à la migration 0008. NE PAS SUPPRIMER avant la fin du déploiement.
+    # -----------------------------------------------------------------------
+    ROLE_MANAGER_LEGACY    = "manager"
+    ROLE_SUPERVISEUR_LEGACY = "superviseur"
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profil",
     )
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.AGENT)
+
+    # Rattachements hiérarchiques — chaque rôle n'utilise que les niveaux
+    # correspondant à son périmètre ; les autres restent NULL.
+    region = models.ForeignKey(
+        Region, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="profils",
+        help_text="Région de rattachement (tous les rôles sauf super_admin).",
+    )
     province = models.ForeignKey(
-        Province, on_delete=models.SET_NULL, null=True, blank=True, related_name="managers",
-        help_text="Obligatoire si le rôle est Manager (définit la province supervisée).",
+        Province, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="op_provinces",
+        help_text="Province de rattachement (OP PROVINCE, OP DISTRICT, OP ZONE, Agent).",
     )
     district = models.ForeignKey(
-        District, on_delete=models.SET_NULL, null=True, blank=True, related_name="superviseurs",
-        help_text="Obligatoire si le rôle est Superviseur (définit le district supervisé).",
+        District, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="op_districts",
+        help_text="District de rattachement (OP DISTRICT, OP ZONE, Agent).",
+    )
+    zone = models.ForeignKey(
+        Zone, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="op_zones",
+        help_text="Zone de rattachement (OP ZONE, Agent).",
+    )
+
+    # Traçabilité : qui a créé ce compte et quand ?
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="comptes_crees",
+        help_text="Utilisateur ayant créé ce compte (rempli automatiquement).",
+    )
+    date_creation = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Date et heure de création du compte.",
     )
 
     class Meta:
@@ -177,26 +312,77 @@ class Profil(models.Model):
         return f"{self.user.get_username()} ({self.get_role_display()})"
 
     def clean(self):
-        if self.role == self.Role.MANAGER and not self.province_id:
-            raise ValidationError({"province": "Une province est requise pour le rôle Manager."})
-        if self.role == self.Role.SUPERVISEUR and not self.district_id:
-            raise ValidationError({"district": "Un district est requis pour le rôle Superviseur."})
+        """Vérifie que les rattachements hiérarchiques sont cohérents avec
+        le rôle choisi. On ne valide que les cas bloquants (champs manquants
+        obligatoires pour le rôle) ; les champs en trop sont ignorés ici
+        (ils seront écrasés dans la vue)."""
+        role = self.role
+        if role == self.Role.OP_PROVINCE:
+            if not self.region_id:
+                raise ValidationError({"region": "Une région est requise pour le rôle OP PROVINCE."})
+            if not self.province_id:
+                raise ValidationError({"province": "Une province est requise pour le rôle OP PROVINCE."})
+        elif role == self.Role.OP_DISTRICT:
+            if not self.region_id:
+                raise ValidationError({"region": "Une région est requise pour le rôle OP DISTRICT."})
+            if not self.province_id:
+                raise ValidationError({"province": "Une province est requise pour le rôle OP DISTRICT."})
+            if not self.district_id:
+                raise ValidationError({"district": "Un district est requis pour le rôle OP DISTRICT."})
+        elif role in (self.Role.OP_ZONE, self.Role.AGENT):
+            if not self.region_id:
+                raise ValidationError({"region": "Une région est requise pour ce rôle."})
+            if not self.province_id:
+                raise ValidationError({"province": "Une province est requise pour ce rôle."})
+            if not self.district_id:
+                raise ValidationError({"district": "Un district est requis pour ce rôle."})
+            if not self.zone_id:
+                raise ValidationError({"zone": "Une zone est requise pour ce rôle."})
+
+    # ------------------------------------------------------------------
+    # Propriétés de commodité (conservées pour compatibilité ascendante)
+    # ------------------------------------------------------------------
 
     @property
     def is_super_admin(self):
         return self.role == self.Role.SUPER_ADMIN
 
     @property
-    def is_manager(self):
-        return self.role == self.Role.MANAGER
+    def is_op_province(self):
+        return self.role == self.Role.OP_PROVINCE
 
     @property
-    def is_superviseur(self):
-        return self.role == self.Role.SUPERVISEUR
+    def is_op_district(self):
+        return self.role == self.Role.OP_DISTRICT
+
+    @property
+    def is_op_zone(self):
+        return self.role == self.Role.OP_ZONE
 
     @property
     def is_agent(self):
         return self.role == self.Role.AGENT
+
+    # Alias de compatibilité pour le code existant qui teste is_manager / is_superviseur
+    @property
+    def is_manager(self):
+        return self.is_op_province
+
+    @property
+    def is_superviseur(self):
+        return self.is_op_district
+
+    def perimetre_display(self):
+        """Texte synthétique du périmètre, utilisé dans les templates."""
+        if self.role == self.Role.OP_PROVINCE and self.province:
+            return f"Province : {self.province.nom}"
+        if self.role == self.Role.OP_DISTRICT and self.district:
+            return f"District : {self.district.nom}"
+        if self.role in (self.Role.OP_ZONE, self.Role.AGENT) and self.zone:
+            return f"Zone : {self.zone.nom}"
+        if self.role == self.Role.SUPER_ADMIN:
+            return "Accès global"
+        return "—"
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
@@ -230,13 +416,13 @@ class FonctionResponsable(models.TextChoices):
 
 class FicheParoisse(models.Model):
     """Fiche remplie par un agent recenseur sur le terrain pour une paroisse."""
-
+ 
     # --- Rattachement à la structure ecclésiale officielle (cascade) ---
     region = models.ForeignKey(Region, on_delete=models.PROTECT, related_name="fiches")
     province = models.ForeignKey(Province, on_delete=models.PROTECT, related_name="fiches")
     district = models.ForeignKey(District, on_delete=models.PROTECT, related_name="fiches")
     zone = models.ForeignKey(Zone, on_delete=models.PROTECT, related_name="fiches")
-
+ 
     # --- Localité : soit un village déjà répertorié, soit une nouvelle localité ---
     village = models.ForeignKey(
         Village, on_delete=models.SET_NULL, null=True, blank=True, related_name="fiches",
@@ -246,11 +432,11 @@ class FicheParoisse(models.Model):
         max_length=200, blank=True,
         help_text="À remplir uniquement si la localité n'existe pas dans la liste ci-dessus.",
     )
-
+ 
     # --- Identité de la paroisse ---
     nom_paroisse = models.CharField(max_length=200)
     annee_fondation = models.PositiveIntegerField(null=True, blank=True)
-
+ 
     # --- Chargé de paroisse ---
     parish_shepherd = models.CharField(max_length=200)
     contact_responsable = models.CharField(max_length=30, null=True, blank=True)
@@ -258,15 +444,15 @@ class FicheParoisse(models.Model):
         upload_to="paroisses/charges/%Y/%m/", blank=True, null=True,
         help_text="Photo du chargé de paroisse (facultative).",
     )
-
+ 
     # --- Effectifs ---
     nombre_fideles_estime = models.PositiveIntegerField(
         null=True, blank=True, help_text="Estimation du nombre de fidèles.",
     )
-
+ 
     # --- Bâtiment ---
     statut_batiment = models.CharField(max_length=20, choices=StatutBatiment.choices)
-
+ 
     # --- Géolocalisation (capturée via le téléphone de l'agent) ---
     latitude = models.DecimalField(
         max_digits=10,
@@ -279,7 +465,7 @@ class FicheParoisse(models.Model):
         ],
         verbose_name="Latitude",
     )
-
+ 
     longitude = models.DecimalField(
         max_digits=10,
         decimal_places=7,
@@ -291,7 +477,7 @@ class FicheParoisse(models.Model):
         ],
         verbose_name="Longitude",
     )
-
+ 
     precision_gps = models.DecimalField(
         max_digits=8,
         decimal_places=2,
@@ -302,7 +488,7 @@ class FicheParoisse(models.Model):
         ],
         verbose_name="Précision GPS",
     )
-
+ 
     # --- Traçabilité : qui a créé cette fiche (détermine sa visibilité pour
     #     le rôle Agent, qui ne voit que ses propres fiches). L'identité de
     #     l'agent recenseur n'est plus saisie à la main : il est connecté. ---
@@ -311,15 +497,17 @@ class FicheParoisse(models.Model):
         related_name="fiches_creees",
         help_text="Compte connecté ayant enregistré cette fiche (rempli automatiquement).",
     )
-
+ 
     # --- Workflow de validation hiérarchique ---
-    # Agent (crée) -> Superviseur/chef de district (valide) ->
-    # Manager/chef de province (valide) -> visible comme "validée" pour le super admin.
+    # Agent (crée) -> OP ZONE (valide) -> OP DISTRICT (valide) ->
+    # OP PROVINCE (valide) -> visible comme "validée".
+    # Pour la v1 on maintient 2 paliers (district + province) pour compatibilité
+    # avec les données existantes ; les libellés sont mis à jour.
     class StatutValidation(models.TextChoices):
-        ATTENTE_SUPERVISEUR = "attente_superviseur", "En attente du chef de district"
-        ATTENTE_MANAGER = "attente_manager", "En attente du chef de province"
-        VALIDEE = "validee", "Validée"
-
+        ATTENTE_SUPERVISEUR = "attente_superviseur", "En attente de l'OP DISTRICT"
+        ATTENTE_MANAGER     = "attente_manager",     "En attente de l'OP PROVINCE"
+        VALIDEE             = "validee",             "Validée"
+ 
     statut_validation = models.CharField(
         max_length=25, choices=StatutValidation.choices,
         default=StatutValidation.ATTENTE_SUPERVISEUR,
@@ -334,50 +522,72 @@ class FicheParoisse(models.Model):
         related_name="fiches_validees_manager",
     )
     date_validation_manager = models.DateTimeField(null=True, blank=True)
-
+ 
     # --- Informateur (personne ayant renseigné l'agent sur place, si
     #     différente du chargé de paroisse) — entièrement facultatif ---
     nom_informateur = models.CharField(max_length=200, blank=True)
     contact_informateur = models.CharField(max_length=30, null=True, blank=True)
-
+ 
     observations = models.TextField(blank=True)
     date_recensement = models.DateTimeField(auto_now_add=True)
+    # --- Codification officielle de la paroisse ---
+    code_officiel = models.CharField(
+        max_length=50,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text=(
+            "Code officiel généré automatiquement après validation complète. "
+            "Format : BJ-AAAA-RR-PP-DD-ZZ-QQ-XXXX"
+        ),
+    )
 
+    date_generation_code = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date et heure de génération du code officiel.",
+    )
+
+    genere_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fiches_codes_generes",
+        help_text="Utilisateur ayant déclenché la génération du code.",
+    )
+    
     class Meta:
         ordering = ["-date_recensement"]
         verbose_name = "Fiche de recensement de paroisse"
         verbose_name_plural = "Fiches de recensement de paroisses"
         constraints = [
-            # Filet de sécurité en base (en plus du contrôle convivial dans
-            # FicheParoisseForm.clean(), qui fait la même vérification en
-            # insensible à la casse) : bloque tout doublon EXACT même si
-            # quelqu'un contourne le formulaire (import, admin, API...).
             models.UniqueConstraint(
                 fields=["zone", "nom_paroisse", "parish_shepherd"],
                 name="unique_paroisse_zone_nom_charge",
             ),
         ]
-
+ 
     def __str__(self):
         return f"{self.nom_paroisse} — {self.localite}"
-
+ 
     @property
     def localite(self):
         """Nom de la localité, qu'elle soit référencée ou nouvellement déclarée."""
         if self.village:
             return self.village.nom
         return self.nouvelle_localite_nom or "Localité non précisée"
-
+ 
     @property
     def a_coordonnees_gps(self):
         return self.latitude is not None and self.longitude is not None
+    
 
 
 class PhotoParoisse(models.Model):
     """Photo du bâtiment/lieu de culte de la paroisse. Une fiche peut avoir
     0 à 3 photos — la limite est appliquée côté formulaire (PhotosParoisseForm),
-    pas par une contrainte de base de données (Django ne permet pas
-    nativement de limiter le nombre de lignes liées en base)."""
+    pas par une contrainte de base de données."""
 
     fiche = models.ForeignKey(FicheParoisse, on_delete=models.CASCADE, related_name="photos")
     image = models.ImageField(upload_to="paroisses/photos/%Y/%m/")
@@ -394,9 +604,7 @@ class PhotoParoisse(models.Model):
 
 class HistoriqueModification(models.Model):
     """Trace chaque modification apportée à une fiche après sa création,
-    avec le motif et un instantané avant/après — permet de retracer la
-    donnée d'origine (saisie par l'agent) jusqu'à sa version finale, et de
-    comprendre pourquoi chaque changement a eu lieu."""
+    avec le motif et un instantané avant/après."""
 
     fiche = models.ForeignKey(
         FicheParoisse, on_delete=models.CASCADE, related_name="historique",
@@ -417,3 +625,46 @@ class HistoriqueModification(models.Model):
     def __str__(self):
         return f"Modification de « {self.fiche.nom_paroisse} » le {self.date_modification:%d/%m/%Y %H:%M}"
 
+
+class CodeParoisseHistorique(models.Model):
+    """Traçabilité de la génération des codes officiels des paroisses.
+
+    Enregistre chaque génération de code, avec les données utilisées.
+    Permet un audit complet du processus de codification.
+    """
+
+    fiche = models.ForeignKey(
+        FicheParoisse,
+        on_delete=models.CASCADE,
+        related_name="historiques_codes",
+        help_text="Fiche concernée.",
+    )
+    code_attribue = models.CharField(
+        max_length=50,
+        help_text="Code officiel attribué.",
+    )
+    date_generation = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Date et heure de génération.",
+    )
+    genere_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="codes_generes",
+        help_text="Utilisateur/système ayant généré le code.",
+    )
+    donnees_composition = models.JSONField(
+        default=dict,
+        help_text="Données utilisées pour composer le code : "
+                  "{'pays': 'BJ', 'annee': 1986, 'region_code': 'R01', ...}",
+    )
+
+    class Meta:
+        verbose_name = "Traçabilité de code paroisse"
+        verbose_name_plural = "Traçabilités de codes paroisses"
+        ordering = ["-date_generation"]
+
+    def __str__(self):
+        return f"{self.fiche.nom_paroisse} → {self.code_attribue}"

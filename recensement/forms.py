@@ -1,65 +1,51 @@
 import re
-
-from django import forms
-from django.contrib.auth.forms import SetPasswordForm, UserCreationForm
-from django.contrib.auth.models import User
-from django.core.validators import MaxValueValidator, MinValueValidator
-
-from .models import District, FicheParoisse, Profil, Province, Region, Village, Zone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django import forms
+from django.contrib.auth.forms import SetPasswordForm
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 
-# Numérotation béninoise (réforme 2021) : tous les numéros commencent par
-# "01" suivi de 8 chiffres (10 chiffres au total), avec ou sans l'indicatif
-# +229. On accepte les espaces/tirets/points saisis par l'utilisateur, mais
-# on les retire avant validation et avant stockage (donnée normalisée).
-# Exemples valides : "0196355621", "+2290196355621", "01 96 35 56 21".
-BENIN_PHONE_REGEX = re.compile(r"^(\+229)?01\d{8}$")
+from .models import District, FicheParoisse, Profil, Province, Region, Village, Zone
 
+# ---------------------------------------------------------------------------
+# Validation téléphonique internationale
+# ---------------------------------------------------------------------------
 
 def valider_telephone_international(value):
+    """Accepte tout numéro national ou international (E.164 informel).
+    Retrait des espaces/tirets/points avant validation — on accepte les formats
+    saisis par l'utilisateur, la valeur normalisée est stockée."""
     if not value:
         return
-
-    import re
-    from django.core.exceptions import ValidationError
-
     numero = str(value).strip()
     numero_normalise = re.sub(r"[\s\-.()]", "", numero)
-
     if numero_normalise.startswith("+"):
         chiffres = numero_normalise[1:]
     else:
         chiffres = numero_normalise
-
     if not chiffres.isdigit():
         raise ValidationError(
-            "Numéro de téléphone invalide. Saisissez un numéro valide avec ou sans indicatif international."
+            "Numéro de téléphone invalide. Saisissez un numéro valide "
+            "avec ou sans indicatif international."
         )
-
     if len(chiffres) < 6 or len(chiffres) > 15:
         raise ValidationError(
             "Numéro de téléphone invalide. Le numéro doit contenir entre 6 et 15 chiffres."
         )
 
 
-MAX_ANNEE_FONDATION = 2100  # borne haute large et fixe
+MAX_ANNEE_FONDATION = 2100
 
-# --- Photos : format et taille autorisés (défense contre l'upload de
-# fichiers arbitraires — seules de vraies images, taille raisonnable) ---
+# --- Photos ---
 TAILLE_MAX_IMAGE_OCTETS = 5 * 1024 * 1024  # 5 Mo
 EXTENSIONS_IMAGE_AUTORISEES = {"jpg", "jpeg", "png", "webp"}
 NB_MAX_PHOTOS_PAROISSE = 3
 
 
 def valider_image(fichier):
-    """Validateur réutilisable (photo du chargé, photos de la paroisse) :
-    extension autorisée + taille raisonnable. Django valide déjà que le
-    contenu est une image exploitable via ImageField/Pillow ; ceci ajoute
-    des bornes explicites contre l'upload de fichiers trop lourds ou d'un
-    format non prévu (ex. SVG, potentiellement porteur de script)."""
+    """Valide l'extension et la taille d'un fichier image uploadé."""
     nom = getattr(fichier, "name", "") or ""
     extension = nom.rsplit(".", 1)[-1].lower() if "." in nom else ""
     if extension not in EXTENSIONS_IMAGE_AUTORISEES:
@@ -72,15 +58,13 @@ def valider_image(fichier):
             f"« {nom} » dépasse la taille maximale autorisée (5 Mo)."
         )
 
-class GPSDecimalField(forms.DecimalField):
-    """
-    Champ décimal qui normalise automatiquement une valeur GPS avant que
-    Django applique les contraintes max_digits et decimal_places.
 
-    Les valeurs envoyées par le navigateur peuvent contenir de nombreuses
-    décimales. Elles sont arrondies côté serveur sans intervention de
-    l'utilisateur.
-    """
+# ---------------------------------------------------------------------------
+# Champs spécialisés
+# ---------------------------------------------------------------------------
+
+class GPSDecimalField(forms.DecimalField):
+    """Champ décimal qui normalise automatiquement une valeur GPS."""
 
     def __init__(self, *args, precision=7, **kwargs):
         self.gps_precision = precision
@@ -89,22 +73,16 @@ class GPSDecimalField(forms.DecimalField):
 
     def to_python(self, value):
         decimal_value = super().to_python(value)
-
         if decimal_value is None:
             return None
-
         try:
-            return decimal_value.quantize(
-                self.quantizer,
-                rounding=ROUND_HALF_UP,
-            )
+            return decimal_value.quantize(self.quantizer, rounding=ROUND_HALF_UP)
         except (InvalidOperation, ValueError, TypeError):
             raise ValidationError(
-                "La position GPS reçue n’est pas exploitable. "
+                "La position GPS reçue n'est pas exploitable. "
                 "Veuillez relancer la géolocalisation.",
                 code="invalid_gps",
             )
-
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -112,9 +90,7 @@ class MultipleFileInput(forms.ClearableFileInput):
 
 
 class MultipleFileField(forms.FileField):
-    """Champ fichier acceptant une sélection multiple — motif officiel
-    Django (doc « Uploading multiple files »), nécessaire tant qu'il n'y a
-    pas de champ multi-fichiers natif au niveau des ModelForm."""
+    """Champ fichier acceptant une sélection multiple."""
 
     def __init__(self, *args, **kwargs):
         kwargs.setdefault("widget", MultipleFileInput())
@@ -126,12 +102,14 @@ class MultipleFileField(forms.FileField):
             return [single_file_clean(d, initial) for d in data]
         return single_file_clean(data, initial)
 
-# Classes Tailwind communes à tous les champs texte/nombre/textarea et selects.
+
+# Classes Tailwind communes
 INPUT_CSS = (
     "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base "
     "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
 )
 SELECT_CSS = INPUT_CSS + " bg-white"
+
 
 class RegionModelChoiceField(forms.ModelChoiceField):
     """Affiche le libellé institutionnel sans modifier la valeur enregistrée."""
@@ -140,18 +118,15 @@ class RegionModelChoiceField(forms.ModelChoiceField):
         return obj.libelle_selection
 
 
+# ---------------------------------------------------------------------------
+# Formulaire de saisie de fiche de recensement
+# ---------------------------------------------------------------------------
 
 class FicheParoisseForm(forms.ModelForm):
-    # On garde les querysets complets (et non filtrés) pour la validation,
-    # car les <option> réelles sont injectées dynamiquement par le JS
-    # (cascade region -> province -> district -> zone -> village).
     region = RegionModelChoiceField(
         queryset=Region.objects.all(),
         label="Région ecclésiale",
-        widget=forms.Select(attrs={
-            "class": SELECT_CSS,
-            "id": "id_region",
-        }),
+        widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_region"}),
     )
     province = forms.ModelChoiceField(
         queryset=Province.objects.all(),
@@ -175,9 +150,7 @@ class FicheParoisseForm(forms.ModelForm):
         widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_village"}),
     )
 
-    # Champ "honeypot" anti-robot : invisible pour un humain (masqué en CSS),
-    # mais un bot qui remplit tous les champs automatiquement le renseignera.
-    # Si non vide à la réception -> on rejette silencieusement (voir clean()).
+    # Champ "honeypot" anti-robot
     site_web = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={
@@ -214,7 +187,8 @@ class FicheParoisseForm(forms.ModelForm):
         required=False,
         validators=[MinValueValidator(1900), MaxValueValidator(MAX_ANNEE_FONDATION)],
         widget=forms.NumberInput(attrs={
-            "class": INPUT_CSS, "min": 1900, "max": MAX_ANNEE_FONDATION, "placeholder": "Ex : 1998",
+            "class": INPUT_CSS, "min": 1900, "max": MAX_ANNEE_FONDATION,
+            "placeholder": "Ex : 1998",
         }),
         label="Année de fondation (si connue)",
     )
@@ -227,77 +201,37 @@ class FicheParoisseForm(forms.ModelForm):
         label="Nombre de fidèles estimé",
     )
     latitude = GPSDecimalField(
-        required=False,
-        precision=7,
-        max_digits=10,
-        decimal_places=7,
-        min_value=Decimal("-90"),
-        max_value=Decimal("90"),
+        required=False, precision=7, max_digits=10, decimal_places=7,
+        min_value=Decimal("-90"), max_value=Decimal("90"),
         widget=forms.HiddenInput(attrs={"id": "id_latitude"}),
         error_messages={
-            "invalid": (
-                "La latitude reçue n’est pas valide. "
-                "Veuillez relancer la géolocalisation."
-            ),
-            "max_digits": (
-                "La latitude GPS n’a pas pu être normalisée. "
-                "Veuillez relancer la géolocalisation."
-            ),
-            "max_decimal_places": (
-                "La latitude GPS n’a pas pu être normalisée. "
-                "Veuillez relancer la géolocalisation."
-            ),
+            "invalid": "La latitude reçue n'est pas valide. Veuillez relancer la géolocalisation.",
+            "max_digits": "La latitude GPS n'a pas pu être normalisée. Veuillez relancer la géolocalisation.",
+            "max_decimal_places": "La latitude GPS n'a pas pu être normalisée. Veuillez relancer la géolocalisation.",
             "min_value": "La latitude reçue est hors de la zone autorisée.",
             "max_value": "La latitude reçue est hors de la zone autorisée.",
         },
     )
-
     longitude = GPSDecimalField(
-        required=False,
-        precision=7,
-        max_digits=10,
-        decimal_places=7,
-        min_value=Decimal("-180"),
-        max_value=Decimal("180"),
+        required=False, precision=7, max_digits=10, decimal_places=7,
+        min_value=Decimal("-180"), max_value=Decimal("180"),
         widget=forms.HiddenInput(attrs={"id": "id_longitude"}),
         error_messages={
-            "invalid": (
-                "La longitude reçue n’est pas valide. "
-                "Veuillez relancer la géolocalisation."
-            ),
-            "max_digits": (
-                "La longitude GPS n’a pas pu être normalisée. "
-                "Veuillez relancer la géolocalisation."
-            ),
-            "max_decimal_places": (
-                "La longitude GPS n’a pas pu être normalisée. "
-                "Veuillez relancer la géolocalisation."
-            ),
+            "invalid": "La longitude reçue n'est pas valide. Veuillez relancer la géolocalisation.",
+            "max_digits": "La longitude GPS n'a pas pu être normalisée. Veuillez relancer la géolocalisation.",
+            "max_decimal_places": "La longitude GPS n'a pas pu être normalisée. Veuillez relancer la géolocalisation.",
             "min_value": "La longitude reçue est hors de la zone autorisée.",
             "max_value": "La longitude reçue est hors de la zone autorisée.",
         },
     )
-
     precision_gps = GPSDecimalField(
-        required=False,
-        precision=2,
-        max_digits=8,
-        decimal_places=2,
+        required=False, precision=2, max_digits=8, decimal_places=2,
         min_value=Decimal("0"),
         widget=forms.HiddenInput(attrs={"id": "id_precision_gps"}),
         error_messages={
-            "invalid": (
-                "La précision GPS reçue n’est pas valide. "
-                "Veuillez relancer la géolocalisation."
-            ),
-            "max_digits": (
-                "La précision GPS reçue est inexploitable. "
-                "Veuillez relancer la géolocalisation."
-            ),
-            "max_decimal_places": (
-                "La précision GPS reçue est inexploitable. "
-                "Veuillez relancer la géolocalisation."
-            ),
+            "invalid": "La précision GPS reçue n'est pas valide. Veuillez relancer la géolocalisation.",
+            "max_digits": "La précision GPS reçue est inexploitable. Veuillez relancer la géolocalisation.",
+            "max_decimal_places": "La précision GPS reçue est inexploitable. Veuillez relancer la géolocalisation.",
             "min_value": "La précision GPS ne peut pas être négative.",
         },
     )
@@ -352,12 +286,8 @@ class FicheParoisseForm(forms.ModelForm):
         }
 
     def clean_site_web(self):
-        """Champ honeypot : doit toujours rester vide. S'il est renseigné,
-        la requête vient très probablement d'un robot de spam."""
         value = (self.cleaned_data.get("site_web") or "").strip()
         if value:
-            # Message volontairement générique : on ne révèle jamais à un
-            # bot qu'il vient de se faire démasquer par un piège spécifique.
             raise forms.ValidationError("Une erreur est survenue. Veuillez réessayer.")
         return value
 
@@ -394,7 +324,6 @@ class FicheParoisseForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
 
-        # Localité : soit un village référencé, soit une nouvelle localité déclarée
         village = cleaned_data.get("village")
         nouvelle_localite = (cleaned_data.get("nouvelle_localite_nom") or "").strip()
         if not village and not nouvelle_localite:
@@ -404,7 +333,6 @@ class FicheParoisseForm(forms.ModelForm):
                 "si elle n'y figure pas.",
             )
 
-        # Cohérence de la cascade géographique (contrôle léger, non bloquant si absent)
         region = cleaned_data.get("region")
         province = cleaned_data.get("province")
         district = cleaned_data.get("district")
@@ -423,29 +351,15 @@ class FicheParoisseForm(forms.ModelForm):
         longitude = cleaned_data.get("longitude")
         precision_gps = cleaned_data.get("precision_gps")
 
-        gps_values = {
-            "latitude": latitude,
-            "longitude": longitude,
-            "precision_gps": precision_gps,
-        }
-
-        values_present = {
-            name: value is not None
-            for name, value in gps_values.items()
-        }
+        gps_values = {"latitude": latitude, "longitude": longitude, "precision_gps": precision_gps}
+        values_present = {name: value is not None for name, value in gps_values.items()}
 
         if any(values_present.values()) and not all(values_present.values()):
-            message = (
-                "La position GPS reçue est incomplète. "
-                "Veuillez relancer la géolocalisation."
-            )
-
+            message = "La position GPS reçue est incomplète. Veuillez relancer la géolocalisation."
             for field_name, is_present in values_present.items():
                 if not is_present:
                     self.add_error(field_name, message)
-        # Anti-doublon : une même paroisse (même nom + même chargé) ne doit
-        # pas être enregistrée deux fois dans la même zone — que ce soit par
-        # le même agent ou par deux agents différents envoyés sur le terrain.
+
         nom_paroisse = cleaned_data.get("nom_paroisse")
         parish_shepherd = cleaned_data.get("parish_shepherd")
         if zone and nom_paroisse and parish_shepherd:
@@ -467,65 +381,108 @@ class FicheParoisseForm(forms.ModelForm):
 
 
 # ---------------------------------------------------------------------------
-# Gestion des comptes (page "Utilisateurs", réservée au super admin)
+# Gestion des comptes utilisateurs
 # ---------------------------------------------------------------------------
 
-class UtilisateurCreationForm(UserCreationForm):
-    """Création d'un compte : identifiant + nom + mot de passe."""
-
-    class Meta(UserCreationForm.Meta):
-        model = User
-        fields = ("username", "first_name", "last_name")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["username"].widget.attrs["class"] = INPUT_CSS
-        self.fields["username"].label = "Identifiant"
-        self.fields["first_name"].widget.attrs["class"] = INPUT_CSS
-        self.fields["first_name"].label = "Prénom"
-        self.fields["last_name"].widget.attrs["class"] = INPUT_CSS
-        self.fields["last_name"].label = "Nom"
-        self.fields["password1"].widget.attrs["class"] = INPUT_CSS
-        self.fields["password1"].label = "Mot de passe"
-        self.fields["password2"].widget.attrs["class"] = INPUT_CSS
-        self.fields["password2"].label = "Confirmer le mot de passe"
-
-
 class ProfilForm(forms.ModelForm):
-    """Rôle + périmètre (province pour Manager, district pour Superviseur)."""
+    """Rôle + périmètre hiérarchique complet (region, province, district, zone).
+
+    La liste des rôles disponibles est filtrée dynamiquement dans la vue
+    selon le rôle du créateur (roles_creables_par). Ce formulaire ne filtre
+    pas lui-même : la validation du périmètre est faite dans la vue et dans
+    permissions.py.
+    """
 
     class Meta:
         model = Profil
-        fields = ["role", "province", "district"]
+        fields = ["role", "region", "province", "district", "zone"]
         widgets = {
-            "role": forms.Select(attrs={"class": SELECT_CSS, "id": "id_role"}),
+            "role":     forms.Select(attrs={"class": SELECT_CSS, "id": "id_role"}),
+            "region":   forms.Select(attrs={"class": SELECT_CSS, "id": "id_region_profil"}),
             "province": forms.Select(attrs={"class": SELECT_CSS, "id": "id_province_profil"}),
             "district": forms.Select(attrs={"class": SELECT_CSS, "id": "id_district_profil"}),
+            "zone":     forms.Select(attrs={"class": SELECT_CSS, "id": "id_zone_profil"}),
         }
         labels = {
-            "role": "Rôle",
-            "province": "Province supervisée (rôle Manager)",
-            "district": "District supervisé (rôle Superviseur)",
+            "role":     "Rôle",
+            "region":   "Région ecclésiale",
+            "province": "Province ecclésiale",
+            "district": "District ecclésial",
+            "zone":     "Zone ecclésiale",
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, createur=None, **kwargs):
+        """
+        `createur` : l'utilisateur connecté qui crée ou modifie le compte.
+        Sert à filtrer les rôles disponibles et à restreindre les périmètres.
+        """
         super().__init__(*args, **kwargs)
-        self.fields["province"].required = False
-        self.fields["district"].required = False
+        self.createur = createur
+
+        # Tous les champs sont optionnels au niveau du formulaire ;
+        # la validation sémantique est faite dans clean() et dans la vue.
+        for field_name in ["region", "province", "district", "zone"]:
+            self.fields[field_name].required = False
+
+        # Restriction des rôles proposés selon le créateur.
+        if createur is not None:
+            from .permissions import roles_creables_par
+            roles_autorisés = roles_creables_par(createur)
+            self.fields["role"].choices = [
+                (value, label)
+                for value, label in Profil.Role.choices
+                if value in roles_autorisés
+            ]
 
     def clean(self):
         cleaned_data = super().clean()
         role = cleaned_data.get("role")
-        if role == Profil.Role.MANAGER and not cleaned_data.get("province"):
-            self.add_error("province", "Une province est requise pour le rôle Manager.")
-        if role == Profil.Role.SUPERVISEUR and not cleaned_data.get("district"):
-            self.add_error("district", "Un district est requis pour le rôle Superviseur.")
+        if not role:
+            return cleaned_data
+
+        # Validation que les champs hiérarchiques obligatoires sont présents.
+        if role == Profil.Role.OP_PROVINCE:
+            if not cleaned_data.get("region"):
+                self.add_error("region", "Une région est requise pour le rôle OP PROVINCE.")
+            if not cleaned_data.get("province"):
+                self.add_error("province", "Une province est requise pour le rôle OP PROVINCE.")
+
+        elif role == Profil.Role.OP_DISTRICT:
+            if not cleaned_data.get("region"):
+                self.add_error("region", "Une région est requise pour le rôle OP DISTRICT.")
+            if not cleaned_data.get("province"):
+                self.add_error("province", "Une province est requise pour le rôle OP DISTRICT.")
+            if not cleaned_data.get("district"):
+                self.add_error("district", "Un district est requis pour le rôle OP DISTRICT.")
+
+        elif role in (Profil.Role.OP_ZONE, Profil.Role.AGENT):
+            if not cleaned_data.get("region"):
+                self.add_error("region", "Une région est requise pour ce rôle.")
+            if not cleaned_data.get("province"):
+                self.add_error("province", "Une province est requise pour ce rôle.")
+            if not cleaned_data.get("district"):
+                self.add_error("district", "Un district est requis pour ce rôle.")
+            if not cleaned_data.get("zone"):
+                self.add_error("zone", "Une zone est requise pour ce rôle.")
+
+        # Vérification de la cohérence de la cascade géographique.
+        region = cleaned_data.get("region")
+        province = cleaned_data.get("province")
+        district = cleaned_data.get("district")
+        zone = cleaned_data.get("zone")
+
+        if province and region and province.region_id != region.id:
+            self.add_error("province", "Cette province n'appartient pas à la région sélectionnée.")
+        if district and province and district.province_id != province.id:
+            self.add_error("district", "Ce district n'appartient pas à la province sélectionnée.")
+        if zone and district and zone.district_id != district.id:
+            self.add_error("zone", "Cette zone n'appartient pas au district sélectionné.")
+
         return cleaned_data
 
 
 class TailwindSetPasswordForm(SetPasswordForm):
-    """Réinitialisation de mot de passe par le super admin (sans connaître
-    l'ancien mot de passe), avec les mêmes classes Tailwind que le reste."""
+    """Réinitialisation de mot de passe par un opérateur habilité."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -534,8 +491,7 @@ class TailwindSetPasswordForm(SetPasswordForm):
 
 
 class MotifModificationForm(forms.Form):
-    """Motif obligatoire avant toute modification d'une fiche déjà
-    enregistrée — alimente l'historique de traçabilité (HistoriqueModification)."""
+    """Motif obligatoire avant toute modification d'une fiche."""
 
     motif = forms.CharField(
         required=True,
@@ -565,21 +521,14 @@ class MultipleImageField(forms.ImageField):
     def clean(self, data, initial=None):
         if not data:
             return []
-
         files = data if isinstance(data, (list, tuple)) else [data]
-
         if len(files) > 3:
-            raise forms.ValidationError(
-                "Vous ne pouvez ajouter que trois photos au maximum."
-            )
-
+            raise forms.ValidationError("Vous ne pouvez ajouter que trois photos au maximum.")
         cleaned_files = []
-
         for uploaded_file in files:
             cleaned_file = super().clean(uploaded_file, initial)
             valider_image(cleaned_file)
             cleaned_files.append(cleaned_file)
-
         return cleaned_files
 
 
@@ -588,4 +537,3 @@ class PhotosParoisseForm(forms.Form):
         required=False,
         label="Photos de la paroisse",
     )
-

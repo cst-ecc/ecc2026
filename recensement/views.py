@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Count
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -12,45 +13,38 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
 
-
 from .forms import (
     FicheParoisseForm, MotifModificationForm, PhotosParoisseForm, ProfilForm,
-    TailwindSetPasswordForm, UtilisateurCreationForm,
+    TailwindSetPasswordForm,
 )
+from .identifiants import generer_identifiant, generer_mot_de_passe_provisoire
+from .codification import generer_code_paroisse
 from .models import (
     District, FicheParoisse, HistoriqueModification, PhotoParoisse, Profil,
     Province, Region, Village, Zone,
 )
-from .permissions import get_role, peut_modifier_fiche, peut_valider_fiche, role_required
+from .permissions import (
+    get_role, peut_creer_utilisateur, peut_modifier_fiche, peut_valider_fiche,
+    perimetre_creation_autorise, role_required, roles_creables_par,
+)
 
-# Caractères qu'un tableur (Excel, LibreOffice, Google Sheets) peut interpréter
-# comme le début d'une formule si une cellule commence par l'un d'eux.
-# Un nom de paroisse ou une observation saisie par un utilisateur malveillant
-# pourrait sinon déclencher l'exécution de code côté tableur à l'ouverture
-# du CSV ("CSV / Formula Injection", cf. OWASP).
+# Caractères qu'un tableur peut interpréter comme début de formule (OWASP CSV Injection).
 _CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 
 def _csv_safe(value):
-    """Neutralise une valeur pour l'export CSV en préfixant d'une apostrophe
-    toute valeur qui pourrait être interprétée comme une formule par un
-    tableur. La donnée reste lisible telle quelle, seule l'exécution comme
-    formule est bloquée."""
     text = "" if value is None else str(value)
     if text.startswith(_CSV_FORMULA_PREFIXES):
         return "'" + text
     return text
 
 
-# Associe chaque champ du wizard à son étape (index JS, base 0). Calculé
-# côté serveur — bien plus fiable qu'un scan JS du DOM à la recherche
-# d'une classe CSS, qui peut rater une erreur si la structure HTML change
-# ou si une classe est mal reprise quelque part.
+# Associe chaque champ du wizard à son étape (index JS, base 0).
 _CHAMP_VERS_ETAPE = {
     "region": 0, "province": 0, "district": 0, "zone": 0, "village": 0,
     "nouvelle_localite_nom": 0,
     "nom_paroisse": 1, "annee_fondation": 1, "statut_batiment": 1, "nombre_fideles_estime": 1,
-    "photos": 1,  # champ du formulaire séparé PhotosParoisseForm, mais affiché à l'étape 1
+    "photos": 1,
     "parish_shepherd": 2, "contact_responsable": 2, "photo_charge": 2,
     "latitude": 3, "longitude": 3, "precision_gps": 3, "observations": 3,
     "nom_informateur": 4, "contact_informateur": 4,
@@ -58,10 +52,6 @@ _CHAMP_VERS_ETAPE = {
 
 
 def _premiere_etape_en_erreur(form, photos_form=None):
-    """Renvoie l'index (base 0) de la première étape du wizard contenant
-    une erreur, en se basant sur les champs réellement en erreur — pas sur
-    une recherche de motif dans le HTML rendu. Retourne None si aucune
-    erreur (permet au template de ne rien forcer côté JS)."""
     etapes = set()
     for champ in form.errors:
         etapes.add(_CHAMP_VERS_ETAPE.get(champ, 0))
@@ -73,8 +63,6 @@ def _premiere_etape_en_erreur(form, photos_form=None):
 
 
 def _snapshot_fiche(fiche):
-    """Capture lisible de l'état actuel d'une fiche, utilisée pour construire
-    l'historique avant/après à chaque modification (HistoriqueModification)."""
     return {
         "region": fiche.region.nom,
         "province": fiche.province.nom,
@@ -99,14 +87,14 @@ def _snapshot_fiche(fiche):
 
 
 def _fiches_visibles_pour(user):
-    """Centralise la règle de visibilité par rôle :
-    - super_admin : tout.
-    - manager     : les fiches de SA province.
-    - superviseur : les fiches de SON district.
-    - agent       : uniquement les fiches QU'IL a créées.
-    Utilisée par fiche_list, fiche_detail et fiche_export_csv, ce qui
-    empêche aussi qu'un agent accède au détail d'une fiche qui n'est pas la
-    sienne simplement en devinant son URL (IDOR)."""
+    """Centralise la règle de visibilité par rôle.
+
+    - super_admin  : tout.
+    - op_province  : fiches de SA province.
+    - op_district  : fiches de SON district.
+    - op_zone      : fiches de SA zone.
+    - agent        : uniquement les fiches QU'IL a créées.
+    """
     qs = FicheParoisse.objects.select_related(
         "region", "province", "district", "zone", "village", "cree_par"
     )
@@ -117,20 +105,24 @@ def _fiches_visibles_pour(user):
 
     profil = getattr(user, "profil", None)
 
-    if role == Profil.Role.MANAGER and profil and profil.province_id:
+    if role == Profil.Role.OP_PROVINCE and profil and profil.province_id:
         return qs.filter(province_id=profil.province_id)
 
-    if role == Profil.Role.SUPERVISEUR and profil and profil.district_id:
+    if role == Profil.Role.OP_DISTRICT and profil and profil.district_id:
         return qs.filter(district_id=profil.district_id)
+
+    if role == Profil.Role.OP_ZONE and profil and profil.zone_id:
+        return qs.filter(zone_id=profil.zone_id)
 
     # Agent (ou profil incomplet/absent) : uniquement ses propres fiches.
     return qs.filter(cree_par=user)
 
 
+# ---------------------------------------------------------------------------
+# Pages publiques / aiguillage
+# ---------------------------------------------------------------------------
+
 def landing(request):
-    """Page d'accueil publique : aucune donnée, juste une présentation et un
-    accès à la connexion. Si déjà connecté, on redirige vers la page utile
-    selon le rôle (tableau de bord pour le super admin, liste sinon)."""
     if request.user.is_authenticated:
         return redirect("recensement:post_login_redirect")
     return render(request, "recensement/landing.html")
@@ -138,20 +130,21 @@ def landing(request):
 
 @login_required
 def post_login_redirect(request):
-    """Aiguillage après connexion : le super admin est dirigé vers son
-    tableau de bord, les autres rôles vers la liste de leurs fiches."""
+    """Aiguillage après connexion selon le rôle."""
     if get_role(request.user) == Profil.Role.SUPER_ADMIN:
         return redirect("recensement:dashboard")
     return redirect("recensement:fiche_list")
 
 
+# ---------------------------------------------------------------------------
+# Fiches de recensement
+# ---------------------------------------------------------------------------
+
 @login_required
 @role_required(Profil.Role.AGENT, Profil.Role.SUPER_ADMIN)
 @require_http_methods(["GET", "POST"])
 def fiche_create(request):
-    """Formulaire de saisie terrain. Réservé aux agents et au super admin.
-    L'identité de l'agent recenseur n'est plus saisie à la main : elle vient
-    du compte connecté (`cree_par`)."""
+    """Formulaire de saisie terrain. Réservé aux agents et au super admin."""
     etape_erreur = None
     if request.method == "POST":
         form = FicheParoisseForm(request.POST, request.FILES)
@@ -164,8 +157,8 @@ def fiche_create(request):
                 PhotoParoisse.objects.create(fiche=fiche, image=photo)
             messages.success(
                 request,
-                "Fiche enregistrée avec succès, en attente de validation par le chef de "
-                "district. Vous pouvez recenser une autre paroisse.",
+                "Fiche enregistrée avec succès, en attente de validation par l'OP DISTRICT. "
+                "Vous pouvez recenser une autre paroisse.",
             )
             return redirect("recensement:fiche_create")
         etape_erreur = _premiere_etape_en_erreur(form, photos_form)
@@ -178,10 +171,6 @@ def fiche_create(request):
         form = FicheParoisseForm()
         photos_form = PhotosParoisseForm()
 
-    # Valeurs déjà saisies (vides à l'ouverture, ou telles que soumises en
-    # cas d'erreur) : permet à cascade.js de restaurer la sélection
-    # région/province/district/zone/village au lieu de tout réinitialiser,
-    # et à wizard.js de rouvrir directement la bonne étape.
     initial_ids = {
         "region": form["region"].value(),
         "province": form["province"].value(),
@@ -199,22 +188,19 @@ def fiche_create(request):
 
 
 @login_required
-@role_required(Profil.Role.MANAGER, Profil.Role.SUPERVISEUR)
+@role_required(Profil.Role.OP_DISTRICT, Profil.Role.OP_PROVINCE)
 @require_http_methods(["GET", "POST"])
 def fiche_update(request, pk):
-    """Modification d'une fiche existante — réservée au superviseur de son
-    district et au manager de sa province (le super admin n'a plus ce droit :
-    seuls les chefs hiérarchiques directs corrigent les données de terrain).
-    Motif obligatoire, tracé dans HistoriqueModification (avant/après),
-    et la modification n'affecte PAS le statut de validation en cours."""
+    """Modification d'une fiche — réservée à l'OP DISTRICT (son district) et
+    à l'OP PROVINCE (sa province), selon le palier de validation en cours."""
     fiche = get_object_or_404(FicheParoisse, pk=pk)
 
     if not peut_modifier_fiche(request.user, fiche):
         role = get_role(request.user)
         profil = getattr(request.user, "profil", None)
         hors_perimetre = (
-            (role == Profil.Role.SUPERVISEUR and (not profil or profil.district_id != fiche.district_id))
-            or (role == Profil.Role.MANAGER and (not profil or profil.province_id != fiche.province_id))
+            (role == Profil.Role.OP_DISTRICT and (not profil or profil.district_id != fiche.district_id))
+            or (role == Profil.Role.OP_PROVINCE and (not profil or profil.province_id != fiche.province_id))
         )
         if hors_perimetre:
             messages.error(request, "Cette fiche n'est pas dans votre périmètre (district/province).")
@@ -251,8 +237,6 @@ def fiche_update(request, pk):
         form = FicheParoisseForm(instance=fiche)
         motif_form = MotifModificationForm()
 
-    # Valeurs actuelles de la cascade géographique, pour pré-sélectionner les
-    # listes déroulantes côté JS (region/province/district/zone/village).
     initial_ids = {
         "region": fiche.region_id,
         "province": fiche.province_id,
@@ -273,33 +257,26 @@ def fiche_update(request, pk):
 @role_required(Profil.Role.SUPER_ADMIN)
 @require_http_methods(["GET", "POST"])
 def fiche_delete(request, pk):
-    """Suppression d'une fiche — réservée au super admin, avec confirmation
-    obligatoire (page dédiée, la suppression ne se déclenche que sur POST)."""
     fiche = get_object_or_404(FicheParoisse, pk=pk)
-
     if request.method == "POST":
         nom = fiche.nom_paroisse
         fiche.delete()
         messages.success(request, f"La fiche « {nom} » a été supprimée définitivement.")
         return redirect("recensement:fiche_list")
-
     return render(request, "recensement/fiche_confirm_delete.html", {"fiche": fiche})
 
 
 @login_required
 @require_GET
 def fiche_list(request):
-    """Liste des fiches.
+    """Liste des fiches filtrée selon le rôle.
 
-    - Super admin : accès aux filtres hiérarchiques et aux filtres de statut.
-    - Autres rôles : aucun filtre URL n'est appliqué. Les fiches restent
-      uniquement limitées par _fiches_visibles_pour(request.user).
+    - Super admin : filtres complets (statut, hiérarchie, paroisse).
+    - Autres rôles : limité par _fiches_visibles_pour().
     """
     fiches = _fiches_visibles_pour(request.user)
     role = get_role(request.user)
 
-    # Valeurs par défaut : utiles pour le template, même si l'utilisateur
-    # n'est pas super admin.
     statut_filtre = ""
     region_id = None
     province_id = None
@@ -313,8 +290,6 @@ def fiche_list(request):
     zones = Zone.objects.none()
     paroisses = []
 
-    # Les filtres de statut, de région, province, district, zone et paroisse
-    # sont réservés exclusivement au super admin.
     if role == Profil.Role.SUPER_ADMIN:
         statut_filtre = request.GET.get("statut", "")
 
@@ -346,25 +321,18 @@ def fiche_list(request):
         zone_id = get_valid_id("zone", Zone)
         paroisse = (request.GET.get("paroisse") or "").strip()[:100]
 
-        # Application réelle des filtres uniquement pour le super admin.
         if region_id:
             fiches = fiches.filter(region_id=region_id)
-
         if province_id:
             fiches = fiches.filter(province_id=province_id)
-
         if district_id:
             fiches = fiches.filter(district_id=district_id)
-
         if zone_id:
             fiches = fiches.filter(zone_id=zone_id)
-
         if paroisse:
             fiches = fiches.filter(nom_paroisse__icontains=paroisse)
 
-        # Listes proposées dans les filtres hiérarchiques.
         regions = Region.objects.all().order_by("nom")
-
         provinces = Province.objects.all().order_by("nom")
         if region_id:
             provinces = provinces.filter(region_id=region_id)
@@ -383,9 +351,7 @@ def fiche_list(request):
         elif region_id:
             zones = zones.filter(district__province__region_id=region_id)
 
-        # Liste des paroisses proposée dans le filtre Paroisse.
         paroisses_qs = _fiches_visibles_pour(request.user)
-
         if statut_filtre == "attente_superviseur":
             paroisses_qs = paroisses_qs.filter(
                 statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
@@ -437,11 +403,11 @@ def fiche_list(request):
 
     return render(request, "recensement/fiche_list.html", context)
 
+
 @login_required
 @require_GET
 def fiche_detail(request, pk):
-    """Détail d'une fiche : 404 si elle est hors du périmètre visible par
-    l'utilisateur connecté (empêche de deviner l'URL d'une fiche d'autrui)."""
+    """Détail d'une fiche — 404 si hors du périmètre visible (anti-IDOR)."""
     fiche = get_object_or_404(_fiches_visibles_pour(request.user), pk=pk)
     context = {
         "fiche": fiche,
@@ -457,24 +423,14 @@ def fiche_detail(request, pk):
 @role_required(Profil.Role.SUPER_ADMIN)
 @require_GET
 def fiche_export_preview(request):
-    """
-    Prévisualisation des données qui seront exportées en Excel.
-    Cette étape permet à l'utilisateur de vérifier les filtres, le nombre
-    de paroisses et le regroupement hiérarchique avant téléchargement.
-    """
     fiches = _fiches_export_filtrees(request)
-
     total = fiches.count()
-
-    # Regroupement hiérarchique pour affichage lisible dans la prévisualisation.
     hierarchy = {}
-
     for fiche in fiches:
         region_nom = fiche.region.nom if fiche.region else "—"
         province_nom = fiche.province.nom if fiche.province else "—"
         district_nom = fiche.district.nom if fiche.district else "—"
         zone_nom = fiche.zone.nom if fiche.zone else "—"
-
         hierarchy.setdefault(region_nom, {})
         hierarchy[region_nom].setdefault(province_nom, {})
         hierarchy[region_nom][province_nom].setdefault(district_nom, {})
@@ -502,32 +458,23 @@ def fiche_export_preview(request):
         "query_string": request.GET.urlencode(),
     })
 
+
 @login_required
 @role_required(Profil.Role.SUPER_ADMIN)
 @require_GET
 def fiche_export_excel(request):
-    """
-    Export Excel uniquement.
-    Colonnes exportées :
-    Région, Province, District, Zone, Paroisse.
-
-    Les données sont ordonnées selon la hiérarchie ecclésiale.
-    """
     from io import BytesIO
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    from openpyxl.utils import get_column_letter
 
     fiches = _fiches_export_filtrees(request)
-
     wb = Workbook()
     ws = wb.active
     ws.title = "Paroisses"
 
-    headers = ["Région", "Province", "District", "Zone", "Paroisse"]
+    headers = ["Code officiel", "Région", "Province", "District", "Zone", "Paroisse"]
     ws.append(headers)
 
-    # Style de l'en-tête
     header_fill = PatternFill("solid", fgColor="1F2937")
     header_font = Font(color="FFFFFF", bold=True)
     border = Border(
@@ -543,9 +490,9 @@ def fiche_export_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = border
 
-    # Écriture des données
     for fiche in fiches:
         ws.append([
+            fiche.code_officiel or "Code officiel en attente",
             fiche.region.nom if fiche.region else "",
             fiche.province.nom if fiche.province else "",
             fiche.district.nom if fiche.district else "",
@@ -553,41 +500,27 @@ def fiche_export_excel(request):
             fiche.nom_paroisse or "",
         ])
 
-    # Mise en forme du contenu
     for row in ws.iter_rows(min_row=2):
         for cell in row:
             cell.border = border
             cell.alignment = Alignment(vertical="top", wrap_text=True)
 
-    # Largeur des colonnes
-    widths = {
-        "A": 24,  # Région
-        "B": 28,  # Province
-        "C": 30,  # District
-        "D": 32,  # Zone
-        "E": 40,  # Paroisse
-    }
-
+    widths = {"A": 34, "B": 24, "C": 28, "D": 30, "E": 32, "F": 40}
     for col, width in widths.items():
         ws.column_dimensions[col].width = width
 
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
 
-    # Feuille de synthèse
     recap = wb.create_sheet("Synthèse")
     recap["A1"] = "Prévisualisation de l'export"
     recap["A1"].font = Font(bold=True, size=14)
-
     recap["A3"] = "Nombre de paroisses concernées"
     recap["B3"] = fiches.count()
-
     recap["A5"] = "Organisation des colonnes"
-    recap["B5"] = "Région → Province → District → Zone → Paroisse"
-
+    recap["B5"] = "Code officiel → Région → Province → District → Zone → Paroisse"
     recap["A7"] = "Colonnes exclues"
     recap["B7"] = "Statut du bâtiment, GPS, Agent, Statut, Date, Actions"
-
     recap.column_dimensions["A"].width = 32
     recap.column_dimensions["B"].width = 80
 
@@ -606,28 +539,25 @@ def fiche_export_excel(request):
     response["Content-Disposition"] = 'attachment; filename="paroisses_hierarchie.xlsx"'
     return response
 
+
 # ---------------------------------------------------------------------------
-# Workflow de validation hiérarchique :
-# agent (crée) -> superviseur/chef de district (valide) ->
-# manager/chef de province (valide) -> visible comme "validée".
+# Workflow de validation hiérarchique
 # ---------------------------------------------------------------------------
 
 @login_required
-@role_required(Profil.Role.SUPERVISEUR, Profil.Role.MANAGER)
+@role_required(Profil.Role.OP_DISTRICT, Profil.Role.OP_PROVINCE)
 @require_GET
 def fiche_a_valider(request):
-    """File d'attente de validation, adaptée au rôle connecté :
-    - Superviseur : fiches de SON district en attente de SA validation.
-    - Manager     : fiches de SA province en attente de SA validation."""
+    """File d'attente de validation selon le rôle connecté."""
     role = get_role(request.user)
     profil = getattr(request.user, "profil", None)
 
-    if role == Profil.Role.SUPERVISEUR:
+    if role == Profil.Role.OP_DISTRICT:
         fiches = FicheParoisse.objects.filter(
             statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR,
             district_id=profil.district_id if profil else None,
         )
-    else:  # MANAGER
+    else:  # OP_PROVINCE
         fiches = FicheParoisse.objects.filter(
             statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER,
             province_id=profil.province_id if profil else None,
@@ -637,23 +567,25 @@ def fiche_a_valider(request):
         "region", "province", "district", "zone", "village", "cree_par"
     ).order_by("date_recensement")
 
-    return render(request, "recensement/fiche_a_valider.html", {
-        "fiches": fiches, "role": role,
-    })
+    return render(request, "recensement/fiche_a_valider.html", {"fiches": fiches, "role": role})
 
 
 @login_required
-@role_required(Profil.Role.SUPERVISEUR, Profil.Role.MANAGER)
+@role_required(Profil.Role.OP_DISTRICT, Profil.Role.OP_PROVINCE)
 @require_http_methods(["POST"])
 def fiche_valider(request, pk):
-    """Valide une fiche au palier correspondant au rôle connecté. Vérifie
-    que la fiche est bien dans le périmètre (district/province) de la
-    personne, et dans le bon état, avant de faire avancer le workflow."""
+    """Valide une fiche au palier correspondant au rôle connecté.
+
+    Le code officiel de la paroisse est généré uniquement au moment où
+    l'OP PROVINCE fait passer la fiche au statut final VALIDEE.
+    Si la génération du code échoue, la validation finale est annulée
+    par transaction : la fiche reste en attente OP PROVINCE.
+    """
     fiche = get_object_or_404(FicheParoisse, pk=pk)
     role = get_role(request.user)
     profil = getattr(request.user, "profil", None)
 
-    if role == Profil.Role.SUPERVISEUR:
+    if role == Profil.Role.OP_DISTRICT:
         if (fiche.statut_validation != FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
                 or not profil or fiche.district_id != profil.district_id):
             messages.error(request, "Cette fiche n'est pas en attente de votre validation.")
@@ -661,31 +593,56 @@ def fiche_valider(request, pk):
             fiche.statut_validation = FicheParoisse.StatutValidation.ATTENTE_MANAGER
             fiche.valide_par_superviseur = request.user
             fiche.date_validation_superviseur = timezone.now()
-            fiche.save()
+            fiche.save(update_fields=[
+                "statut_validation",
+                "valide_par_superviseur",
+                "date_validation_superviseur",
+            ])
             messages.success(
                 request,
-                f"Fiche « {fiche.nom_paroisse} » validée, transmise au manager de province.",
+                f"Fiche « {fiche.nom_paroisse} » validée, transmise à l'OP PROVINCE.",
             )
-    elif role == Profil.Role.MANAGER:
+
+    elif role == Profil.Role.OP_PROVINCE:
         if (fiche.statut_validation != FicheParoisse.StatutValidation.ATTENTE_MANAGER
                 or not profil or fiche.province_id != profil.province_id):
             messages.error(request, "Cette fiche n'est pas en attente de votre validation.")
         else:
-            fiche.statut_validation = FicheParoisse.StatutValidation.VALIDEE
-            fiche.valide_par_manager = request.user
-            fiche.date_validation_manager = timezone.now()
-            fiche.save()
-            messages.success(request, f"Fiche « {fiche.nom_paroisse} » validée définitivement.")
+            try:
+                with transaction.atomic():
+                    fiche.statut_validation = FicheParoisse.StatutValidation.VALIDEE
+                    fiche.valide_par_manager = request.user
+                    fiche.date_validation_manager = timezone.now()
+                    fiche.save(update_fields=[
+                        "statut_validation",
+                        "valide_par_manager",
+                        "date_validation_manager",
+                    ])
+                    code = generer_code_paroisse(fiche, genere_par=request.user)
+
+                messages.success(
+                    request,
+                    f"Fiche « {fiche.nom_paroisse} » validée définitivement. "
+                    f"Code officiel généré : {code}.",
+                )
+            except ValueError as exc:
+                messages.error(
+                    request,
+                    "La validation finale n'a pas été enregistrée, car le code officiel "
+                    f"n'a pas pu être généré : {exc}",
+                )
 
     return redirect("recensement:fiche_a_valider")
 
+
+# ---------------------------------------------------------------------------
+# Tableau de bord
+# ---------------------------------------------------------------------------
 
 @login_required
 @role_required(Profil.Role.SUPER_ADMIN)
 @require_GET
 def dashboard(request):
-    """Tableau de bord du super admin : volumes globaux + détail de qui
-    bloque quoi (par district/province), pour savoir qui relancer."""
     total_general = FicheParoisse.objects.count()
     total_valide = FicheParoisse.objects.filter(
         statut_validation=FicheParoisse.StatutValidation.VALIDEE
@@ -706,11 +663,11 @@ def dashboard(request):
     )
     for ligne in par_district:
         responsables = Profil.objects.filter(
-            role=Profil.Role.SUPERVISEUR, district_id=ligne["district_id"]
+            role=Profil.Role.OP_DISTRICT, district_id=ligne["district_id"]
         ).select_related("user")
         ligne["responsables"] = [
             (p.user.get_full_name() or p.user.get_username()) for p in responsables
-        ] or ["Aucun superviseur assigné"]
+        ] or ["Aucun OP DISTRICT assigné"]
 
     par_province = list(
         FicheParoisse.objects
@@ -721,11 +678,11 @@ def dashboard(request):
     )
     for ligne in par_province:
         responsables = Profil.objects.filter(
-            role=Profil.Role.MANAGER, province_id=ligne["province_id"]
+            role=Profil.Role.OP_PROVINCE, province_id=ligne["province_id"]
         ).select_related("user")
         ligne["responsables"] = [
             (p.user.get_full_name() or p.user.get_username()) for p in responsables
-        ] or ["Aucun manager assigné"]
+        ] or ["Aucun OP PROVINCE assigné"]
 
     context = {
         "total_general": total_general,
@@ -742,9 +699,6 @@ def dashboard(request):
 @role_required(Profil.Role.SUPER_ADMIN)
 @require_GET
 def suivi_modifications(request):
-    """Liste globale de toutes les modifications apportées aux fiches
-    (qui, quand, pourquoi), réservée au super admin. Chaque ligne renvoie
-    vers la fiche concernée (section historique de fiche_detail)."""
     historique = HistoriqueModification.objects.select_related(
         "fiche", "modifie_par"
     ).order_by("-date_modification")[:500]
@@ -752,27 +706,20 @@ def suivi_modifications(request):
 
 
 # ---------------------------------------------------------------------------
-# Carte des paroisses (Leaflet.js côté client + JSON servi par Django).
-# Même règle de visibilité par rôle que fiche_list (_fiches_visibles_pour),
-# donc chacun ne voit sur la carte que ce qu'il a le droit de voir en liste.
+# Carte des paroisses
 # ---------------------------------------------------------------------------
 
 @login_required
-@role_required(Profil.Role.SUPER_ADMIN, Profil.Role.MANAGER, Profil.Role.SUPERVISEUR)
+@role_required(Profil.Role.SUPER_ADMIN, Profil.Role.OP_PROVINCE, Profil.Role.OP_DISTRICT)
 @require_GET
 def carte_paroisses(request):
-    """Page carte : ne contient que le conteneur + le JS, les données sont
-    chargées ensuite via fetch() sur fiches_geojson. Réservée aux rôles de
-    supervision (pas les agents, qui n'ont pas besoin de vue d'ensemble)."""
     return render(request, "recensement/carte.html")
 
 
 @login_required
-@role_required(Profil.Role.SUPER_ADMIN, Profil.Role.MANAGER, Profil.Role.SUPERVISEUR)
+@role_required(Profil.Role.SUPER_ADMIN, Profil.Role.OP_PROVINCE, Profil.Role.OP_DISTRICT)
 @require_GET
 def fiches_geojson(request):
-    """Données des fiches géolocalisées, au format GeoJSON, filtrées selon
-    le rôle connecté (même périmètre que la liste)."""
     fiches = _fiches_visibles_pour(request.user).filter(
         latitude__isnull=False, longitude__isnull=False,
     )
@@ -809,10 +756,7 @@ def fiches_geojson(request):
 
 
 # ---------------------------------------------------------------------------
-# Endpoints AJAX pour les listes déroulantes en cascade (JS vanilla + fetch)
-# Connexion requise : ces endpoints n'ont de sens que pour alimenter le
-# formulaire de saisie, lui-même réservé. Cela évite aussi qu'un tiers
-# authentifié mais non autorisé aspire tout le référentiel géographique.
+# Endpoints AJAX pour les listes déroulantes en cascade
 # ---------------------------------------------------------------------------
 
 @login_required
@@ -844,82 +788,268 @@ def ajax_villages(request, zone_id):
 
 
 # ---------------------------------------------------------------------------
-# Gestion des comptes (page "Utilisateurs") — réservée au super admin.
-# Remplace l'admin Django par défaut pour cette tâche : le super admin crée,
-# modifie le rôle/périmètre, réinitialise le mot de passe, active/désactive
-# ou supprime un compte, sans jamais passer par /admin/.
+# Gestion des comptes utilisateurs
 # ---------------------------------------------------------------------------
 
+def _utilisateurs_visibles_pour(user):
+    """Retourne le queryset des utilisateurs que le créateur connecté peut voir.
+
+    - super_admin  : tous les utilisateurs.
+    - op_province  : utilisateurs de sa province.
+    - op_district  : utilisateurs de son district.
+    - op_zone      : utilisateurs de sa zone.
+    - agent        : aucun (redirection 403).
+    """
+    role = get_role(user)
+    qs = User.objects.select_related(
+        "profil", "profil__region", "profil__province",
+        "profil__district", "profil__zone", "profil__cree_par",
+    ).order_by("username")
+
+    if role == Profil.Role.SUPER_ADMIN:
+        return qs
+
+    profil = getattr(user, "profil", None)
+    if not profil:
+        return User.objects.none()
+
+    if role == Profil.Role.OP_PROVINCE and profil.province_id:
+        return qs.filter(profil__province_id=profil.province_id)
+
+    if role == Profil.Role.OP_DISTRICT and profil.district_id:
+        return qs.filter(profil__district_id=profil.district_id)
+
+    if role == Profil.Role.OP_ZONE and profil.zone_id:
+        return qs.filter(profil__zone_id=profil.zone_id)
+
+    return User.objects.none()
+
+
 @login_required
-@role_required(Profil.Role.SUPER_ADMIN)
 @require_GET
 def utilisateur_list(request):
-    utilisateurs = User.objects.select_related("profil", "profil__province", "profil__district").order_by("username")
-    return render(request, "recensement/utilisateur_list.html", {"utilisateurs": utilisateurs})
+    """Liste des utilisateurs — accessible aux opérateurs habilités à créer."""
+    if not peut_creer_utilisateur(request.user):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Vous n'avez pas les droits nécessaires pour accéder à cette page.")
 
+    utilisateurs = _utilisateurs_visibles_pour(request.user)
+    role = get_role(request.user)
 
-@login_required
-@role_required(Profil.Role.SUPER_ADMIN)
-@require_http_methods(["GET", "POST"])
-def utilisateur_create(request):
-    if request.method == "POST":
-        user_form = UtilisateurCreationForm(request.POST)
-        profil_form = ProfilForm(request.POST)
-        if user_form.is_valid() and profil_form.is_valid():
-            nouvel_utilisateur = user_form.save()
-            # Le signal post_save (models.py) a déjà créé un Profil par
-            # défaut (rôle Agent) ; on applique ici les valeurs choisies.
-            profil = nouvel_utilisateur.profil
-            profil.role = profil_form.cleaned_data["role"]
-            profil.province = profil_form.cleaned_data["province"]
-            profil.district = profil_form.cleaned_data["district"]
-            profil.save()
-            messages.success(request, f"Compte « {nouvel_utilisateur.get_username()} » créé avec succès.")
-            return redirect("recensement:utilisateur_list")
-        messages.error(request, "Veuillez corriger les erreurs ci-dessous.")
-    else:
-        user_form = UtilisateurCreationForm()
-        profil_form = ProfilForm()
+    # Filtres disponibles pour le super admin
+    filtre_role = (request.GET.get("role") or "").strip()
+    filtre_region = (request.GET.get("region") or "").strip()
+    filtre_province = (request.GET.get("province") or "").strip()
+    filtre_district = (request.GET.get("district") or "").strip()
+    filtre_zone = (request.GET.get("zone") or "").strip()
 
-    return render(request, "recensement/utilisateur_form.html", {
-        "user_form": user_form, "profil_form": profil_form, "is_edit": False,
-        "provinces": Province.objects.select_related("region").all(),
+    if role == Profil.Role.SUPER_ADMIN:
+        if filtre_role and filtre_role in [r.value for r in Profil.Role]:
+            utilisateurs = utilisateurs.filter(profil__role=filtre_role)
+        if filtre_region.isdigit():
+            utilisateurs = utilisateurs.filter(profil__region_id=int(filtre_region))
+        if filtre_province.isdigit():
+            utilisateurs = utilisateurs.filter(profil__province_id=int(filtre_province))
+        if filtre_district.isdigit():
+            utilisateurs = utilisateurs.filter(profil__district_id=int(filtre_district))
+        if filtre_zone.isdigit():
+            utilisateurs = utilisateurs.filter(profil__zone_id=int(filtre_zone))
+
+    return render(request, "recensement/utilisateur_list.html", {
+        "utilisateurs": utilisateurs,
+        "roles": Profil.Role.choices,
+        "regions": Region.objects.all() if role == Profil.Role.SUPER_ADMIN else [],
+        "provinces": Province.objects.all() if role == Profil.Role.SUPER_ADMIN else [],
+        "filtre_role": filtre_role,
+        "filtre_region": filtre_region,
+        "filtre_province": filtre_province,
+        "filtre_district": filtre_district,
+        "filtre_zone": filtre_zone,
     })
 
 
 @login_required
-@role_required(Profil.Role.SUPER_ADMIN)
+@require_http_methods(["GET", "POST"])
+def utilisateur_create(request):
+    """Création d'un utilisateur.
+
+    Accès : tout utilisateur autorisé à créer (super_admin, op_province,
+    op_district, op_zone). L'identifiant est généré automatiquement.
+    Le mot de passe provisoire est affiché UNE SEULE FOIS après la création.
+    """
+    if not peut_creer_utilisateur(request.user):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Vous n'avez pas les droits nécessaires.")
+
+    if request.method == "POST":
+        profil_form = ProfilForm(request.POST, createur=request.user)
+        if profil_form.is_valid():
+            role_cible = profil_form.cleaned_data["role"]
+            region = profil_form.cleaned_data.get("region")
+            province = profil_form.cleaned_data.get("province")
+            district = profil_form.cleaned_data.get("district")
+            zone = profil_form.cleaned_data.get("zone")
+
+            # Vérification du périmètre (sécurité serveur, ne se base pas
+            # uniquement sur ce que le formulaire propose).
+            ok, msg = perimetre_creation_autorise(request.user, {
+                "region_id":   region.pk if region else None,
+                "province_id": province.pk if province else None,
+                "district_id": district.pk if district else None,
+                "zone_id":     zone.pk if zone else None,
+            })
+            if not ok:
+                messages.error(request, msg)
+                return render(request, "recensement/utilisateur_form.html", {
+                    "profil_form": profil_form, "is_edit": False,
+                    "regions": _regions_disponibles(request.user),
+                    "provinces": _provinces_disponibles(request.user),
+                })
+
+            try:
+                with transaction.atomic():
+                    username = generer_identifiant(
+                        role=role_cible,
+                        region=region,
+                        province=province,
+                        district=district,
+                        zone=zone,
+                    )
+                    mdp = generer_mot_de_passe_provisoire()
+                    nouvel_utilisateur = User.objects.create_user(
+                        username=username,
+                        password=mdp,
+                        first_name=request.POST.get("first_name", "").strip(),
+                        last_name=request.POST.get("last_name", "").strip(),
+                    )
+                    # Le signal post_save a créé un Profil par défaut ; on le met à jour.
+                    profil = nouvel_utilisateur.profil
+                    profil.role = role_cible
+                    profil.region = region
+                    profil.province = province
+                    profil.district = district
+                    profil.zone = zone
+                    profil.cree_par = request.user
+                    profil.save()
+
+                    # Le mot de passe provisoire est stocké dans la session
+                    # pour être affiché UNE SEULE FOIS sur la page de confirmation.
+                    request.session["mdp_provisoire_username"] = username
+                    request.session["mdp_provisoire_valeur"] = mdp
+
+            except ValueError as e:
+                messages.error(request, f"Erreur de génération de l'identifiant : {e}")
+                return render(request, "recensement/utilisateur_form.html", {
+                    "profil_form": profil_form, "is_edit": False,
+                    "regions": _regions_disponibles(request.user),
+                    "provinces": _provinces_disponibles(request.user),
+                })
+
+            return redirect("recensement:utilisateur_created", pk=nouvel_utilisateur.pk)
+
+        messages.error(request, "Veuillez corriger les erreurs ci-dessous.")
+    else:
+        profil_form = ProfilForm(createur=request.user)
+
+    return render(request, "recensement/utilisateur_form.html", {
+        "profil_form": profil_form,
+        "is_edit": False,
+        "regions": _regions_disponibles(request.user),
+        "provinces": _provinces_disponibles(request.user),
+    })
+
+
+@login_required
+@require_GET
+def utilisateur_created(request, pk):
+    """Page de confirmation après création d'un utilisateur.
+
+    Affiche le mot de passe provisoire UNE SEULE FOIS, puis le supprime
+    de la session. L'administrateur doit copier et transmettre ce mot de
+    passe à l'utilisateur par un canal sécurisé.
+    """
+    if not peut_creer_utilisateur(request.user):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied()
+
+    utilisateur = get_object_or_404(User, pk=pk)
+
+    # Récupération et suppression immédiate du mot de passe provisoire.
+    mdp = request.session.pop("mdp_provisoire_valeur", None)
+    mdp_username = request.session.pop("mdp_provisoire_username", None)
+
+    # Sécurité : on ne réaffiche le mot de passe que si la session correspond
+    # bien à cet utilisateur (évite qu'un autre admin accède à l'URL directement).
+    if mdp_username != utilisateur.username:
+        mdp = None
+
+    return render(request, "recensement/utilisateur_created.html", {
+        "utilisateur": utilisateur,
+        "mdp_provisoire": mdp,
+    })
+
+
+@login_required
 @require_http_methods(["GET", "POST"])
 def utilisateur_update(request, pk):
-    utilisateur = get_object_or_404(User, pk=pk)
+    """Modification d'un utilisateur — accessible aux opérateurs habilités."""
+    if not peut_creer_utilisateur(request.user):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied()
+
+    utilisateur = get_object_or_404(_utilisateurs_visibles_pour(request.user), pk=pk)
     profil, _ = Profil.objects.get_or_create(user=utilisateur)
 
     if request.method == "POST":
-        profil_form = ProfilForm(request.POST, instance=profil)
+        profil_form = ProfilForm(request.POST, instance=profil, createur=request.user)
         if profil_form.is_valid():
-            profil_form.save()
-            utilisateur.first_name = request.POST.get("first_name", "").strip()
-            utilisateur.last_name = request.POST.get("last_name", "").strip()
-            utilisateur.is_active = request.POST.get("is_active") == "on"
-            utilisateur.save()
-            messages.success(request, "Compte mis à jour avec succès.")
-            return redirect("recensement:utilisateur_list")
+            role_cible = profil_form.cleaned_data["role"]
+            province = profil_form.cleaned_data.get("province")
+            district = profil_form.cleaned_data.get("district")
+            zone = profil_form.cleaned_data.get("zone")
+            region = profil_form.cleaned_data.get("region")
+
+            ok, msg = perimetre_creation_autorise(request.user, {
+                "region_id":   region.pk if region else None,
+                "province_id": province.pk if province else None,
+                "district_id": district.pk if district else None,
+                "zone_id":     zone.pk if zone else None,
+            })
+            if not ok:
+                messages.error(request, msg)
+            else:
+                profil_form.save()
+                utilisateur.first_name = request.POST.get("first_name", "").strip()
+                utilisateur.last_name = request.POST.get("last_name", "").strip()
+                utilisateur.is_active = request.POST.get("is_active") == "on"
+                utilisateur.save()
+                messages.success(request, "Compte mis à jour avec succès.")
+                return redirect("recensement:utilisateur_list")
         messages.error(request, "Veuillez corriger les erreurs ci-dessous.")
     else:
-        profil_form = ProfilForm(instance=profil)
+        profil_form = ProfilForm(instance=profil, createur=request.user)
 
     return render(request, "recensement/utilisateur_form.html", {
-        "profil_form": profil_form, "is_edit": True, "utilisateur": utilisateur,
-        "provinces": Province.objects.select_related("region").all(),
+        "profil_form": profil_form,
+        "is_edit": True,
+        "utilisateur": utilisateur,
+        "regions": _regions_disponibles(request.user),
+        "provinces": _provinces_disponibles(request.user),
         "province_du_district_id": profil.district.province_id if profil.district_id else None,
+        "zone_du_district_id": profil.zone.district_id if profil.zone_id else None,
     })
 
 
 @login_required
-@role_required(Profil.Role.SUPER_ADMIN)
 @require_http_methods(["GET", "POST"])
 def utilisateur_reset_password(request, pk):
-    utilisateur = get_object_or_404(User, pk=pk)
+    """Réinitialisation du mot de passe — accessible aux opérateurs habilités."""
+    if not peut_creer_utilisateur(request.user):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied()
+
+    utilisateur = get_object_or_404(_utilisateurs_visibles_pour(request.user), pk=pk)
+
     if request.method == "POST":
         form = TailwindSetPasswordForm(utilisateur, request.POST)
         if form.is_valid():
@@ -936,10 +1066,14 @@ def utilisateur_reset_password(request, pk):
 
 
 @login_required
-@role_required(Profil.Role.SUPER_ADMIN)
 @require_http_methods(["POST"])
 def utilisateur_toggle_actif(request, pk):
-    utilisateur = get_object_or_404(User, pk=pk)
+    """Activation/désactivation d'un compte — accessible aux opérateurs habilités."""
+    if not peut_creer_utilisateur(request.user):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied()
+
+    utilisateur = get_object_or_404(_utilisateurs_visibles_pour(request.user), pk=pk)
     if utilisateur == request.user:
         messages.error(request, "Vous ne pouvez pas désactiver votre propre compte.")
     else:
@@ -951,9 +1085,14 @@ def utilisateur_toggle_actif(request, pk):
 
 
 @login_required
-@role_required(Profil.Role.SUPER_ADMIN)
 @require_http_methods(["GET", "POST"])
 def utilisateur_delete(request, pk):
+    """Suppression d'un compte — réservée au super admin."""
+    role = get_role(request.user)
+    if role != Profil.Role.SUPER_ADMIN:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied()
+
     utilisateur = get_object_or_404(User, pk=pk)
     if utilisateur == request.user:
         messages.error(request, "Vous ne pouvez pas supprimer votre propre compte.")
@@ -968,11 +1107,37 @@ def utilisateur_delete(request, pk):
     return render(request, "recensement/utilisateur_confirm_delete.html", {"utilisateur": utilisateur})
 
 
+# ---------------------------------------------------------------------------
+# Helpers internes : périmètres disponibles selon le créateur
+# ---------------------------------------------------------------------------
+
+def _regions_disponibles(user):
+    """Régions que le créateur connecté peut sélectionner pour un nouveau compte."""
+    role = get_role(user)
+    if role == Profil.Role.SUPER_ADMIN:
+        return Region.objects.all()
+    profil = getattr(user, "profil", None)
+    if profil and profil.region_id:
+        return Region.objects.filter(pk=profil.region_id)
+    return Region.objects.none()
+
+
+def _provinces_disponibles(user):
+    """Provinces que le créateur connecté peut sélectionner."""
+    role = get_role(user)
+    if role == Profil.Role.SUPER_ADMIN:
+        return Province.objects.select_related("region").all()
+    profil = getattr(user, "profil", None)
+    if profil and profil.province_id:
+        return Province.objects.filter(pk=profil.province_id)
+    return Province.objects.none()
+
+
+# ---------------------------------------------------------------------------
+# Helpers export (utilisé par fiche_export_preview et fiche_export_excel)
+# ---------------------------------------------------------------------------
+
 def _fiches_export_filtrees(request):
-    """
-    Retourne les fiches visibles par l'utilisateur, avec les mêmes filtres
-    que le tableau : statut, région, province, district, zone, paroisse.
-    """
     fiches = _fiches_visibles_pour(request.user)
     role = get_role(request.user)
 
@@ -1005,25 +1170,17 @@ def _fiches_export_filtrees(request):
 
     if region_id:
         fiches = fiches.filter(region_id=region_id)
-
     if province_id:
         fiches = fiches.filter(province_id=province_id)
-
     if district_id:
         fiches = fiches.filter(district_id=district_id)
-
     if zone_id:
         fiches = fiches.filter(zone_id=zone_id)
-
     if paroisse:
         fiches = fiches.filter(nom_paroisse__icontains=paroisse)
 
     return fiches.select_related(
-        "region", "province", "district", "zone"
+        "region", "province", "district", "zone", "village"
     ).order_by(
-        "region__nom",
-        "province__nom",
-        "district__nom",
-        "zone__nom",
-        "nom_paroisse",
+        "region__nom", "province__nom", "district__nom", "zone__nom", "nom_paroisse",
     )

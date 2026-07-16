@@ -1,0 +1,113 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}Compte créé — {{ utilisateur.username }}{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+
+  <div class="bg-green-50 border border-green-200 rounded-2xl p-6 mb-6 text-center">
+    <div class="text-4xl mb-3">✅</div>
+    <h1 class="text-xl font-semibold text-green-800">Compte créé avec succès</h1>
+    <p class="text-green-700 mt-1">L'identifiant a été généré automatiquement.</p>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+
+    <div>
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Identifiant</p>
+      <p class="font-mono text-lg font-bold text-slate-900 bg-slate-50 rounded-lg px-4 py-2 border border-slate-200">
+        {{ utilisateur.username }}
+      </p>
+    </div>
+
+    <div>
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Nom complet</p>
+      <p class="text-slate-800">{{ utilisateur.get_full_name|default:"(non renseigné)" }}</p>
+    </div>
+
+    <div>
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Rôle</p>
+      <p class="text-slate-800">{{ utilisateur.profil.get_role_display }}</p>
+    </div>
+
+    <div>
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Périmètre</p>
+      <p class="text-slate-800">{{ utilisateur.profil.perimetre_display }}</p>
+    </div>
+
+    {% if mdp_provisoire %}
+    <div class="border-t border-slate-100 pt-4">
+      <p class="text-xs font-medium text-amber-700 uppercase tracking-wide mb-1">
+        ⚠️ Mot de passe provisoire — affiché une seule fois
+      </p>
+      <div class="flex items-center gap-2">
+        <p id="mdp-display" class="font-mono text-lg font-bold text-red-700 bg-red-50 rounded-lg px-4 py-2 border border-red-200 flex-1 select-all">
+          {{ mdp_provisoire }}
+        </p>
+        <button type="button" onclick="copierMdp()" id="btn-copier"
+                class="bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium px-3 py-2 rounded-lg whitespace-nowrap">
+          Copier
+        </button>
+      </div>
+      <p class="text-xs text-slate-500 mt-2">
+        Ce mot de passe ne sera plus affiché après la fermeture de cette page.
+        Copiez-le maintenant et transmettez-le à l'utilisateur par un canal sécurisé.
+      </p>
+    </div>
+    {% else %}
+    <div class="border-t border-slate-100 pt-4">
+      <p class="text-sm text-slate-500 italic">
+        Le mot de passe provisoire n'est plus disponible (la page a déjà été consultée ou la session a expiré).
+        Utilisez le bouton « Mot de passe » pour en définir un nouveau.
+      </p>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <div class="mt-6 flex gap-3 justify-end">
+    <a href="{% url 'recensement:utilisateur_reset_password' utilisateur.pk %}"
+       class="border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg text-sm">
+      Changer le mot de passe
+    </a>
+    <a href="{% url 'recensement:utilisateur_create' %}"
+       class="border border-brand-600 text-brand-700 hover:bg-brand-50 font-medium px-4 py-2.5 rounded-lg text-sm">
+      Créer un autre compte
+    </a>
+    <a href="{% url 'recensement:utilisateur_list' %}"
+       class="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-5 py-2.5 rounded-lg text-sm">
+      Retour à la liste
+    </a>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function copierMdp() {
+    var mdp = document.getElementById("mdp-display");
+    var btn = document.getElementById("btn-copier");
+    if (!mdp || !btn) return;
+
+    navigator.clipboard.writeText(mdp.textContent.trim()).then(function () {
+      btn.textContent = "✓ Copié";
+      btn.classList.add("bg-green-700");
+      btn.classList.remove("bg-slate-800");
+      setTimeout(function () {
+        btn.textContent = "Copier";
+        btn.classList.remove("bg-green-700");
+        btn.classList.add("bg-slate-800");
+      }, 2500);
+    }).catch(function () {
+      // Fallback pour les navigateurs sans Clipboard API
+      var range = document.createRange();
+      range.selectNode(mdp);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+      document.execCommand("copy");
+      btn.textContent = "✓ Copié";
+    });
+  }
+</script>
+{% endblock %}

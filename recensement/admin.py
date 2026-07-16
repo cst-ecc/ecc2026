@@ -1,7 +1,14 @@
 from django.contrib import admin
 
-from .models import District, FicheParoisse, HistoriqueModification, PhotoParoisse, Profil, Province, Region, Village, Zone
+from .models import (
+    CodeParoisseHistorique, District, FicheParoisse, HistoriqueModification,
+    PhotoParoisse, Profil, Province, Region, Village, Zone,
+)
 
+
+# ---------------------------------------------------------------------------
+# Référentiel géo-ecclésial
+# ---------------------------------------------------------------------------
 
 class ProvinceInline(admin.TabularInline):
     model = Province
@@ -25,9 +32,9 @@ class VillageInline(admin.TabularInline):
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):
-    list_display = ("nom", "ordre", "nb_provinces")
+    list_display = ("nom", "ordre", "code", "nb_provinces")
     ordering = ("ordre", "nom")
-    search_fields = ("nom",)
+    search_fields = ("nom", "code")
     inlines = [ProvinceInline]
 
     def nb_provinces(self, obj):
@@ -37,17 +44,17 @@ class RegionAdmin(admin.ModelAdmin):
 
 @admin.register(Province)
 class ProvinceAdmin(admin.ModelAdmin):
-    list_display = ("nom", "region")
+    list_display = ("nom", "code", "region")
     list_filter = ("region",)
-    search_fields = ("nom", "region__nom")
+    search_fields = ("nom", "code", "region__nom")
     inlines = [DistrictInline]
 
 
 @admin.register(District)
 class DistrictAdmin(admin.ModelAdmin):
-    list_display = ("nom", "province", "region")
+    list_display = ("nom", "code", "province", "region")
     list_filter = ("province__region", "province")
-    search_fields = ("nom", "province__nom")
+    search_fields = ("nom", "code", "province__nom")
     inlines = [ZoneInline]
 
     def region(self, obj):
@@ -57,9 +64,9 @@ class DistrictAdmin(admin.ModelAdmin):
 
 @admin.register(Zone)
 class ZoneAdmin(admin.ModelAdmin):
-    list_display = ("nom", "district", "province", "region")
+    list_display = ("nom", "code", "district", "province", "region")
     list_filter = ("district__province__region", "district__province")
-    search_fields = ("nom", "district__nom")
+    search_fields = ("nom", "code", "district__nom")
     inlines = [VillageInline]
 
     def province(self, obj):
@@ -82,14 +89,47 @@ class VillageAdmin(admin.ModelAdmin):
     district.short_description = "District"
 
 
+# ---------------------------------------------------------------------------
+# Profils utilisateurs
+# ---------------------------------------------------------------------------
+
 @admin.register(Profil)
 class ProfilAdmin(admin.ModelAdmin):
-    list_display = ("user", "role", "province", "district")
-    list_filter = ("role", "province", "district")
-    search_fields = ("user__username", "user__first_name", "user__last_name")
-    autocomplete_fields = ["province", "district"]
-    list_select_related = ("user", "province", "district")
+    list_display = (
+        "user", "role", "region", "province", "district", "zone",
+        "cree_par", "date_creation",
+    )
+    list_filter = ("role", "region", "province", "district")
+    search_fields = (
+        "user__username", "user__first_name", "user__last_name",
+        "province__nom", "district__nom", "zone__nom",
+    )
+    autocomplete_fields = ["region", "province", "district", "zone"]
+    list_select_related = ("user", "region", "province", "district", "zone", "cree_par")
+    readonly_fields = ("date_creation",)
 
+    fieldsets = (
+        ("Compte", {
+            "fields": ("user", "role"),
+        }),
+        ("Périmètre hiérarchique", {
+            "description": (
+                "Renseignez uniquement les niveaux correspondant au rôle choisi :\n"
+                "OP PROVINCE → région + province ;\n"
+                "OP DISTRICT → région + province + district ;\n"
+                "OP ZONE / Agent → région + province + district + zone."
+            ),
+            "fields": ("region", "province", "district", "zone"),
+        }),
+        ("Traçabilité", {
+            "fields": ("cree_par", "date_creation"),
+        }),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Fiches de recensement
+# ---------------------------------------------------------------------------
 
 class PhotoParoisseInline(admin.TabularInline):
     model = PhotoParoisse
@@ -100,17 +140,17 @@ class PhotoParoisseInline(admin.TabularInline):
 @admin.register(FicheParoisse)
 class FicheParoisseAdmin(admin.ModelAdmin):
     list_display = (
-        "nom_paroisse", "localite", "zone", "district", "province", "region",
+        "code_officiel", "nom_paroisse", "localite", "zone", "district", "province", "region",
         "statut_batiment", "statut_validation", "a_coordonnees_gps",
         "cree_par", "date_recensement",
     )
     list_filter = ("region", "province", "statut_batiment", "statut_validation")
     search_fields = (
-        "nom_paroisse", "parish_shepherd",
+        "code_officiel", "nom_paroisse", "parish_shepherd",
         "village__nom", "nouvelle_localite_nom", "cree_par__username",
     )
     date_hierarchy = "date_recensement"
-    readonly_fields = ("date_recensement",)
+    readonly_fields = ("date_recensement", "code_officiel", "date_generation_code", "genere_par")
     autocomplete_fields = ["region", "province", "district", "zone", "village"]
     inlines = [PhotoParoisseInline]
 
@@ -131,11 +171,16 @@ class FicheParoisseAdmin(admin.ModelAdmin):
             "fields": ("nom_informateur", "contact_informateur"),
         }),
         ("Validation hiérarchique", {
+            "description": "Palier 1 : OP DISTRICT — Palier 2 : OP PROVINCE",
             "fields": (
                 "statut_validation",
                 "valide_par_superviseur", "date_validation_superviseur",
                 "valide_par_manager", "date_validation_manager",
             ),
+        }),
+        ("Codification officielle", {
+            "description": "Code généré automatiquement après validation complète. Ne pas modifier manuellement.",
+            "fields": ("code_officiel", "date_generation_code", "genere_par"),
         }),
         ("Agent recenseur & observations", {
             "fields": ("cree_par", "observations", "date_recensement"),
@@ -143,16 +188,22 @@ class FicheParoisseAdmin(admin.ModelAdmin):
     )
 
 
+# ---------------------------------------------------------------------------
+# Historique de modification (lecture seule)
+# ---------------------------------------------------------------------------
+
 @admin.register(HistoriqueModification)
 class HistoriqueModificationAdmin(admin.ModelAdmin):
-    """Journal d'audit en LECTURE SEULE : jamais créé/modifié/supprimé à la
-    main, uniquement consulté (les entrées sont générées automatiquement par
-    views.fiche_update)."""
+    """Journal d'audit en LECTURE SEULE : les entrées sont générées
+    automatiquement par views.fiche_update — jamais créées à la main."""
     list_display = ("fiche", "modifie_par", "date_modification")
     list_filter = ("date_modification",)
     search_fields = ("fiche__nom_paroisse", "modifie_par__username", "motif")
     date_hierarchy = "date_modification"
-    readonly_fields = ("fiche", "modifie_par", "date_modification", "motif", "donnees_avant", "donnees_apres")
+    readonly_fields = (
+        "fiche", "modifie_par", "date_modification",
+        "motif", "donnees_avant", "donnees_apres",
+    )
 
     def has_add_permission(self, request):
         return False
@@ -163,3 +214,27 @@ class HistoriqueModificationAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+
+# ---------------------------------------------------------------------------
+# Historique de codification officielle (lecture seule)
+# ---------------------------------------------------------------------------
+
+@admin.register(CodeParoisseHistorique)
+class CodeParoisseHistoriqueAdmin(admin.ModelAdmin):
+    list_display = ("code_attribue", "fiche", "genere_par", "date_generation")
+    list_filter = ("date_generation", "genere_par")
+    search_fields = ("code_attribue", "fiche__nom_paroisse", "genere_par__username")
+    date_hierarchy = "date_generation"
+    readonly_fields = (
+        "fiche", "code_attribue", "date_generation",
+        "genere_par", "donnees_composition",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

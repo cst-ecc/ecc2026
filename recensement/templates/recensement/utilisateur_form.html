@@ -12,13 +12,14 @@
 <form method="post" id="utilisateur-form" class="space-y-4">
   {% csrf_token %}
 
+  {# ---- Identité ---- #}
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Identité</div>
     <div class="p-5 space-y-4">
       {% if is_edit %}
         <div class="grid sm:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Identifiant</label>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Identifiant (généré automatiquement)</label>
             <input type="text" value="{{ utilisateur.username }}" disabled
                    class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-500">
           </div>
@@ -40,64 +41,89 @@
           Compte actif (peut se connecter)
         </label>
       {% else %}
+        {# Création : l'identifiant sera généré automatiquement — pas de champ username #}
+        <p class="text-sm text-slate-500 italic">
+          L'identifiant sera généré automatiquement selon le rôle et le périmètre choisis.
+        </p>
         <div class="grid sm:grid-cols-2 gap-4">
-          <div class="sm:col-span-2">
-            <label for="{{ user_form.username.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ user_form.username.label }}</label>
-            {{ user_form.username }}
-            {% for error in user_form.username.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          <div>
+            <label for="first_name" class="block text-sm font-medium text-slate-700 mb-1">Prénom</label>
+            <input type="text" name="first_name" id="first_name"
+                   class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
           </div>
           <div>
-            <label for="{{ user_form.first_name.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ user_form.first_name.label }}</label>
-            {{ user_form.first_name }}
-          </div>
-          <div>
-            <label for="{{ user_form.last_name.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ user_form.last_name.label }}</label>
-            {{ user_form.last_name }}
-          </div>
-          <div>
-            <label for="{{ user_form.password1.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ user_form.password1.label }}</label>
-            {{ user_form.password1 }}
-            {% for error in user_form.password1.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
-          </div>
-          <div>
-            <label for="{{ user_form.password2.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ user_form.password2.label }}</label>
-            {{ user_form.password2 }}
-            {% for error in user_form.password2.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+            <label for="last_name" class="block text-sm font-medium text-slate-700 mb-1">Nom</label>
+            <input type="text" name="last_name" id="last_name"
+                   class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
           </div>
         </div>
+        <p class="text-sm text-amber-700 bg-amber-50 rounded-lg px-4 py-2">
+          Le mot de passe provisoire sera généré automatiquement et affiché <strong>une seule fois</strong>
+          après la création du compte. Notez-le soigneusement pour le transmettre à l'utilisateur.
+        </p>
       {% endif %}
     </div>
   </div>
 
+  {# ---- Rôle & périmètre ---- #}
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Rôle & périmètre</div>
     <div class="p-5 space-y-4">
-      <div>
-        <label for="{{ profil_form.role.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ profil_form.role.label }}</label>
-        {{ profil_form.role }}
-        {% for error in profil_form.role.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
-      </div>
-      <div id="champ-province">
-        <label for="{{ profil_form.province.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ profil_form.province.label }}</label>
-        {{ profil_form.province }}
-        {% for error in profil_form.province.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
-      </div>
-      <div id="champ-district">
-        <label for="province_filtre_district" class="block text-sm font-medium text-slate-700 mb-1">
-          Province (pour retrouver le district plus facilement)
-        </label>
-        <select id="province_filtre_district"
-                class="w-full rounded-lg border border-slate-300 px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 mb-3">
-          <option value="">— Sélectionnez d'abord une province —</option>
-          {% for p in provinces %}
-            <option value="{{ p.id }}" {% if p.id == province_du_district_id %}selected{% endif %}>{{ p.nom }}</option>
-          {% endfor %}
-        </select>
 
-        <label for="{{ profil_form.district.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ profil_form.district.label }}</label>
-        {{ profil_form.district }}
-        {% for error in profil_form.district.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      <div>
+        <label for="{{ profil_form.role.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
+          {{ profil_form.role.label }}
+        </label>
+        {{ profil_form.role }}
+        {% for error in profil_form.role.errors %}
+          <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+        {% endfor %}
       </div>
+
+      {# Région — visible pour OP PROVINCE, OP DISTRICT, OP ZONE, AGENT #}
+      <div id="champ-region" class="hidden">
+        <label for="{{ profil_form.region.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
+          {{ profil_form.region.label }}
+        </label>
+        {{ profil_form.region }}
+        {% for error in profil_form.region.errors %}
+          <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+        {% endfor %}
+      </div>
+
+      {# Province — visible pour OP PROVINCE, OP DISTRICT, OP ZONE, AGENT #}
+      <div id="champ-province" class="hidden">
+        <label for="{{ profil_form.province.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
+          {{ profil_form.province.label }}
+        </label>
+        {{ profil_form.province }}
+        {% for error in profil_form.province.errors %}
+          <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+        {% endfor %}
+      </div>
+
+      {# District — visible pour OP DISTRICT, OP ZONE, AGENT #}
+      <div id="champ-district" class="hidden">
+        <label for="{{ profil_form.district.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
+          {{ profil_form.district.label }}
+        </label>
+        {{ profil_form.district }}
+        {% for error in profil_form.district.errors %}
+          <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+        {% endfor %}
+      </div>
+
+      {# Zone — visible pour OP ZONE, AGENT #}
+      <div id="champ-zone" class="hidden">
+        <label for="{{ profil_form.zone.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
+          {{ profil_form.zone.label }}
+        </label>
+        {{ profil_form.zone }}
+        {% for error in profil_form.zone.errors %}
+          <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+        {% endfor %}
+      </div>
+
     </div>
   </div>
 
@@ -115,68 +141,148 @@
 
 {% block extra_js %}
 <script>
-  // Affiche province/district uniquement selon le rôle choisi.
+  /**
+   * Gestion du formulaire de création/modification d'utilisateur.
+   *
+   * Logique :
+   * 1. Selon le rôle sélectionné, afficher les champs hiérarchiques nécessaires.
+   * 2. Charger dynamiquement les provinces quand la région change (AJAX).
+   * 3. Charger dynamiquement les districts quand la province change (AJAX).
+   * 4. Charger dynamiquement les zones quand le district change (AJAX).
+   */
   (function () {
-    var roleSelect = document.getElementById("id_role");
-    var champProvince = document.getElementById("champ-province");
-    var champDistrict = document.getElementById("champ-district");
+    "use strict";
+
+    var roleSelect      = document.getElementById("id_role");
+    var champRegion     = document.getElementById("champ-region");
+    var champProvince   = document.getElementById("champ-province");
+    var champDistrict   = document.getElementById("champ-district");
+    var champZone       = document.getElementById("champ-zone");
+
+    var regionSelect    = document.getElementById("{{ profil_form.region.id_for_label }}");
+    var provinceSelect  = document.getElementById("{{ profil_form.province.id_for_label }}");
+    var districtSelect  = document.getElementById("{{ profil_form.district.id_for_label }}");
+    var zoneSelect      = document.getElementById("{{ profil_form.zone.id_for_label }}");
+
     if (!roleSelect) return;
 
-    function update() {
-      champProvince.classList.toggle("hidden", roleSelect.value !== "manager");
-      champDistrict.classList.toggle("hidden", roleSelect.value !== "superviseur");
+    // Valeurs actuelles (mode édition — pré-sélection après chargement de la page)
+    var regionActuelle   = "{{ profil_form.region.value|default_if_none:'' }}";
+    var provinceActuelle = "{{ profil_form.province.value|default_if_none:'' }}";
+    var districtActuel   = "{{ profil_form.district.value|default_if_none:'' }}";
+    var zoneActuelle     = "{{ profil_form.zone.value|default_if_none:'' }}";
+
+    // URLs des endpoints AJAX
+    var URL_PROVINCES = "{% url 'recensement:ajax_provinces' 0 %}".replace("/0/", "/");
+    var URL_DISTRICTS = "{% url 'recensement:ajax_districts' 0 %}".replace("/0/", "/");
+    var URL_ZONES     = "{% url 'recensement:ajax_zones' 0 %}".replace("/0/", "/");
+
+    // ----------------------------------------------------------------
+    // Affichage conditionnel des champs selon le rôle
+    // ----------------------------------------------------------------
+    function updateVisibilite() {
+      var role = roleSelect.value;
+
+      var afficheRegion   = ["op_province", "op_district", "op_zone", "agent"].includes(role);
+      var afficheProvince = ["op_province", "op_district", "op_zone", "agent"].includes(role);
+      var afficheDistrict = ["op_district", "op_zone", "agent"].includes(role);
+      var afficheZone     = ["op_zone", "agent"].includes(role);
+
+      champRegion.classList.toggle("hidden", !afficheRegion);
+      champProvince.classList.toggle("hidden", !afficheProvince);
+      champDistrict.classList.toggle("hidden", !afficheDistrict);
+      champZone.classList.toggle("hidden", !afficheZone);
+
+      // Vider les selects cachés (évite l'envoi de valeurs incohérentes)
+      if (!afficheDistrict) resetSelect(districtSelect, "— Sélectionnez d'abord une province —", true);
+      if (!afficheZone)     resetSelect(zoneSelect, "— Sélectionnez d'abord un district —", true);
     }
-    roleSelect.addEventListener("change", update);
-    update();
-  })();
 
-  // Filtre la liste des districts selon la province choisie, en réutilisant
-  // le même endpoint AJAX que le formulaire de recensement — évite d'avoir
-  // à se souvenir de quelle province contient quel district.
-  (function () {
-    var provinceFiltre = document.getElementById("province_filtre_district");
-    var districtSelect = document.getElementById("id_district_profil");
-    if (!provinceFiltre || !districtSelect) return;
+    // ----------------------------------------------------------------
+    // Helpers AJAX
+    // ----------------------------------------------------------------
+    function resetSelect(select, placeholder, disabled) {
+      if (!select) return;
+      select.innerHTML = "";
+      var opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = placeholder;
+      select.appendChild(opt);
+      select.disabled = !!disabled;
+    }
 
-    var URL_TEMPLATE = "{% url 'recensement:ajax_districts' 0 %}";
-    var districtActuelId = "{{ profil_form.district.value|default_if_none:'' }}";
-
-    function chargerDistricts(provinceId, districtASelectionner) {
-      districtSelect.innerHTML = "";
-      var placeholder = document.createElement("option");
-      placeholder.value = "";
-      placeholder.textContent = provinceId ? "— Sélectionnez un district —" : "— Choisissez d'abord une province —";
-      districtSelect.appendChild(placeholder);
-      districtSelect.disabled = !provinceId;
-      if (!provinceId) return;
-
-      fetch(URL_TEMPLATE.replace(/0\/$/, provinceId + "/"))
+    function chargerOptions(url, id, select, preselectId, placeholder) {
+      if (!select || !id) {
+        resetSelect(select, placeholder, true);
+        return;
+      }
+      fetch(url + id + "/")
         .then(function (r) { return r.json(); })
         .then(function (data) {
-          (data.results || []).forEach(function (d) {
+          resetSelect(select, "— Sélectionnez —", false);
+          (data.results || []).forEach(function (item) {
             var opt = document.createElement("option");
-            opt.value = d.id;
-            opt.textContent = d.nom;
-            if (districtASelectionner && String(d.id) === String(districtASelectionner)) {
+            opt.value = item.id;
+            opt.textContent = item.nom;
+            if (preselectId && String(item.id) === String(preselectId)) {
               opt.selected = true;
             }
-            districtSelect.appendChild(opt);
+            select.appendChild(opt);
           });
         })
         .catch(function () {
-          placeholder.textContent = "— Erreur de chargement, réessayez —";
+          resetSelect(select, "— Erreur de chargement, réessayez —", false);
         });
     }
 
-    provinceFiltre.addEventListener("change", function () {
-      chargerDistricts(provinceFiltre.value, null);
-    });
+    // ----------------------------------------------------------------
+    // Événements en cascade
+    // ----------------------------------------------------------------
+    if (regionSelect) {
+      regionSelect.addEventListener("change", function () {
+        chargerOptions(URL_PROVINCES, regionSelect.value, provinceSelect, null,
+          "— Sélectionnez d'abord une région —");
+        resetSelect(districtSelect, "— Sélectionnez d'abord une province —", true);
+        resetSelect(zoneSelect, "— Sélectionnez d'abord un district —", true);
+      });
+    }
 
-    // Initialisation : si une province est déjà choisie (mode édition), on
-    // précharge et présélectionne son district ; sinon on désactive
-    // simplement le select tant qu'aucune province n'est choisie (au lieu
-    // de laisser apparaître la liste complète et non filtrée de Django).
-    chargerDistricts(provinceFiltre.value, districtActuelId);
+    if (provinceSelect) {
+      provinceSelect.addEventListener("change", function () {
+        chargerOptions(URL_DISTRICTS, provinceSelect.value, districtSelect, null,
+          "— Sélectionnez d'abord une province —");
+        resetSelect(zoneSelect, "— Sélectionnez d'abord un district —", true);
+      });
+    }
+
+    if (districtSelect) {
+      districtSelect.addEventListener("change", function () {
+        chargerOptions(URL_ZONES, districtSelect.value, zoneSelect, null,
+          "— Sélectionnez d'abord un district —");
+      });
+    }
+
+    // ----------------------------------------------------------------
+    // Initialisation (mode édition : pré-remplir en cascade)
+    // ----------------------------------------------------------------
+    function init() {
+      updateVisibilite();
+      if (regionActuelle) {
+        chargerOptions(URL_PROVINCES, regionActuelle, provinceSelect, provinceActuelle,
+          "— Sélectionnez —");
+      }
+      if (provinceActuelle) {
+        chargerOptions(URL_DISTRICTS, provinceActuelle, districtSelect, districtActuel,
+          "— Sélectionnez —");
+      }
+      if (districtActuel) {
+        chargerOptions(URL_ZONES, districtActuel, zoneSelect, zoneActuelle,
+          "— Sélectionnez —");
+      }
+    }
+
+    roleSelect.addEventListener("change", updateVisibilite);
+    init();
   })();
 </script>
 {% endblock %}
