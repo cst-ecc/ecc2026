@@ -160,6 +160,26 @@ def annuler_migration_roles(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    # -----------------------------------------------------------------------
+    # IMPORTANT : atomic = False
+    #
+    # Cette migration mélange DDL (AddField, AlterField) et DML (RunPython
+    # avec .save() sur Profil) sur la MÊME table dans la MÊME migration.
+    #
+    # PostgreSQL interdit de faire du DDL sur une table qui a des "pending
+    # trigger events" dans la même transaction. L'erreur serait :
+    #   "cannot CREATE INDEX ... because it has pending trigger events"
+    #
+    # En rendant la migration non-atomique, chaque opération s'exécute et
+    # se committe indépendamment. Le RunPython committe ses .save(), puis
+    # l'AlterField suivant s'exécute dans une nouvelle transaction propre.
+    #
+    # Conséquence : en cas d'erreur à mi-parcours, un rollback automatique
+    # complet n'est pas possible. Mais les fonctions reverse (rollback)
+    # sont définies pour chaque RunPython, donc `migrate 0007` reste sûr.
+    # -----------------------------------------------------------------------
+    atomic = False
+
     dependencies = [
         ("recensement", "0007_alter_ficheparoisse_contact_informateur"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
