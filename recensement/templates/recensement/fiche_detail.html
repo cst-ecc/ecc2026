@@ -1,4 +1,5 @@
 {% extends "recensement/base.html" %}
+{% load l10n %}
 
 {% block title %}{{ fiche.nom_paroisse }} — Détail{% endblock %}
 
@@ -103,12 +104,17 @@
     <div class="p-5">
       {% if fiche.a_coordonnees_gps %}
         <dl class="grid grid-cols-3 gap-y-2 text-sm mb-3">
-          <dt class="col-span-1 text-slate-500">Latitude</dt><dd class="col-span-2">{{ fiche.latitude }}</dd>
-          <dt class="col-span-1 text-slate-500">Longitude</dt><dd class="col-span-2">{{ fiche.longitude }}</dd>
+          {# |unlocalize force le point décimal (.) indépendamment de la locale Django.      #}
+          {# Sans ce filtre, Django/français convertit 6.3702000 → 6,3702000, ce qui brise  #}
+          {# l'URL Google Maps (4 segments au lieu de 2 coordonnées).                        #}
+          <dt class="col-span-1 text-slate-500">Latitude</dt><dd class="col-span-2">{{ fiche.latitude|unlocalize }}</dd>
+          <dt class="col-span-1 text-slate-500">Longitude</dt><dd class="col-span-2">{{ fiche.longitude|unlocalize }}</dd>
           <dt class="col-span-1 text-slate-500">Précision</dt><dd class="col-span-2">{{ fiche.precision_gps|floatformat:0 }} m</dd>
         </dl>
+        {# Les deux |unlocalize ici sont le correctif principal : ils garantissent que  #}
+        {# l'URL contient bien "?q=6.3702000,2.3912000" et non "?q=6,3702000,2,3912000" #}
         <a class="inline-flex items-center gap-1.5 border border-brand-600 text-brand-700 hover:bg-brand-50 text-sm font-medium px-3.5 py-2 rounded-lg"
-           href="https://www.google.com/maps?q={{ fiche.latitude }},{{ fiche.longitude }}"
+           href="https://www.google.com/maps?q={{ fiche.latitude|unlocalize }},{{ fiche.longitude|unlocalize }}"
            target="_blank" rel="noopener">
           🗺️ Voir sur Google Maps
         </a>
