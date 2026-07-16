@@ -146,10 +146,16 @@ def generer_code_paroisse(fiche, genere_par=None, numero_enregistrement=None):
 
     La fonction est idempotente : si la fiche a déjà un code, ce code est
     retourné sans modification.
+
+    NOTE PostgreSQL : `select_for_update(of=('self',))` est nécessaire ici
+    car le `select_related("village")` produit un LEFT OUTER JOIN (village est
+    nullable). PostgreSQL refuse `FOR UPDATE` sur les tables du côté nullable
+    d'une jointure externe. En précisant `of=('self',)`, on demande à
+    verrouiller uniquement la ligne de `FicheParoisse`, pas les tables jointes.
     """
     fiche = (
         FicheParoisse.objects
-        .select_for_update()
+        .select_for_update(of=("self",))
         .select_related("region", "province", "district", "zone", "village")
         .get(pk=fiche.pk)
     )
