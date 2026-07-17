@@ -1,0 +1,107 @@
+# =============================================================================
+# CD — Déploiement continu en production
+# =============================================================================
+#
+# Déclenché :
+#   - Automatiquement après un push sur `main` (seulement si CI passe)
+#   - Manuellement via le bouton "Run workflow" dans GitHub Actions
+#
+# Séquence :
+#   1. Attend que le workflow CI soit vert
+#   2. Se connecte au VPS via SSH
+#   3. Exécute scripts/deploy.sh qui :
+#      a. Backup pg_dump (rétention 7 jours)
+#      b. git pull --ff-only
+#      c. docker compose build + up
+#      d. Health check (Django + Nginx)
+#   4. En cas d'échec → email d'alerte
+#
+# Secrets GitHub requis (Settings > Secrets and variables > Actions) :
+#   VPS_HOST             — IP ou hostname du serveur (ex: 169.58.0.201)
+#   VPS_USER             — utilisateur SSH (ex: eccops)
+#   VPS_SSH_KEY          — clé privée SSH dédiée CI/CD (contenu complet)
+#   VPS_PORT             — port SSH (optionnel, défaut: 22)
+#   ALERT_EMAIL_TO       — destinataire des alertes d'échec
+#   ALERT_EMAIL_FROM     — expéditeur Gmail (ex: csmecc2026@gmail.com)
+#   ALERT_EMAIL_PASSWORD — mot de passe d'application Gmail (pas le mdp du compte !)
+# =============================================================================
+
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    # Permet le déclenchement manuel depuis l'onglet Actions de GitHub
+
+# Un seul déploiement à la fois — les suivants attendent
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  # ===========================================================================
+  # Job 1 : Exécuter le CI d'abord
+  # ===========================================================================
+  ci:
+    name: "CI (pré-déploiement)"
+    uses: ./.github/workflows/ci.yml
+
+  # ===========================================================================
+  # Job 2 : Déployer en production
+  # ===========================================================================
+  deploy:
+    name: "Déployer en production"
+    runs-on: ubuntu-latest
+    needs: ci
+    environment: production
+
+    steps:
+      - name: Déploiement via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          timeout: 300s
+          command_timeout: 600s
+          script: |
+            cd ~/apps/ecc2026
+            chmod +x scripts/deploy.sh scripts/backup-db.sh
+            ./scripts/deploy.sh
+
+  # ===========================================================================
+  # Job 3 : Notification en cas d'échec
+  # ===========================================================================
+  notify-failure:
+    name: "Alerte échec"
+    runs-on: ubuntu-latest
+    needs: [ci, deploy]
+    if: failure()
+
+    steps:
+      - name: Envoyer un email d'alerte
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          secure: true
+          username: ${{ secrets.ALERT_EMAIL_FROM }}
+          password: ${{ secrets.ALERT_EMAIL_PASSWORD }}
+          subject: "❌ ECC Recensement — Échec de déploiement"
+          to: ${{ secrets.ALERT_EMAIL_TO }}
+          from: ${{ secrets.ALERT_EMAIL_FROM }}
+          body: |
+            Le déploiement automatique de l'application ECC Recensement a échoué.
+
+            Branche : ${{ github.ref_name }}
+            Commit  : ${{ github.sha }}
+            Auteur  : ${{ github.actor }}
+            Message : ${{ github.event.head_commit.message }}
+
+            Consultez les logs du pipeline :
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            ---
+            Cet email est envoyé automatiquement par GitHub Actions.

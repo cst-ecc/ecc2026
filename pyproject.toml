@@ -1,0 +1,52 @@
+# =============================================================================
+# Configuration Ruff — linter et formateur Python
+# =============================================================================
+# Utilisé par le workflow CI (GitHub Actions) et en local.
+#
+# Installation locale :
+#   pip install ruff
+#
+# Commandes :
+#   ruff check .          # analyser le code
+#   ruff check --fix .    # corriger automatiquement
+#   ruff format .         # formater le code
+#   ruff format --check . # vérifier le formatage sans modifier
+# =============================================================================
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+# Fichiers/dossiers à ignorer
+exclude = [
+    "*/migrations/*",
+    "staticfiles",
+    "media",
+    "manage.py",
+    ".git",
+    "__pycache__",
+    "venv",
+    "env",
+]
+
+[tool.ruff.lint]
+# Règles activées :
+#   E    — erreurs pycodestyle
+#   F    — erreurs pyflakes (imports inutilisés, variables non définies, etc.)
+#   W    — avertissements pycodestyle
+#   I    — tri des imports (isort)
+#   B    — bugbear (anti-patterns courants)
+#   UP   — pyupgrade (modernisation Python 3.12+)
+select = ["E", "F", "W", "I", "B", "UP"]
+
+# Règles ignorées :
+#   E501 — ligne trop longue (gérée par le formateur, pas le linter)
+#   E722 — bare except (parfois nécessaire dans les migrations)
+ignore = ["E501", "E722"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["recensement", "racine"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

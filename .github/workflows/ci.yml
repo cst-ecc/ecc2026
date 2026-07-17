@@ -1,0 +1,135 @@
+# =============================================================================
+# CI — Intégration continue
+# =============================================================================
+#
+# Déclenché sur :
+#   - Chaque push (toutes branches)
+#   - Chaque Pull Request vers main ou development
+#
+# Étapes :
+#   1. Lint Python (ruff)
+#   2. Vérifications système Django (check --deploy)
+#   3. Vérification de cohérence des migrations
+#   4. Tests unitaires + couverture (scaffold — prêt pour quand tu ajouteras
+#      des tests dans recensement/tests/)
+#
+# Base de données : PostgreSQL 16 en service container (identique à la prod).
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+    branches: [main, development]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  DJANGO_SETTINGS_MODULE: racine.settings
+
+jobs:
+  lint:
+    name: "Lint Python"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Installer ruff
+        run: pip install ruff
+
+      - name: Vérifier le formatage (ruff format)
+        run: ruff format --check .
+
+      - name: Analyser le code (ruff check)
+        run: ruff check .
+
+  checks:
+    name: "Django checks + migrations"
+    runs-on: ubuntu-latest
+    needs: lint
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ecc_ci_db
+          POSTGRES_USER: ecc_ci_user
+          POSTGRES_PASSWORD: ecc_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ecc_ci_user -d ecc_ci_db"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      SECRET_KEY: "ci-test-secret-key-not-for-production"
+      DEBUG: "True"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DATABASE_URL: "postgres://ecc_ci_user:ecc_ci_password@localhost:5432/ecc_ci_db"
+      LANGUAGE_CODE: "fr-fr"
+      TIME_ZONE: "Africa/Porto-Novo"
+      # Variables de sécurité (non utilisées en DEBUG=True, mais settings.py
+      # les lit via env() donc elles doivent exister)
+      CSRF_COOKIE_SECURE: "False"
+      SESSION_COOKIE_SECURE: "False"
+      SECURE_SSL_REDIRECT: "False"
+      CSRF_TRUSTED_ORIGINS: "http://localhost"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Installer les dépendances
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install coverage ruff
+
+      - name: Vérifications système Django
+        run: python manage.py check
+
+      - name: Vérifier la cohérence des migrations
+        run: python manage.py makemigrations --check --dry-run
+        # Échoue si des migrations manquent (modèle modifié sans makemigrations)
+
+      - name: Appliquer les migrations (vérifie qu'elles passent)
+        run: python manage.py migrate --noinput
+
+      - name: Collecter les fichiers statiques (vérifie que ça ne crash pas)
+        run: python manage.py collectstatic --noinput --clear
+
+      # ==================================================================
+      # Tests — scaffold prêt pour quand tu ajouteras des tests
+      # ==================================================================
+      # Quand tu créeras recensement/tests/, décommente les lignes ci-dessous.
+      # Les tests tourneront automatiquement avec couverture.
+      # ==================================================================
+
+      # - name: Lancer les tests avec couverture
+      #   run: |
+      #     coverage run manage.py test recensement --verbosity=2
+      #     coverage report --show-missing
+      #     coverage xml -o coverage.xml
+
+      # - name: Rapport de couverture (info seulement)
+      #   if: always()
+      #   run: |
+      #     if [ -f coverage.xml ]; then
+      #       echo "### 📊 Couverture de tests" >> $GITHUB_STEP_SUMMARY
+      #       coverage report --format=markdown >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+      #     fi
