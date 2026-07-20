@@ -1,7 +1,8 @@
 from django.contrib import admin
 
 from .models import (
-    CodeParoisseHistorique, District, FicheParoisse, HistoriqueModification,
+    AffectationTerritoriale, District, FicheParoisse,
+    HistoriqueAffectationTerritoriale, HistoriqueModification,
     PhotoParoisse, Profil, Province, Region, Village, Zone,
 )
 
@@ -140,17 +141,17 @@ class PhotoParoisseInline(admin.TabularInline):
 @admin.register(FicheParoisse)
 class FicheParoisseAdmin(admin.ModelAdmin):
     list_display = (
-        "code_officiel", "nom_paroisse", "localite", "zone", "district", "province", "region",
+        "nom_paroisse", "localite", "zone", "district", "province", "region",
         "statut_batiment", "statut_validation", "a_coordonnees_gps",
         "cree_par", "date_recensement",
     )
     list_filter = ("region", "province", "statut_batiment", "statut_validation")
     search_fields = (
-        "code_officiel", "nom_paroisse", "parish_shepherd",
+        "nom_paroisse", "parish_shepherd",
         "village__nom", "nouvelle_localite_nom", "cree_par__username",
     )
     date_hierarchy = "date_recensement"
-    readonly_fields = ("date_recensement", "code_officiel", "date_generation_code", "genere_par")
+    readonly_fields = ("date_recensement",)
     autocomplete_fields = ["region", "province", "district", "zone", "village"]
     inlines = [PhotoParoisseInline]
 
@@ -177,10 +178,6 @@ class FicheParoisseAdmin(admin.ModelAdmin):
                 "valide_par_superviseur", "date_validation_superviseur",
                 "valide_par_manager", "date_validation_manager",
             ),
-        }),
-        ("Codification officielle", {
-            "description": "Code généré automatiquement après validation complète. Ne pas modifier manuellement.",
-            "fields": ("code_officiel", "date_generation_code", "genere_par"),
         }),
         ("Agent recenseur & observations", {
             "fields": ("cree_par", "observations", "date_recensement"),
@@ -216,18 +213,44 @@ class HistoriqueModificationAdmin(admin.ModelAdmin):
 
 
 # ---------------------------------------------------------------------------
-# Historique de codification officielle (lecture seule)
+# Affectations territoriales
 # ---------------------------------------------------------------------------
 
-@admin.register(CodeParoisseHistorique)
-class CodeParoisseHistoriqueAdmin(admin.ModelAdmin):
-    list_display = ("code_attribue", "fiche", "genere_par", "date_generation")
-    list_filter = ("date_generation", "genere_par")
-    search_fields = ("code_attribue", "fiche__nom_paroisse", "genere_par__username")
-    date_hierarchy = "date_generation"
+@admin.register(AffectationTerritoriale)
+class AffectationTerritorialeAdmin(admin.ModelAdmin):
+    list_display = (
+        "utilisateur", "niveau", "perimetre_admin", "statut",
+        "attribue_par", "role_attributeur", "date_attribution", "date_fin",
+    )
+    list_filter = ("niveau", "statut", "date_attribution")
+    search_fields = (
+        "utilisateur__username", "utilisateur__first_name",
+        "utilisateur__last_name", "district__nom", "zone__nom",
+        "attribue_par__username",
+    )
+    autocomplete_fields = ("utilisateur", "district", "zone", "attribue_par")
+    readonly_fields = ("date_attribution", "date_modification", "role_attributeur")
+
+    @admin.display(description="Périmètre")
+    def perimetre_admin(self, obj):
+        return obj.libelle_perimetre
+
+
+@admin.register(HistoriqueAffectationTerritoriale)
+class HistoriqueAffectationTerritorialeAdmin(admin.ModelAdmin):
+    list_display = (
+        "utilisateur", "action", "niveau", "effectue_par",
+        "role_effecteur", "date_action",
+    )
+    list_filter = ("action", "niveau", "date_action")
+    search_fields = (
+        "utilisateur__username", "effectue_par__username", "motif",
+    )
+    date_hierarchy = "date_action"
     readonly_fields = (
-        "fiche", "code_attribue", "date_generation",
-        "genere_par", "donnees_composition",
+        "affectation", "utilisateur", "niveau", "action",
+        "ancien_perimetre", "nouveau_perimetre", "effectue_par",
+        "role_effecteur", "date_action", "motif",
     )
 
     def has_add_permission(self, request):

@@ -60,6 +60,9 @@
   <div class="form-step" data-step="0">
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4">
       <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">1. Localisation ecclésiale</div>
+      <div id="territoire-notice"
+           class="hidden mx-5 mt-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800"
+           aria-live="polite"></div>
       <div class="p-5 space-y-4 step-body">
         <div class="grid sm:grid-cols-2 gap-4">
           <div>
@@ -490,6 +493,32 @@
    * formulaire est réaffiché après une erreur de validation.
    */
   window.RECENSEMENT_INITIAL = {{ initial_ids_json|safe }};
+
+  /*
+   * Périmètre réellement proposé à l'utilisateur connecté.
+   * Pour les non-super-admins, la liste form.fields.zone.queryset est déjà
+   * limitée côté serveur par FicheParoisseForm(user=request.user).
+   * cascade.js s'en sert pour verrouiller l'interface et empêcher l'affichage
+   * de zones hors périmètre.
+   */
+  window.RECENSEMENT_TERRITOIRE = {
+    restricted: {% if is_super_admin %}false{% else %}true{% endif %},
+    role: "{{ current_role|default:''|escapejs }}",
+    zones: [
+      {% for z in form.fields.zone.queryset %}
+        {
+          id: {{ z.id }},
+          nom: "{{ z.nom|escapejs }}",
+          district_id: {{ z.district_id }},
+          district_nom: "{{ z.district.nom|escapejs }}",
+          province_id: {{ z.district.province_id }},
+          province_nom: "{{ z.district.province.nom|escapejs }}",
+          region_id: {{ z.district.province.region_id }},
+          region_nom: "{{ z.district.province.region.libelle_selection|escapejs }}"
+        }{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ]
+  };
 
   /*
    * Première étape contenant une erreur.

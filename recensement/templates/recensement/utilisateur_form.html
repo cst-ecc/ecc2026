@@ -5,284 +5,224 @@
 {% block content %}
 <a href="{% url 'recensement:utilisateur_list' %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour aux utilisateurs</a>
 
-<h1 class="text-xl font-semibold text-slate-900 mt-2 mb-6">
+<h1 class="text-xl font-semibold text-slate-900 mt-2 mb-1">
   {% if is_edit %}Modifier le compte : {{ utilisateur.username }}{% else %}Nouveau compte utilisateur{% endif %}
 </h1>
+<p class="text-sm text-slate-500 mb-6">
+  Les rôles et territoires proposés sont limités à votre propre périmètre. Toute modification territoriale est journalisée.
+</p>
 
 <form method="post" id="utilisateur-form" class="space-y-4">
   {% csrf_token %}
 
-  {# ---- Identité ---- #}
+  {% if profil_form.non_field_errors %}
+    <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {% for error in profil_form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+    </div>
+  {% endif %}
+
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
-    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Identité</div>
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Identité et statut</div>
     <div class="p-5 space-y-4">
       {% if is_edit %}
-        <div class="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Identifiant (généré automatiquement)</label>
-            <input type="text" value="{{ utilisateur.username }}" disabled
-                   class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-500">
-          </div>
-          <div></div>
-          <div>
-            <label for="first_name" class="block text-sm font-medium text-slate-700 mb-1">Prénom</label>
-            <input type="text" name="first_name" id="first_name" value="{{ utilisateur.first_name }}"
-                   class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
-          <div>
-            <label for="last_name" class="block text-sm font-medium text-slate-700 mb-1">Nom</label>
-            <input type="text" name="last_name" id="last_name" value="{{ utilisateur.last_name }}"
-                   class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Identifiant</label>
+          <input type="text" value="{{ utilisateur.username }}" disabled
+                 class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-500">
         </div>
+      {% else %}
+        <p class="text-sm italic text-slate-500">L’identifiant et le mot de passe provisoire seront générés automatiquement.</p>
+      {% endif %}
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label for="first_name" class="block text-sm font-medium text-slate-700 mb-1">Prénom</label>
+          <input type="text" name="first_name" id="first_name"
+                 value="{% if is_edit %}{{ utilisateur.first_name }}{% else %}{{ request.POST.first_name }}{% endif %}"
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label for="last_name" class="block text-sm font-medium text-slate-700 mb-1">Nom</label>
+          <input type="text" name="last_name" id="last_name"
+                 value="{% if is_edit %}{{ utilisateur.last_name }}{% else %}{{ request.POST.last_name }}{% endif %}"
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-brand-500">
+        </div>
+      </div>
+
+      {% if is_edit %}
         <label class="flex items-center gap-2 text-sm text-slate-700">
           <input type="checkbox" name="is_active" {% if utilisateur.is_active %}checked{% endif %}
                  class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-          Compte actif (peut se connecter)
+          Compte actif
         </label>
-      {% else %}
-        {# Création : l'identifiant sera généré automatiquement — pas de champ username #}
-        <p class="text-sm text-slate-500 italic">
-          L'identifiant sera généré automatiquement selon le rôle et le périmètre choisis.
-        </p>
-        <div class="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label for="first_name" class="block text-sm font-medium text-slate-700 mb-1">Prénom</label>
-            <input type="text" name="first_name" id="first_name"
-                   class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
-          <div>
-            <label for="last_name" class="block text-sm font-medium text-slate-700 mb-1">Nom</label>
-            <input type="text" name="last_name" id="last_name"
-                   class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
-        </div>
-        <p class="text-sm text-amber-700 bg-amber-50 rounded-lg px-4 py-2">
-          Le mot de passe provisoire sera généré automatiquement et affiché <strong>une seule fois</strong>
-          après la création du compte. Notez-le soigneusement pour le transmettre à l'utilisateur.
-        </p>
       {% endif %}
     </div>
   </div>
 
-  {# ---- Rôle & périmètre ---- #}
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
-    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Rôle & périmètre</div>
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Affectation principale</div>
     <div class="p-5 space-y-4">
-
       <div>
-        <label for="{{ profil_form.role.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
-          {{ profil_form.role.label }}
-        </label>
+        <label for="{{ profil_form.role.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ profil_form.role.label }}</label>
         {{ profil_form.role }}
-        {% for error in profil_form.role.errors %}
-          <p class="text-red-600 text-sm mt-1">{{ error }}</p>
-        {% endfor %}
+        {% for error in profil_form.role.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
       </div>
 
-      {# Région — visible pour OP PROVINCE, OP DISTRICT, OP ZONE, AGENT #}
-      <div id="champ-region" class="hidden">
-        <label for="{{ profil_form.region.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
-          {{ profil_form.region.label }}
-        </label>
+      <div id="champ-region">
+        <label for="{{ profil_form.region.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ profil_form.region.label }}</label>
         {{ profil_form.region }}
-        {% for error in profil_form.region.errors %}
-          <p class="text-red-600 text-sm mt-1">{{ error }}</p>
-        {% endfor %}
+        {% for error in profil_form.region.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
       </div>
-
-      {# Province — visible pour OP PROVINCE, OP DISTRICT, OP ZONE, AGENT #}
-      <div id="champ-province" class="hidden">
-        <label for="{{ profil_form.province.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
-          {{ profil_form.province.label }}
-        </label>
+      <div id="champ-province">
+        <label for="{{ profil_form.province.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ profil_form.province.label }}</label>
         {{ profil_form.province }}
-        {% for error in profil_form.province.errors %}
-          <p class="text-red-600 text-sm mt-1">{{ error }}</p>
-        {% endfor %}
+        {% for error in profil_form.province.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
       </div>
-
-      {# District — visible pour OP DISTRICT, OP ZONE, AGENT #}
-      <div id="champ-district" class="hidden">
-        <label for="{{ profil_form.district.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
-          {{ profil_form.district.label }}
-        </label>
+      <div id="champ-district">
+        <label for="{{ profil_form.district.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ profil_form.district.label }}</label>
         {{ profil_form.district }}
-        {% for error in profil_form.district.errors %}
-          <p class="text-red-600 text-sm mt-1">{{ error }}</p>
-        {% endfor %}
+        {% for error in profil_form.district.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
       </div>
-
-      {# Zone — visible pour OP ZONE, AGENT #}
-      <div id="champ-zone" class="hidden">
-        <label for="{{ profil_form.zone.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
-          {{ profil_form.zone.label }}
-        </label>
+      <div id="champ-zone">
+        <label for="{{ profil_form.zone.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ profil_form.zone.label }}</label>
         {{ profil_form.zone }}
-        {% for error in profil_form.zone.errors %}
-          <p class="text-red-600 text-sm mt-1">{{ error }}</p>
-        {% endfor %}
+        {% for error in profil_form.zone.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
       </div>
 
+      {% if is_edit %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <label for="{{ profil_form.motif_principal.id_for_label }}" class="block text-sm font-medium text-amber-900 mb-1">
+            {{ profil_form.motif_principal.label }}
+          </label>
+          {{ profil_form.motif_principal }}
+          <p class="text-xs text-amber-700 mt-1">Obligatoire uniquement si le rôle ou le périmètre principal change.</p>
+          {% for error in profil_form.motif_principal.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        </div>
+      {% endif %}
     </div>
   </div>
 
   <div class="flex justify-end gap-2">
-    <a href="{% url 'recensement:utilisateur_list' %}"
-       class="border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg">
-      Annuler
-    </a>
+    <a href="{% url 'recensement:utilisateur_list' %}" class="border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg">Annuler</a>
     <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-5 py-2.5 rounded-lg">
-      {% if is_edit %}Enregistrer les modifications{% else %}Créer le compte{% endif %}
+      {% if is_edit %}Enregistrer l’affectation principale{% else %}Créer le compte{% endif %}
     </button>
   </div>
 </form>
+
+{% if is_edit %}
+<div class="mt-8 space-y-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Périmètre d’intervention autorisé</div>
+    <div class="p-5">
+      <div class="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-800 mb-5">
+        <strong>Affectation principale :</strong> {{ utilisateur.profil.perimetre_display }}.
+        Elle se modifie dans le formulaire ci-dessus et ne peut pas être supprimée sans être remplacée.
+      </div>
+
+      {% if peut_ajouter_affectation %}
+      <form method="post" action="{% url 'recensement:affectation_ajouter' utilisateur.pk %}" class="rounded-xl border border-slate-200 p-4 mb-5 space-y-3">
+        {% csrf_token %}
+        <h2 class="font-semibold text-slate-800">Ajouter une affectation supplémentaire</h2>
+        {% if affectation_form.district %}
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">{{ affectation_form.district.label }}</label>
+            {{ affectation_form.district }}
+          </div>
+        {% endif %}
+        {% if affectation_form.zone %}
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">{{ affectation_form.zone.label }}</label>
+            {{ affectation_form.zone }}
+          </div>
+        {% endif %}
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">{{ affectation_form.motif.label }}</label>
+          {{ affectation_form.motif }}
+        </div>
+        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg">Ajouter l’affectation</button>
+      </form>
+      {% endif %}
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-800 text-white text-left">
+            <tr>
+              <th class="px-3 py-2">Type</th><th class="px-3 py-2">Territoire</th><th class="px-3 py-2">Statut</th>
+              <th class="px-3 py-2">Attribuée par</th><th class="px-3 py-2">Date</th><th class="px-3 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for affectation in affectations %}
+            <tr>
+              <td class="px-3 py-2">{{ affectation.get_niveau_display }}</td>
+              <td class="px-3 py-2 font-medium">{{ affectation.libelle_perimetre }}</td>
+              <td class="px-3 py-2">
+                {% if affectation.statut == 'active' %}<span class="text-green-700">Active</span>
+                {% elif affectation.statut == 'suspendue' %}<span class="text-amber-700">Suspendue</span>
+                {% elif affectation.statut == 'revoquee' %}<span class="text-red-700">Retirée</span>
+                {% else %}<span class="text-slate-500">{{ affectation.get_statut_display }}</span>{% endif %}
+              </td>
+              <td class="px-3 py-2">{{ affectation.attribue_par.get_username|default:'—' }}<br><span class="text-xs text-slate-400">{{ affectation.role_attributeur }}</span></td>
+              <td class="px-3 py-2 whitespace-nowrap">{{ affectation.date_attribution|date:'d/m/Y H:i' }}</td>
+              <td class="px-3 py-2 whitespace-nowrap">
+                {% if affectation.statut == 'active' %}
+                  <a class="text-amber-600 hover:underline" href="{% url 'recensement:affectation_action' utilisateur.pk affectation.pk 'suspendre' %}">Suspendre</a>
+                  <span class="text-slate-300">·</span>
+                  <a class="text-red-600 hover:underline" href="{% url 'recensement:affectation_action' utilisateur.pk affectation.pk 'retirer' %}">Retirer</a>
+                {% elif affectation.statut == 'suspendue' or affectation.statut == 'expiree' %}
+                  <a class="text-green-600 hover:underline" href="{% url 'recensement:affectation_action' utilisateur.pk affectation.pk 'reactiver' %}">Réactiver</a>
+                  <span class="text-slate-300">·</span>
+                  <a class="text-red-600 hover:underline" href="{% url 'recensement:affectation_action' utilisateur.pk affectation.pk 'retirer' %}">Retirer</a>
+                {% else %}<span class="text-slate-400">Historique</span>{% endif %}
+              </td>
+            </tr>
+            {% empty %}<tr><td colspan="6" class="px-3 py-6 text-center text-slate-400">Aucune affectation supplémentaire.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Historique des accès territoriaux</div>
+    <div class="divide-y divide-slate-100">
+      {% for entree in historique_affectations %}
+      <div class="p-4 text-sm">
+        <div class="flex justify-between gap-4"><strong>{{ entree.get_action_display }}</strong><span class="text-xs text-slate-400">{{ entree.date_action|date:'d/m/Y H:i' }}</span></div>
+        <p class="text-slate-600 mt-1">Par {{ entree.effectue_par.get_username|default:'Compte supprimé' }} ({{ entree.role_effecteur|default:'—' }})</p>
+        {% if entree.motif %}<p class="mt-1"><span class="text-slate-400">Motif :</span> {{ entree.motif }}</p>{% endif %}
+        <details class="mt-2 text-xs"><summary class="cursor-pointer text-brand-600">Voir avant / après</summary><pre class="mt-2 overflow-auto rounded bg-slate-50 p-3">Avant : {{ entree.ancien_perimetre }}
+Après : {{ entree.nouveau_perimetre }}</pre></details>
+      </div>
+      {% empty %}<p class="p-5 text-sm text-slate-400">Aucun historique territorial.</p>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  /**
-   * Gestion du formulaire de création/modification d'utilisateur.
-   *
-   * Logique :
-   * 1. Selon le rôle sélectionné, afficher les champs hiérarchiques nécessaires.
-   * 2. Charger dynamiquement les provinces quand la région change (AJAX).
-   * 3. Charger dynamiquement les districts quand la province change (AJAX).
-   * 4. Charger dynamiquement les zones quand le district change (AJAX).
-   */
-  (function () {
-    "use strict";
+(function () {
+  "use strict";
+  var role = document.getElementById("id_role");
+  if (!role) return;
+  var region = document.getElementById("champ-region");
+  var province = document.getElementById("champ-province");
+  var district = document.getElementById("champ-district");
+  var zone = document.getElementById("champ-zone");
 
-    var roleSelect      = document.getElementById("id_role");
-    var champRegion     = document.getElementById("champ-region");
-    var champProvince   = document.getElementById("champ-province");
-    var champDistrict   = document.getElementById("champ-district");
-    var champZone       = document.getElementById("champ-zone");
-
-    var regionSelect    = document.getElementById("{{ profil_form.region.id_for_label }}");
-    var provinceSelect  = document.getElementById("{{ profil_form.province.id_for_label }}");
-    var districtSelect  = document.getElementById("{{ profil_form.district.id_for_label }}");
-    var zoneSelect      = document.getElementById("{{ profil_form.zone.id_for_label }}");
-
-    if (!roleSelect) return;
-
-    // Valeurs actuelles (mode édition — pré-sélection après chargement de la page)
-    var regionActuelle   = "{{ profil_form.region.value|default_if_none:'' }}";
-    var provinceActuelle = "{{ profil_form.province.value|default_if_none:'' }}";
-    var districtActuel   = "{{ profil_form.district.value|default_if_none:'' }}";
-    var zoneActuelle     = "{{ profil_form.zone.value|default_if_none:'' }}";
-
-    // URLs des endpoints AJAX
-    var URL_PROVINCES = "{% url 'recensement:ajax_provinces' 0 %}".replace("/0/", "/");
-    var URL_DISTRICTS = "{% url 'recensement:ajax_districts' 0 %}".replace("/0/", "/");
-    var URL_ZONES     = "{% url 'recensement:ajax_zones' 0 %}".replace("/0/", "/");
-
-    // ----------------------------------------------------------------
-    // Affichage conditionnel des champs selon le rôle
-    // ----------------------------------------------------------------
-    function updateVisibilite() {
-      var role = roleSelect.value;
-
-      var afficheRegion   = ["op_province", "op_district", "op_zone", "agent"].includes(role);
-      var afficheProvince = ["op_province", "op_district", "op_zone", "agent"].includes(role);
-      var afficheDistrict = ["op_district", "op_zone", "agent"].includes(role);
-      var afficheZone     = ["op_zone", "agent"].includes(role);
-
-      champRegion.classList.toggle("hidden", !afficheRegion);
-      champProvince.classList.toggle("hidden", !afficheProvince);
-      champDistrict.classList.toggle("hidden", !afficheDistrict);
-      champZone.classList.toggle("hidden", !afficheZone);
-
-      // Vider les selects cachés (évite l'envoi de valeurs incohérentes)
-      if (!afficheDistrict) resetSelect(districtSelect, "— Sélectionnez d'abord une province —", true);
-      if (!afficheZone)     resetSelect(zoneSelect, "— Sélectionnez d'abord un district —", true);
-    }
-
-    // ----------------------------------------------------------------
-    // Helpers AJAX
-    // ----------------------------------------------------------------
-    function resetSelect(select, placeholder, disabled) {
-      if (!select) return;
-      select.innerHTML = "";
-      var opt = document.createElement("option");
-      opt.value = "";
-      opt.textContent = placeholder;
-      select.appendChild(opt);
-      select.disabled = !!disabled;
-    }
-
-    function chargerOptions(url, id, select, preselectId, placeholder) {
-      if (!select || !id) {
-        resetSelect(select, placeholder, true);
-        return;
-      }
-      fetch(url + id + "/")
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          resetSelect(select, "— Sélectionnez —", false);
-          (data.results || []).forEach(function (item) {
-            var opt = document.createElement("option");
-            opt.value = item.id;
-            opt.textContent = item.nom;
-            if (preselectId && String(item.id) === String(preselectId)) {
-              opt.selected = true;
-            }
-            select.appendChild(opt);
-          });
-        })
-        .catch(function () {
-          resetSelect(select, "— Erreur de chargement, réessayez —", false);
-        });
-    }
-
-    // ----------------------------------------------------------------
-    // Événements en cascade
-    // ----------------------------------------------------------------
-    if (regionSelect) {
-      regionSelect.addEventListener("change", function () {
-        chargerOptions(URL_PROVINCES, regionSelect.value, provinceSelect, null,
-          "— Sélectionnez d'abord une région —");
-        resetSelect(districtSelect, "— Sélectionnez d'abord une province —", true);
-        resetSelect(zoneSelect, "— Sélectionnez d'abord un district —", true);
-      });
-    }
-
-    if (provinceSelect) {
-      provinceSelect.addEventListener("change", function () {
-        chargerOptions(URL_DISTRICTS, provinceSelect.value, districtSelect, null,
-          "— Sélectionnez d'abord une province —");
-        resetSelect(zoneSelect, "— Sélectionnez d'abord un district —", true);
-      });
-    }
-
-    if (districtSelect) {
-      districtSelect.addEventListener("change", function () {
-        chargerOptions(URL_ZONES, districtSelect.value, zoneSelect, null,
-          "— Sélectionnez d'abord un district —");
-      });
-    }
-
-    // ----------------------------------------------------------------
-    // Initialisation (mode édition : pré-remplir en cascade)
-    // ----------------------------------------------------------------
-    function init() {
-      updateVisibilite();
-      if (regionActuelle) {
-        chargerOptions(URL_PROVINCES, regionActuelle, provinceSelect, provinceActuelle,
-          "— Sélectionnez —");
-      }
-      if (provinceActuelle) {
-        chargerOptions(URL_DISTRICTS, provinceActuelle, districtSelect, districtActuel,
-          "— Sélectionnez —");
-      }
-      if (districtActuel) {
-        chargerOptions(URL_ZONES, districtActuel, zoneSelect, zoneActuelle,
-          "— Sélectionnez —");
-      }
-    }
-
-    roleSelect.addEventListener("change", updateVisibilite);
-    init();
-  })();
+  function afficher() {
+    var valeur = role.value;
+    var avecTerritoire = ["op_province", "op_district", "op_zone", "agent"].includes(valeur);
+    region.classList.toggle("hidden", !avecTerritoire);
+    province.classList.toggle("hidden", !avecTerritoire);
+    district.classList.toggle("hidden", !["op_district", "op_zone", "agent"].includes(valeur));
+    zone.classList.toggle("hidden", !["op_zone", "agent"].includes(valeur));
+  }
+  role.addEventListener("change", afficher);
+  afficher();
+})();
 </script>
 {% endblock %}

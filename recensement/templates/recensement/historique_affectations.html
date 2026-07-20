@@ -1,0 +1,38 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}Historique des accès territoriaux{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-4 gap-2 flex-wrap">
+  <div>
+    <h1 class="text-xl font-semibold text-slate-900">Historique des accès territoriaux</h1>
+    <p class="text-sm text-slate-500">Journal global consultable uniquement par le super administrateur.</p>
+  </div>
+  <a href="{% url 'recensement:utilisateur_list' %}" class="border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg">Retour aux utilisateurs</a>
+</div>
+
+<div class="overflow-x-auto bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <table class="min-w-full text-sm">
+    <thead class="bg-slate-800 text-white text-left">
+      <tr>
+        <th class="px-3 py-3">Date</th><th class="px-3 py-3">Utilisateur concerné</th><th class="px-3 py-3">Action</th>
+        <th class="px-3 py-3">Niveau</th><th class="px-3 py-3">Effectuée par</th><th class="px-3 py-3">Motif</th><th class="px-3 py-3">Détails</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for entree in historique_affectations %}
+      <tr class="align-top">
+        <td class="px-3 py-3 whitespace-nowrap">{{ entree.date_action|date:'d/m/Y H:i' }}</td>
+        <td class="px-3 py-3 font-mono text-xs">{{ entree.utilisateur.username }}</td>
+        <td class="px-3 py-3">{{ entree.get_action_display }}</td>
+        <td class="px-3 py-3">{{ entree.niveau|default:'—' }}</td>
+        <td class="px-3 py-3">{{ entree.effectue_par.get_username|default:'Compte supprimé' }}<br><span class="text-xs text-slate-400">{{ entree.role_effecteur }}</span></td>
+        <td class="px-3 py-3 max-w-xs">{{ entree.motif|default:'—' }}</td>
+        <td class="px-3 py-3"><details><summary class="cursor-pointer text-brand-600">Voir</summary><pre class="mt-2 min-w-[360px] whitespace-pre-wrap rounded bg-slate-50 p-3 text-xs">Avant : {{ entree.ancien_perimetre }}
+Après : {{ entree.nouveau_perimetre }}</pre></details></td>
+      </tr>
+      {% empty %}<tr><td colspan="7" class="text-center text-slate-400 py-8">Aucune action territoriale enregistrée.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

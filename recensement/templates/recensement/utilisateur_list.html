@@ -5,10 +5,18 @@
 {% block content %}
 <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
   <h1 class="text-xl font-semibold text-slate-900">Comptes utilisateurs</h1>
-  <a href="{% url 'recensement:utilisateur_create' %}"
-     class="inline-flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg">
-    + Nouveau compte
-  </a>
+  <div class="flex gap-2 flex-wrap">
+    {% if request.user.is_superuser or request.user.profil.is_super_admin %}
+      <a href="{% url 'recensement:historique_affectations' %}"
+         class="inline-flex items-center border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-lg">
+        Historique des accès
+      </a>
+    {% endif %}
+    <a href="{% url 'recensement:utilisateur_create' %}"
+       class="inline-flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg">
+      + Nouveau compte
+    </a>
+  </div>
 </div>
 
 {# ---- Filtres (super admin uniquement) ---- #}
@@ -68,6 +76,7 @@
         <th class="px-4 py-3 font-medium">Nom</th>
         <th class="px-4 py-3 font-medium">Rôle</th>
         <th class="px-4 py-3 font-medium">Périmètre</th>
+        <th class="px-4 py-3 font-medium">Accès supplémentaires</th>
         <th class="px-4 py-3 font-medium">Créé par</th>
         <th class="px-4 py-3 font-medium">Date création</th>
         <th class="px-4 py-3 font-medium text-center">Statut</th>
@@ -121,6 +130,17 @@
           {% endif %}
         </td>
 
+        {# Affectations supplémentaires #}
+        <td class="px-4 py-3 text-slate-600">
+          {% with total_acces=u.affectations_territoriales.count %}
+            {% if total_acces %}
+              <span class="inline-block px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">{{ total_acces }} accès</span>
+            {% else %}
+              <span class="text-slate-400">Aucun</span>
+            {% endif %}
+          {% endwith %}
+        </td>
+
         {# Créé par (traçabilité) #}
         <td class="px-4 py-3 text-slate-600">
           {% if u.profil.cree_par %}
@@ -151,10 +171,14 @@
 
         {# Actions #}
         <td class="px-4 py-3 whitespace-nowrap space-x-1">
-          <a href="{% url 'recensement:utilisateur_update' u.pk %}" class="text-brand-600 hover:underline">Modifier</a>
-          <span class="text-slate-300">·</span>
-          <a href="{% url 'recensement:utilisateur_reset_password' u.pk %}" class="text-brand-600 hover:underline">Mot de passe</a>
-          {% if u != request.user %}
+          {% if u == request.user %}
+            <span class="text-slate-400">Compte connecté</span>
+          {% elif u.is_superuser or u.profil.is_super_admin %}
+            <span class="text-slate-400">Consultation uniquement</span>
+          {% else %}
+            <a href="{% url 'recensement:utilisateur_update' u.pk %}" class="text-brand-600 hover:underline">Gérer les accès</a>
+            <span class="text-slate-300">·</span>
+            <a href="{% url 'recensement:utilisateur_reset_password' u.pk %}" class="text-brand-600 hover:underline">Mot de passe</a>
             <span class="text-slate-300">·</span>
             <form method="post" action="{% url 'recensement:utilisateur_toggle_actif' u.pk %}" class="inline">
               {% csrf_token %}
@@ -171,7 +195,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="8" class="text-center text-slate-400 py-8">Aucun compte pour le moment.</td>
+        <td colspan="9" class="text-center text-slate-400 py-8">Aucun compte pour le moment.</td>
       </tr>
       {% endfor %}
     </tbody>

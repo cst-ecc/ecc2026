@@ -24,8 +24,9 @@ from .models import (
     Province, Region, Village, Zone,
 )
 from .permissions import (
-    get_role, peut_creer_utilisateur, peut_modifier_fiche, peut_valider_fiche,
-    perimetre_creation_autorise, role_required, roles_creables_par,
+    districts_autorises, fiche_dans_perimetre, fiches_visibles_pour, get_role, peut_creer_utilisateur,
+    peut_modifier_fiche, peut_valider_fiche, perimetre_creation_autorise,
+    role_required, roles_creables_par, zones_autorisees,
 )
 
 # Caractères qu'un tableur peut interpréter comme début de formule (OWASP CSV Injection).
@@ -87,35 +88,8 @@ def _snapshot_fiche(fiche):
 
 
 def _fiches_visibles_pour(user):
-    """Centralise la règle de visibilité par rôle.
-
-    - super_admin  : tout.
-    - op_province  : fiches de SA province.
-    - op_district  : fiches de SON district.
-    - op_zone      : fiches de SA zone.
-    - agent        : uniquement les fiches QU'IL a créées.
-    """
-    qs = FicheParoisse.objects.select_related(
-        "region", "province", "district", "zone", "village", "cree_par"
-    )
-    role = get_role(user)
-
-    if role == Profil.Role.SUPER_ADMIN:
-        return qs
-
-    profil = getattr(user, "profil", None)
-
-    if role == Profil.Role.OP_PROVINCE and profil and profil.province_id:
-        return qs.filter(province_id=profil.province_id)
-
-    if role == Profil.Role.OP_DISTRICT and profil and profil.district_id:
-        return qs.filter(district_id=profil.district_id)
-
-    if role == Profil.Role.OP_ZONE and profil and profil.zone_id:
-        return qs.filter(zone_id=profil.zone_id)
-
-    # Agent (ou profil incomplet/absent) : uniquement ses propres fiches.
-    return qs.filter(cree_par=user)
+    """Compatibilité locale : délègue au moteur territorial centralisé."""
+    return fiches_visibles_pour(user)
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +121,7 @@ def fiche_create(request):
     """Formulaire de saisie terrain. Réservé aux agents et au super admin."""
     etape_erreur = None
     if request.method == "POST":
-        form = FicheParoisseForm(request.POST, request.FILES)
+        form = FicheParoisseForm(request.POST, request.FILES, user=request.user)
         photos_form = PhotosParoisseForm(request.POST, request.FILES)
         if form.is_valid() and photos_form.is_valid():
             fiche = form.save(commit=False)
@@ -168,7 +142,7 @@ def fiche_create(request):
             "à l'étape contenant l'erreur, indiquée en rouge ci-dessous.",
         )
     else:
-        form = FicheParoisseForm()
+        form = FicheParoisseForm(user=request.user)
         photos_form = PhotosParoisseForm()
 
     initial_ids = {
@@ -184,6 +158,8 @@ def fiche_create(request):
         "photos_form": photos_form,
         "initial_ids_json": json.dumps(initial_ids),
         "etape_erreur_json": json.dumps(etape_erreur),
+        "current_role": get_role(request.user),
+        "is_super_admin": get_role(request.user) == Profil.Role.SUPER_ADMIN,
     })
 
 
@@ -198,10 +174,7 @@ def fiche_update(request, pk):
     if not peut_modifier_fiche(request.user, fiche):
         role = get_role(request.user)
         profil = getattr(request.user, "profil", None)
-        hors_perimetre = (
-            (role == Profil.Role.OP_DISTRICT and (not profil or profil.district_id != fiche.district_id))
-            or (role == Profil.Role.OP_PROVINCE and (not profil or profil.province_id != fiche.province_id))
-        )
+        hors_perimetre = not fiche_dans_perimetre(request.user, fiche)
         if hors_perimetre:
             messages.error(request, "Cette fiche n'est pas dans votre périmètre (district/province).")
             return redirect("recensement:fiche_list")
@@ -214,7 +187,7 @@ def fiche_update(request, pk):
             return redirect("recensement:fiche_detail", pk=fiche.pk)
 
     if request.method == "POST":
-        form = FicheParoisseForm(request.POST, request.FILES, instance=fiche)
+        form = FicheParoisseForm(request.POST, request.FILES, instance=fiche, user=request.user)
         motif_form = MotifModificationForm(request.POST)
         if form.is_valid() and motif_form.is_valid():
             avant = _snapshot_fiche(fiche)
@@ -234,7 +207,7 @@ def fiche_update(request, pk):
             return redirect("recensement:fiche_detail", pk=fiche.pk)
         messages.error(request, "Veuillez corriger les erreurs ci-dessous.")
     else:
-        form = FicheParoisseForm(instance=fiche)
+        form = FicheParoisseForm(instance=fiche, user=request.user)
         motif_form = MotifModificationForm()
 
     initial_ids = {
@@ -250,6 +223,8 @@ def fiche_update(request, pk):
         "motif_form": motif_form,
         "fiche": fiche,
         "initial_ids_json": json.dumps(initial_ids),
+        "current_role": get_role(request.user),
+        "is_super_admin": get_role(request.user) == Profil.Role.SUPER_ADMIN,
     })
 
 
@@ -553,9 +528,10 @@ def fiche_a_valider(request):
     profil = getattr(request.user, "profil", None)
 
     if role == Profil.Role.OP_DISTRICT:
+        zone_ids = zones_autorisees(request.user) or set()
         fiches = FicheParoisse.objects.filter(
             statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR,
-            district_id=profil.district_id if profil else None,
+            zone_id__in=zone_ids,
         )
     else:  # OP_PROVINCE
         fiches = FicheParoisse.objects.filter(
@@ -585,52 +561,48 @@ def fiche_valider(request, pk):
     role = get_role(request.user)
     profil = getattr(request.user, "profil", None)
 
+    if not peut_valider_fiche(request.user, fiche):
+        messages.error(request, "Cette fiche n'est pas en attente de votre validation ou se trouve hors de votre périmètre.")
+        return redirect("recensement:fiche_a_valider")
+
     if role == Profil.Role.OP_DISTRICT:
-        if (fiche.statut_validation != FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
-                or not profil or fiche.district_id != profil.district_id):
-            messages.error(request, "Cette fiche n'est pas en attente de votre validation.")
-        else:
-            fiche.statut_validation = FicheParoisse.StatutValidation.ATTENTE_MANAGER
-            fiche.valide_par_superviseur = request.user
-            fiche.date_validation_superviseur = timezone.now()
-            fiche.save(update_fields=[
-                "statut_validation",
-                "valide_par_superviseur",
-                "date_validation_superviseur",
-            ])
-            messages.success(
-                request,
-                f"Fiche « {fiche.nom_paroisse} » validée, transmise à l'OP PROVINCE.",
-            )
+        fiche.statut_validation = FicheParoisse.StatutValidation.ATTENTE_MANAGER
+        fiche.valide_par_superviseur = request.user
+        fiche.date_validation_superviseur = timezone.now()
+        fiche.save(update_fields=[
+            "statut_validation",
+            "valide_par_superviseur",
+            "date_validation_superviseur",
+        ])
+        messages.success(
+            request,
+            f"Fiche « {fiche.nom_paroisse} » validée, transmise à l'OP PROVINCE.",
+        )
 
     elif role == Profil.Role.OP_PROVINCE:
-        if (fiche.statut_validation != FicheParoisse.StatutValidation.ATTENTE_MANAGER
-                or not profil or fiche.province_id != profil.province_id):
-            messages.error(request, "Cette fiche n'est pas en attente de votre validation.")
-        else:
-            try:
-                with transaction.atomic():
-                    fiche.statut_validation = FicheParoisse.StatutValidation.VALIDEE
-                    fiche.valide_par_manager = request.user
-                    fiche.date_validation_manager = timezone.now()
-                    fiche.save(update_fields=[
-                        "statut_validation",
-                        "valide_par_manager",
-                        "date_validation_manager",
-                    ])
-                    code = generer_code_paroisse(fiche, genere_par=request.user)
+        try:
+            with transaction.atomic():
+                fiche.statut_validation = FicheParoisse.StatutValidation.VALIDEE
+                fiche.valide_par_manager = request.user
+                fiche.date_validation_manager = timezone.now()
+                fiche.save(update_fields=[
+                    "statut_validation",
+                    "valide_par_manager",
+                    "date_validation_manager",
+                ])
+                code = generer_code_paroisse(fiche, genere_par=request.user)
 
-                messages.success(
-                    request,
-                    f"Fiche « {fiche.nom_paroisse} » validée définitivement. "
-                    f"Code officiel généré : {code}.",
-                )
-            except ValueError as exc:
-                messages.error(
-                    request,
-                    "La validation finale n'a pas été enregistrée, car le code officiel "
-                    f"n'a pas pu être généré : {exc}",
-                )
+            messages.success(
+                request,
+                f"Fiche « {fiche.nom_paroisse} » validée définitivement. "
+                f"Code officiel généré : {code}.",
+            )
+        except ValueError as exc:
+            messages.error(
+                request,
+                "La validation finale n'a pas été enregistrée, car le code officiel "
+                f"n'a pas pu être généré : {exc}",
+            )
 
     return redirect("recensement:fiche_a_valider")
 
@@ -762,28 +734,45 @@ def fiches_geojson(request):
 @login_required
 @require_GET
 def ajax_provinces(request, region_id):
-    provinces = Province.objects.filter(region_id=region_id).values("id", "nom")
-    return JsonResponse({"results": list(provinces)})
+    qs = Province.objects.filter(region_id=region_id)
+    role = get_role(request.user)
+    profil = getattr(request.user, "profil", None)
+    if role != Profil.Role.SUPER_ADMIN:
+        if role == Profil.Role.OP_PROVINCE and profil and profil.province_id:
+            qs = qs.filter(pk=profil.province_id)
+        else:
+            zone_ids = zones_autorisees(request.user) or set()
+            qs = qs.filter(districts__zones__id__in=zone_ids).distinct()
+    return JsonResponse({"results": list(qs.order_by("nom").values("id", "nom"))})
 
 
 @login_required
 @require_GET
 def ajax_districts(request, province_id):
-    districts = District.objects.filter(province_id=province_id).values("id", "nom")
-    return JsonResponse({"results": list(districts)})
+    qs = District.objects.filter(province_id=province_id)
+    district_ids = districts_autorises(request.user)
+    if district_ids is not None:
+        qs = qs.filter(pk__in=district_ids)
+    return JsonResponse({"results": list(qs.order_by("nom").values("id", "nom"))})
 
 
 @login_required
 @require_GET
 def ajax_zones(request, district_id):
-    zones = Zone.objects.filter(district_id=district_id).values("id", "nom")
-    return JsonResponse({"results": list(zones)})
+    qs = Zone.objects.filter(district_id=district_id)
+    zone_ids = zones_autorisees(request.user)
+    if zone_ids is not None:
+        qs = qs.filter(pk__in=zone_ids)
+    return JsonResponse({"results": list(qs.order_by("nom").values("id", "nom"))})
 
 
 @login_required
 @require_GET
 def ajax_villages(request, zone_id):
-    villages = Village.objects.filter(zone_id=zone_id).values("id", "nom")
+    zone_ids = zones_autorisees(request.user)
+    if zone_ids is not None and zone_id not in zone_ids:
+        return JsonResponse({"results": []}, status=403)
+    villages = Village.objects.filter(zone_id=zone_id).order_by("nom").values("id", "nom")
     return JsonResponse({"results": list(villages)})
 
 

@@ -668,3 +668,275 @@ class CodeParoisseHistorique(models.Model):
 
     def __str__(self):
         return f"{self.fiche.nom_paroisse} → {self.code_attribue}"
+
+# ---------------------------------------------------------------------------
+# Affectations supplémentaires pour les agents multi-zones
+# ---------------------------------------------------------------------------
+
+class AffectationSupplementaire(models.Model):
+    """Autorise un agent recenseur à intervenir dans une zone supplémentaire.
+
+    L'affectation principale de l'agent reste dans son Profil (zone).
+    Ce modèle ajoute des zones complémentaires, chacune attribuée par un
+    utilisateur habilité et tracée individuellement.
+    """
+
+    class Statut(models.TextChoices):
+        ACTIVE    = "active",    "Active"
+        SUSPENDUE = "suspendue", "Suspendue"
+        REVOQUEE  = "revoquee",  "Révoquée"
+        EXPIREE   = "expiree",   "Expirée"
+
+    agent = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="affectations_supplementaires",
+        help_text="Agent recenseur concerné.",
+    )
+
+    # Rattachement complet pour traçabilité
+    region = models.ForeignKey(Region, on_delete=models.PROTECT, related_name="+")
+    province = models.ForeignKey(Province, on_delete=models.PROTECT, related_name="+")
+    district = models.ForeignKey(District, on_delete=models.PROTECT, related_name="+")
+    zone = models.ForeignKey(Zone, on_delete=models.PROTECT, related_name="affectations")
+
+    # Traçabilité de l'attribution
+    attribue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="affectations_accordees",
+        help_text="Utilisateur ayant accordé cette affectation.",
+    )
+    role_attributeur = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text="Rôle de l'utilisateur au moment de l'attribution.",
+    )
+    date_attribution = models.DateTimeField(auto_now_add=True)
+
+    # Statut et cycle de vie
+    statut = models.CharField(
+        max_length=15,
+        choices=Statut.choices,
+        default=Statut.ACTIVE,
+    )
+    date_fin = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date de suspension, révocation ou expiration.",
+    )
+    motif = models.TextField(
+        blank=True,
+        help_text="Commentaire ou justification de l'affectation.",
+    )
+
+    class Meta:
+        verbose_name = "Affectation supplémentaire"
+        verbose_name_plural = "Affectations supplémentaires"
+        ordering = ["-date_attribution"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["agent", "zone"],
+                condition=models.Q(statut="active"),
+                name="unique_affectation_active_agent_zone",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.agent.get_username()} → {self.zone.nom} ({self.get_statut_display()})"
+
+# ---------------------------------------------------------------------------
+# Gestion générique des accès territoriaux des utilisateurs
+# ---------------------------------------------------------------------------
+
+class AffectationTerritoriale(models.Model):
+    """Affectation territoriale supplémentaire d'un utilisateur.
+
+    L'affectation principale reste portée par ``Profil``. Ce modèle complète
+    ce périmètre sans modifier l'identifiant du compte ni supprimer les
+    affectations antérieures. Il couvre :
+
+    - les districts supplémentaires des OP DISTRICT ;
+    - les zones supplémentaires des OP ZONE et des agents recenseurs.
+
+    Une affectation n'est jamais supprimée physiquement : un retrait passe son
+    statut à ``revoquee`` afin de préserver l'historique.
+    """
+
+    class Niveau(models.TextChoices):
+        DISTRICT = "district", "District"
+        ZONE = "zone", "Zone"
+
+    class Statut(models.TextChoices):
+        ACTIVE = "active", "Active"
+        SUSPENDUE = "suspendue", "Suspendue"
+        REVOQUEE = "revoquee", "Retirée"
+        EXPIREE = "expiree", "Expirée"
+
+    utilisateur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="affectations_territoriales",
+    )
+    niveau = models.CharField(max_length=10, choices=Niveau.choices)
+    district = models.ForeignKey(
+        District,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="affectations_territoriales",
+    )
+    zone = models.ForeignKey(
+        Zone,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="affectations_territoriales",
+    )
+    statut = models.CharField(
+        max_length=15,
+        choices=Statut.choices,
+        default=Statut.ACTIVE,
+    )
+    attribue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="affectations_territoriales_attribuees",
+    )
+    role_attributeur = models.CharField(max_length=20, blank=True)
+    date_attribution = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+    date_fin = models.DateTimeField(null=True, blank=True)
+    motif = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-date_attribution", "-id"]
+        verbose_name = "Affectation territoriale"
+        verbose_name_plural = "Affectations territoriales"
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(
+                        niveau="district",
+                        district__isnull=False,
+                        zone__isnull=True,
+                    )
+                    | models.Q(
+                        niveau="zone",
+                        district__isnull=True,
+                        zone__isnull=False,
+                    )
+                ),
+                name="affectation_territoriale_niveau_coherent",
+            ),
+            models.UniqueConstraint(
+                fields=["utilisateur", "district"],
+                condition=models.Q(
+                    niveau="district",
+                    statut="active",
+                    district__isnull=False,
+                ),
+                name="unique_affectation_active_utilisateur_district",
+            ),
+            models.UniqueConstraint(
+                fields=["utilisateur", "zone"],
+                condition=models.Q(
+                    niveau="zone",
+                    statut="active",
+                    zone__isnull=False,
+                ),
+                name="unique_affectation_active_utilisateur_zone",
+            ),
+        ]
+
+    @property
+    def perimetre(self):
+        return self.district if self.niveau == self.Niveau.DISTRICT else self.zone
+
+    @property
+    def libelle_perimetre(self):
+        perimetre = self.perimetre
+        return str(perimetre) if perimetre else "—"
+
+    def clean(self):
+        super().clean()
+        profil = getattr(self.utilisateur, "profil", None)
+        role = profil.role if profil else None
+
+        if self.niveau == self.Niveau.DISTRICT:
+            if role != Profil.Role.OP_DISTRICT:
+                raise ValidationError(
+                    {"niveau": "Seul un OP DISTRICT peut recevoir un district supplémentaire."}
+                )
+            if not self.district_id or self.zone_id:
+                raise ValidationError(
+                    "Une affectation de niveau district doit renseigner uniquement un district."
+                )
+
+        elif self.niveau == self.Niveau.ZONE:
+            if role not in (Profil.Role.OP_ZONE, Profil.Role.AGENT):
+                raise ValidationError(
+                    {"niveau": "Seuls un OP ZONE ou un agent peuvent recevoir une zone supplémentaire."}
+                )
+            if not self.zone_id or self.district_id:
+                raise ValidationError(
+                    "Une affectation de niveau zone doit renseigner uniquement une zone."
+                )
+
+    def __str__(self):
+        return (
+            f"{self.utilisateur.get_username()} → {self.libelle_perimetre} "
+            f"({self.get_statut_display()})"
+        )
+
+
+class HistoriqueAffectationTerritoriale(models.Model):
+    """Journal immuable des changements de périmètre territorial."""
+
+    class Action(models.TextChoices):
+        AJOUT = "ajout", "Ajout"
+        MODIFICATION_PRINCIPALE = "modification_principale", "Modification de l'affectation principale"
+        SUSPENSION = "suspension", "Suspension"
+        REACTIVATION = "reactivation", "Réactivation"
+        RETRAIT = "retrait", "Retrait"
+
+    affectation = models.ForeignKey(
+        AffectationTerritoriale,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historique",
+    )
+    utilisateur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="historique_affectations_territoriales",
+    )
+    niveau = models.CharField(max_length=20, blank=True)
+    action = models.CharField(max_length=30, choices=Action.choices)
+    ancien_perimetre = models.JSONField(default=dict, blank=True)
+    nouveau_perimetre = models.JSONField(default=dict, blank=True)
+    effectue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="actions_affectations_territoriales",
+    )
+    role_effecteur = models.CharField(max_length=20, blank=True)
+    date_action = models.DateTimeField(auto_now_add=True)
+    motif = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-date_action", "-id"]
+        verbose_name = "Historique d'affectation territoriale"
+        verbose_name_plural = "Historiques d'affectations territoriales"
+
+    def __str__(self):
+        return (
+            f"{self.get_action_display()} — "
+            f"{self.utilisateur.get_username()} — {self.date_action:%d/%m/%Y %H:%M}"
+        )

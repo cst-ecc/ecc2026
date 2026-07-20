@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 
 from .models import District, FicheParoisse, Profil, Province, Region, Village, Zone
+from .permissions import get_role, peut_creer_dans_zone, zones_autorisees
 
 # ---------------------------------------------------------------------------
 # Validation téléphonique internationale
@@ -160,6 +161,46 @@ class FicheParoisseForm(forms.ModelForm):
             "aria-hidden": "true",
         }),
     )
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        if user is None:
+            return
+
+        role = get_role(user)
+        if role == Profil.Role.SUPER_ADMIN:
+            return
+
+        zone_ids = zones_autorisees(user) or set()
+        zones_qs = Zone.objects.filter(pk__in=zone_ids).select_related(
+            "district__province__region"
+        ).order_by("nom")
+
+        self.fields["zone"].queryset = zones_qs
+        self.fields["district"].queryset = District.objects.filter(
+            zones__in=zones_qs
+        ).distinct().order_by("nom")
+        self.fields["province"].queryset = Province.objects.filter(
+            districts__zones__in=zones_qs
+        ).distinct().order_by("nom")
+        self.fields["region"].queryset = Region.objects.filter(
+            provinces__districts__zones__in=zones_qs
+        ).distinct().order_by("ordre", "nom")
+        self.fields["village"].queryset = Village.objects.filter(
+            zone_id__in=zone_ids
+        ).order_by("nom")
+
+        # Une seule zone effective : préremplissage complet. Le verrouillage
+        # visuel est appliqué dans cascade.js, tandis que la validation serveur
+        # ci-dessous empêche toute falsification du POST.
+        if len(zone_ids) == 1:
+            zone = zones_qs.first()
+            if zone:
+                self.fields["zone"].initial = zone.pk
+                self.fields["district"].initial = zone.district_id
+                self.fields["province"].initial = zone.district.province_id
+                self.fields["region"].initial = zone.district.province.region_id
 
     contact_responsable = forms.CharField(
         required=False,
@@ -376,6 +417,14 @@ class FicheParoisseForm(forms.ModelForm):
                     "Cette paroisse existe déjà dans cette zone (même nom, même chargé de paroisse). "
                     "Vérifiez auprès de votre superviseur avant de continuer.",
                 )
+
+        # Contrôle serveur commun à tous les rôles. Le HTML et le JavaScript
+        # ne sont jamais considérés comme une barrière de sécurité.
+        if zone and self.user and not peut_creer_dans_zone(self.user, zone):
+            self.add_error(
+                "zone",
+                "Vous n'êtes pas autorisé à enregistrer une paroisse dans cette zone.",
+            )
 
         return cleaned_data
 
