@@ -692,8 +692,10 @@ def carte_paroisses(request):
 @role_required(Profil.Role.SUPER_ADMIN, Profil.Role.OP_PROVINCE, Profil.Role.OP_DISTRICT)
 @require_GET
 def fiches_geojson(request):
-    fiches = _fiches_visibles_pour(request.user).filter(
-        latitude__isnull=False, longitude__isnull=False,
+    fiches = (
+        _fiches_visibles_pour(request.user)
+        .filter(latitude__isnull=False, longitude__isnull=False)
+        .select_related("region", "province", "district", "zone", "cree_par")
     )
     role = get_role(request.user)
 
@@ -712,6 +714,7 @@ def fiches_geojson(request):
                 "nom": f.nom_paroisse,
                 "localite": f.localite,
                 "zone": f.zone.nom,
+                "districtId": f.district_id,
                 "district": f.district.nom,
                 "province": f.province.nom,
                 "region": f.region.nom,

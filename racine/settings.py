@@ -113,6 +113,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"  # utilisé par `collectstatic` en produc
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+FILE_UPLOAD_PERMISSIONS = 0o644
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ---------------------------------------------------------------------------

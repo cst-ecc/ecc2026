@@ -49,8 +49,10 @@
   {% endif %}
 </p>
 
+{% include "recensement/includes/_code_officiel_paroisse.html" %}
+
 <div class="space-y-4">
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Localisation ecclésiale</div>
     <dl class="p-5 grid grid-cols-3 gap-y-2 text-sm">
       <dt class="col-span-1 text-slate-500">Région</dt><dd class="col-span-2">{{ fiche.region.nom }}</dd>
@@ -61,7 +63,7 @@
     </dl>
   </div>
 
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Paroisse</div>
     <dl class="p-5 grid grid-cols-3 gap-y-2 text-sm">
       <dt class="col-span-1 text-slate-500">Année de fondation</dt><dd class="col-span-2">{{ fiche.annee_fondation|default:"Non précisée" }}</dd>
@@ -70,7 +72,7 @@
     </dl>
   </div>
 
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Chargé de paroisse</div>
     <dl class="p-5 grid grid-cols-3 gap-y-2 text-sm">
       <dt class="col-span-1 text-slate-500">Nom</dt><dd class="col-span-2">{{ fiche.parish_shepherd }}</dd>
@@ -87,7 +89,7 @@
   </div>
 
   {% if fiche.photos.all %}
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Photos de la paroisse</div>
     <div class="p-5 flex flex-wrap gap-3">
       {% for photo in fiche.photos.all %}
@@ -99,7 +101,7 @@
   </div>
   {% endif %}
 
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Géolocalisation</div>
     <div class="p-5">
       {% if fiche.a_coordonnees_gps %}
@@ -124,7 +126,7 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Agent recenseur & observations</div>
     <div class="p-5">
       <dl class="grid grid-cols-3 gap-y-2 text-sm mb-2">
@@ -143,7 +145,7 @@
   </div>
 
   {% if fiche.valide_par_superviseur or fiche.valide_par_manager %}
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Traçabilité de la validation</div>
     <dl class="p-5 grid grid-cols-3 gap-y-2 text-sm">
       {% if fiche.valide_par_superviseur %}
@@ -159,7 +161,7 @@
   {% endif %}
 
   {% if historique %}
-  <div id="historique" class="bg-white rounded-2xl border border-slate-200 shadow-sm scroll-mt-4">
+  <div id="historique" class="app-card scroll-mt-4">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">
       Historique des modifications
     </div>

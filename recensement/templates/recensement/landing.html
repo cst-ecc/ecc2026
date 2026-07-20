@@ -1,69 +1,21 @@
 {% extends "recensement/base_public.html" %}
 {% load static %}
-
 {% block title %}Recensement des paroisses — Église du Christianisme Céleste{% endblock %}
-
 {% block content %}
-<div class="relative overflow-hidden rounded-3xl mb-10">
-  <!-- Dégradé de secours : toujours visible, même si l'image n'est pas encore fournie -->
-  <div class="absolute inset-0 bg-gradient-to-br from-brand-700 to-brand-900"></div>
-
-  <!-- Bannière en arrière-plan, en transparence, à fournir dans
-       recensement/static/recensement/img/banner-landing.jpg -->
-  <div class="absolute inset-0 bg-cover bg-center opacity-40"
-       style="background-image: url('{% static 'recensement/img/banner-landing.jpg' %}');"></div>
-
-  <!-- Voile dégradé pour garder le texte lisible par-dessus l'image -->
-  <div class="absolute inset-0 bg-gradient-to-b from-black/10 via-black/30 to-black/70"></div>
-
-  <div class="relative z-10 px-6 py-16 sm:py-24 text-center text-white">
-    <p class="text-xs sm:text-sm font-semibold tracking-widest uppercase text-accent-400 mb-3">
-      Église du Christianisme Céleste
-    </p>
-    <h1 class="text-3xl sm:text-4xl font-bold tracking-tight">
-      Recensement des Paroisses
-    </h1>
-    <p class="mt-4 text-lg text-white/85 max-w-xl mx-auto">
-      Un outil de terrain pour cartographier les paroisses de l'Eglise du Christianisme Céleste.
-    </p>
-
-    <div class="mt-8">
-      <a href="{% url 'login' %}"
-         class="inline-flex items-center gap-2 bg-accent-500 text-brand-900 hover:bg-accent-400 font-semibold px-6 py-3 rounded-xl shadow-sm transition-colors">
-        Connexion agent
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-        </svg>
-      </a>
-    </div>
-    <p class="mt-3 text-sm text-white/70">
-      Accès réservé aux agents, superviseurs, managers et administrateurs habilités.
-    </p>
+<section class="landing-hero relative overflow-hidden rounded-3xl px-6 py-14 text-center text-white shadow-soft sm:py-20">
+  <div class="absolute inset-0 opacity-10" aria-hidden="true"></div>
+  <div class="relative z-10 mx-auto max-w-3xl">
+    <img src="{% static 'recensement/img/logo-cst.png' %}" alt="Conseil Supérieur de Transition" class="mx-auto mb-5 h-24 w-24 rounded-full bg-white p-2 object-contain shadow-lg">
+    <p class="mb-3 text-xs font-semibold uppercase tracking-[.22em] text-accent-300 sm:text-sm">Église du Christianisme Céleste</p>
+    <h1 class="text-3xl font-bold tracking-tight sm:text-5xl">Recensement des paroisses</h1>
+    <p class="mx-auto mt-4 max-w-2xl text-base text-brand-50 sm:text-lg">Une plateforme administrative sécurisée pour recenser, valider et cartographier les paroisses.</p>
+    <a href="{% url 'login' %}" class="mt-8 inline-flex items-center gap-2 rounded-xl bg-accent-400 px-6 py-3 font-semibold text-brand-950 shadow hover:bg-accent-300" data-loader-message="Ouverture de la connexion…">Connexion agent <span aria-hidden="true">→</span></a>
+    <p class="mt-3 text-sm text-brand-100">Accès réservé aux utilisateurs habilités.</p>
   </div>
-</div>
-
-<div class="grid sm:grid-cols-3 gap-4 max-w-3xl mx-auto pb-4">
-  <div class="bg-white rounded-xl border border-slate-200 p-5 text-center">
-    <svg class="w-6 h-6 mx-auto mb-2 text-accent-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
-      <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-    <h3 class="font-semibold text-slate-800">Saisie sur le terrain</h3>
-    <p class="text-sm text-slate-500 mt-1">Localisation ecclésiale et position GPS précise.</p>
-  </div>
-  <div class="bg-white rounded-xl border border-slate-200 p-5 text-center">
-    <svg class="w-6 h-6 mx-auto mb-2 text-accent-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-    </svg>
-    <h3 class="font-semibold text-slate-800">Suivi structuré</h3>
-    <p class="text-sm text-slate-500 mt-1">Chaque rôle voit exactement ce qui le concerne.</p>
-  </div>
-  <div class="bg-white rounded-xl border border-slate-200 p-5 text-center">
-    <svg class="w-6 h-6 mx-auto mb-2 text-accent-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-    </svg>
-    <h3 class="font-semibold text-slate-800">Accès sécurisé</h3>
-    <p class="text-sm text-slate-500 mt-1">Données visibles uniquement par les comptes autorisés.</p>
-  </div>
+</section>
+<div class="mx-auto mt-8 grid max-w-4xl gap-4 sm:grid-cols-3">
+  <article class="app-card p-5 text-center"><h2 class="font-semibold text-brand-800">Saisie terrain</h2><p class="mt-1 text-sm text-slate-500">Informations paroissiales, photos et coordonnées GPS.</p></article>
+  <article class="app-card p-5 text-center"><h2 class="font-semibold text-brand-800">Validation hiérarchique</h2><p class="mt-1 text-sm text-slate-500">Suivi clair selon les rôles et les périmètres.</p></article>
+  <article class="app-card p-5 text-center"><h2 class="font-semibold text-brand-800">Données sécurisées</h2><p class="mt-1 text-sm text-slate-500">Accès contrôlé, traçabilité et exports administratifs.</p></article>
 </div>
 {% endblock %}

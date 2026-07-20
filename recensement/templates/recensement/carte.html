@@ -24,11 +24,19 @@
   {% endif %}
 </div>
 
-<!-- Légende -->
-<div class="flex flex-wrap gap-4 mb-3 text-xs text-slate-600">
-  <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block" style="background:#16a34a"></span> Validée</span>
-  <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block" style="background:#f59e0b"></span> Attente province</span>
-  <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block" style="background:#64748b"></span> Attente district</span>
+<div class="map-legend-card mb-3" aria-label="Légende de la carte">
+  <div class="map-legend-section">
+    <span class="map-legend-title">Couleur intérieure : district</span>
+    <div id="district-legend" class="district-legend" aria-live="polite">
+      <span class="text-xs text-slate-400">Chargement des districts…</span>
+    </div>
+  </div>
+  <div class="map-legend-section map-status-legend">
+    <span class="map-legend-title">Contour : statut</span>
+    <span class="map-status-item"><span class="map-status-dot map-status-dot--validated"></span> Validée</span>
+    <span class="map-status-item"><span class="map-status-dot map-status-dot--province"></span> Attente province</span>
+    <span class="map-status-item"><span class="map-status-dot map-status-dot--district"></span> Attente district</span>
+  </div>
 </div>
 
 <div id="carte-paroisses" class="rounded-2xl border border-slate-200 shadow-sm" style="height: 70vh; min-height: 420px;"></div>
@@ -42,14 +50,61 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
   (function () {
-    var COULEURS = {
+    "use strict";
+
+    var STATUS_COLORS = {
       validee: "#16a34a",
       attente_manager: "#f59e0b",
-      attente_superviseur: "#64748b",
+      attente_superviseur: "#64748b"
     };
 
+    /*
+     * Produit une couleur stable à partir de l'identifiant du district.
+     * Le pas doré répartit mieux les teintes, même lorsque les identifiants
+     * sont proches. La couleur reste identique à chaque rechargement.
+     */
+    function districtColor(districtId) {
+      var id = Number(districtId);
+      if (!Number.isFinite(id)) return "hsl(205 70% 45%)";
+      var hue = Math.round((id * 137.508) % 360);
+      return "hsl(" + hue + " 68% 44%)";
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function renderDistrictLegend(districts) {
+      var legend = document.getElementById("district-legend");
+      if (!legend) return;
+
+      var values = Object.keys(districts).map(function (key) {
+        return districts[key];
+      }).sort(function (a, b) {
+        return a.name.localeCompare(b.name, "fr", { sensitivity: "base" });
+      });
+
+      if (!values.length) {
+        legend.innerHTML = '<span class="text-xs text-slate-400">Aucun district affiché.</span>';
+        return;
+      }
+
+      legend.innerHTML = values.map(function (district) {
+        return '<span class="district-legend-item">' +
+          '<span class="district-legend-swatch" style="background:' + district.color + '"></span>' +
+          '<span>' + escapeHtml(district.name) + '</span>' +
+          '</span>';
+      }).join("");
+    }
+
     var params = new URLSearchParams(window.location.search);
-    var statutUrl = "{% url 'recensement:fiches_geojson' %}" + (params.get("statut") ? "?statut=" + params.get("statut") : "");
+    var statutUrl = "{% url 'recensement:fiches_geojson' %}" +
+      (params.get("statut") ? "?statut=" + encodeURIComponent(params.get("statut")) : "");
 
     var lienValidees = document.getElementById("lien-validees");
     var lienTous = document.getElementById("lien-tous");
@@ -65,58 +120,87 @@
       }
     }
 
-    var map = L.map("carte-paroisses").setView([9.3, 2.3], 7); // Centre approximatif du Bénin
+    var map = L.map("carte-paroisses").setView([9.3, 2.3], 7);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18,
-      attribution: "&copy; contributeurs OpenStreetMap",
+      attribution: "&copy; contributeurs OpenStreetMap"
     }).addTo(map);
 
-    fetch(statutUrl)
-      .then(function (r) { return r.json(); })
+    fetch(statutUrl, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin"
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        return response.json();
+      })
       .then(function (geojson) {
         var features = geojson.features || [];
         if (features.length === 0) {
           document.getElementById("carte-vide").classList.remove("hidden");
+          renderDistrictLegend({});
           return;
         }
 
         var bounds = [];
+        var districts = {};
+
         features.forEach(function (feature) {
-          var coords = feature.geometry.coordinates; // [lng, lat]
-          var p = feature.properties;
-          var latlng = [coords[1], coords[0]];
+          if (!feature.geometry || !Array.isArray(feature.geometry.coordinates)) return;
+
+          var coords = feature.geometry.coordinates;
+          var p = feature.properties || {};
+          var latitude = Number(coords[1]);
+          var longitude = Number(coords[0]);
+          if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+          var latlng = [latitude, longitude];
           bounds.push(latlng);
 
+          var fillColor = districtColor(p.districtId);
+          var strokeColor = STATUS_COLORS[p.statutCode] || STATUS_COLORS.attente_superviseur;
+          var districtKey = String(p.districtId || p.district || "sans-district");
+          districts[districtKey] = {
+            name: p.district || "District non renseigné",
+            color: fillColor
+          };
+
           var marker = L.circleMarker(latlng, {
-            radius: 8,
-            weight: 2,
-            color: "#fff",
-            fillColor: COULEURS[p.statutCode] || "#64748b",
-            fillOpacity: 0.9,
+            radius: 9,
+            weight: 4,
+            color: strokeColor,
+            fillColor: fillColor,
+            fillOpacity: 0.92,
+            opacity: 1
           }).addTo(map);
 
           var popup =
-            '<div style="min-width:180px">' +
-            '<div style="font-weight:600;margin-bottom:2px">' + p.nom + '</div>' +
-            '<div style="font-size:12px;color:#64748b">' + p.localite + ' — ' + p.zone + '</div>' +
-            '<div style="font-size:12px;color:#64748b">' + p.district + ', ' + p.province + '</div>' +
-            '<div style="font-size:12px;margin-top:4px">Chargé : ' + p.chargeParoisse + '</div>' +
-            '<div style="font-size:12px">Agent : ' + p.agent + '</div>' +
-            '<div style="font-size:12px;margin-top:4px">Statut : ' + p.statutLabel + '</div>' +
-            '<a href="' + p.url + '" style="display:inline-block;margin-top:6px;font-size:12px;color:#4f46e5">Voir la fiche &rarr;</a>' +
+            '<div style="min-width:190px">' +
+            '<div style="font-weight:700;margin-bottom:3px">' + escapeHtml(p.nom) + '</div>' +
+            '<div style="font-size:12px;color:#64748b">' + escapeHtml(p.localite) + ' — ' + escapeHtml(p.zone) + '</div>' +
+            '<div style="font-size:12px;color:#64748b">' + escapeHtml(p.district) + ', ' + escapeHtml(p.province) + '</div>' +
+            '<div style="font-size:12px;margin-top:5px">Chargé : ' + escapeHtml(p.chargeParoisse) + '</div>' +
+            '<div style="font-size:12px">Agent : ' + escapeHtml(p.agent) + '</div>' +
+            '<div style="font-size:12px;margin-top:5px">Statut : ' + escapeHtml(p.statutLabel) + '</div>' +
+            '<a href="' + escapeHtml(p.url) + '" style="display:inline-block;margin-top:7px;font-size:12px;color:#0b6eae;font-weight:600">Voir la fiche &rarr;</a>' +
             '</div>';
 
           marker.bindPopup(popup);
+          marker.bindTooltip(escapeHtml(p.nom), { direction: "top", offset: [0, -8] });
         });
+
+        renderDistrictLegend(districts);
 
         if (bounds.length > 0) {
           map.fitBounds(bounds, { padding: [30, 30], maxZoom: 13 });
         }
       })
       .catch(function () {
-        document.getElementById("carte-vide").textContent = "Erreur de chargement des données. Réessayez.";
-        document.getElementById("carte-vide").classList.remove("hidden");
+        var empty = document.getElementById("carte-vide");
+        empty.textContent = "Erreur de chargement des données. Réessayez.";
+        empty.classList.remove("hidden");
+        renderDistrictLegend({});
       });
   })();
 </script>

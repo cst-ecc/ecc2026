@@ -11,12 +11,12 @@
 </div>
 
 <div class="grid md:grid-cols-3 gap-4 mb-5">
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+  <div class="app-card p-4">
     <div class="text-sm text-slate-500">Nombre de paroisses concernées</div>
     <div class="text-3xl font-semibold text-slate-900 mt-1">{{ total }}</div>
   </div>
 
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:col-span-2">
+  <div class="app-card p-4 md:col-span-2">
     <div class="text-sm font-semibold text-slate-800 mb-2">Organisation du fichier</div>
     <p class="text-sm text-slate-600">
       Le fichier Excel contiendra uniquement les colonnes suivantes :
@@ -31,7 +31,7 @@
   </div>
 </div>
 
-<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-5">
+<div class="app-card p-4 mb-5">
   <h2 class="text-sm font-semibold text-slate-800 mb-3">Filtres appliqués</h2>
 
   <div class="grid sm:grid-cols-2 md:grid-cols-5 gap-3 text-sm">
@@ -58,7 +58,7 @@
   </div>
 </div>
 
-<div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5">
+<div class="app-card mb-5">
   <div class="px-4 py-3 border-b border-slate-100">
     <h2 class="text-sm font-semibold text-slate-800">Regroupement hiérarchique des données</h2>
     <p class="text-xs text-slate-500 mt-0.5">
@@ -70,7 +70,7 @@
     {% if hierarchy %}
       {% for region, provinces in hierarchy.items %}
         <div class="border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-800 text-white px-4 py-2 font-semibold">
+          <div class="bg-brand-800 text-white px-4 py-2 font-semibold">
             Région : {{ region }}
           </div>
 

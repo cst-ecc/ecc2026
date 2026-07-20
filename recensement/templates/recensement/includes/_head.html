@@ -1,10 +1,14 @@
 {% load static %}
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+<meta name="theme-color" content="#054771">
 <title>{% block title %}Recensement des paroisses{% endblock %}</title>
 
-<!-- Tailwind via CDN (Play CDN) : pratique pour démarrer sans outillage Node.
-     Pour la production, voir README §Tailwind pour passer à une build compilée. -->
+<link rel="icon" href="{% static 'recensement/img/favicon.ico' %}" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="{% static 'recensement/img/favicon-32x32.png' %}">
+<link rel="icon" type="image/png" sizes="192x192" href="{% static 'recensement/img/favicon-192x192.png' %}">
+<link rel="apple-touch-icon" sizes="180x180" href="{% static 'recensement/img/apple-touch-icon.png' %}">
+
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -12,18 +16,19 @@
       extend: {
         colors: {
           brand: {
-            50: '#EBF7FE', 100: '#D3EDFD', 200: '#A7DAFB', 300: '#71C4F9',
-            400: '#3BADF7', 500: '#0984D3', 600: '#0765A2', 700: '#054771',
-            800: '#032E4A', 900: '#021928',
+            50:'#eef8fe',100:'#d9effd',200:'#b8e1fb',300:'#81ccf7',
+            400:'#42aef0',500:'#188bd5',600:'#0b6eae',700:'#085789',
+            800:'#06456d',900:'#043653',950:'#022238'
           },
           accent: {
-            50: '#FFFEEB', 100: '#FFFCD1', 200: '#FFFAA3', 300: '#FFF66B',
-            400: '#FFF333', 500: '#FFF000', 600: '#CCC000', 700: '#999000',
-            800: '#706A00', 900: '#4D4800',
-          },
+            50:'#fffdeb',100:'#fff9c7',200:'#fff38a',300:'#ffe84d',
+            400:'#ffdb1f',500:'#f5c800',600:'#c79b00',700:'#947000',
+            800:'#795a06',900:'#654a0a'
+          }
         },
-      },
-    },
+        boxShadow: { soft: '0 10px 30px rgba(2,34,56,.08)' }
+      }
+    }
   };
 </script>
 <link href="{% static 'recensement/css/style.css' %}" rel="stylesheet">

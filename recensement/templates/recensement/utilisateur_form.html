@@ -21,7 +21,7 @@
     </div>
   {% endif %}
 
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Identité et statut</div>
     <div class="p-5 space-y-4">
       {% if is_edit %}
@@ -59,7 +59,7 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Affectation principale</div>
     <div class="p-5 space-y-4">
       <div>
@@ -112,7 +112,7 @@
 
 {% if is_edit %}
 <div class="mt-8 space-y-4">
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Périmètre d’intervention autorisé</div>
     <div class="p-5">
       <div class="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-800 mb-5">
@@ -145,8 +145,8 @@
       {% endif %}
 
       <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
-          <thead class="bg-slate-800 text-white text-left">
+        <table class="min-w-full text-sm app-table">
+          <thead class="bg-brand-800 text-white text-left">
             <tr>
               <th class="px-3 py-2">Type</th><th class="px-3 py-2">Territoire</th><th class="px-3 py-2">Statut</th>
               <th class="px-3 py-2">Attribuée par</th><th class="px-3 py-2">Date</th><th class="px-3 py-2">Actions</th>
@@ -184,7 +184,7 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+  <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Historique des accès territoriaux</div>
     <div class="divide-y divide-slate-100">
       {% for entree in historique_affectations %}

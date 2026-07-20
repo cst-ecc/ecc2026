@@ -50,7 +50,7 @@
 </div>
 
 {% if is_super_admin %}
-<form method="get" id="filters-form" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4">
+<form method="get" id="filters-form" class="app-card p-4 mb-4">
   {% if statut_filtre %}
     <input type="hidden" name="statut" value="{{ statut_filtre }}">
   {% endif %}
@@ -155,9 +155,9 @@
 </form>
 {% endif %}
 
-<div class="overflow-x-auto bg-white rounded-2xl border border-slate-200 shadow-sm">
-  <table class="min-w-full text-sm">
-    <thead class="bg-slate-800 text-white text-left">
+<div class="overflow-x-auto app-card">
+  <table class="min-w-full text-sm app-table">
+    <thead class="bg-brand-800 text-white text-left">
       <tr>
         <th class="px-4 py-3 font-medium">Région</th>
         <th class="px-4 py-3 font-medium">Province</th>

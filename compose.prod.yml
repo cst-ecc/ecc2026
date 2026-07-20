@@ -54,9 +54,14 @@ services:
     command:
       - |
         mkdir -p /app/media/paroisses /app/staticfiles
+
         chown -R eccparishatlast:eccparishatlast /app/media /app/staticfiles
-        chmod -R u+rwX,g+rX,o-rwx /app/media
-        chmod -R u+rwX,g+rX,o+rX /app/staticfiles
+
+        find /app/media -type d -exec chmod 755 {} \;
+        find /app/media -type f -exec chmod 644 {} \;
+
+        find /app/staticfiles -type d -exec chmod 755 {} \;
+        find /app/staticfiles -type f -exec chmod 644 {} \;
 
     volumes:
       - static_data:/app/staticfiles

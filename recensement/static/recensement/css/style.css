@@ -1,136 +1,411 @@
-/* Le gros du style vient de Tailwind (classes utilitaires dans les templates).
-   Ce fichier ne couvre que ce qui est plus simple en CSS classique :
-   les connecteurs du stepper (pseudo-éléments) et le piège anti-robot. */
+:root {
+    --brand-950: #022238;
+    --brand-900: #043653;
+    --brand-800: #06456d;
+    --brand-700: #085789;
+    --brand-600: #0b6eae;
+    --brand-500: #188bd5;
+    --accent: #f5c800;
+    --surface: #fff;
+    --line: #dbe5ec
+}
+
+html {
+    scroll-behavior: smooth
+}
+
+body {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif
+}
+
+.app-sidebar,
+.app-mobile-header,
+.app-public-nav {
+    background: linear-gradient(180deg, var(--brand-900), var(--brand-950))
+}
+
+.landing-hero {
+    background: radial-gradient(circle at 20% 15%, rgba(24, 139, 213, .55), transparent 35%), linear-gradient(135deg, var(--brand-700), var(--brand-950))
+}
+
+.landing-hero>.absolute {
+    background-image: linear-gradient(45deg, rgba(255, 255, 255, .12) 1px, transparent 1px);
+    background-size: 24px 24px
+}
+
+.app-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: 0 8px 26px rgba(2, 34, 56, .06)
+}
+
+.sidebar-group {
+    margin-bottom: .35rem
+}
+
+.sidebar-summary {
+    display: flex;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: .65rem;
+    padding: .7rem .8rem;
+    color: #d9effd;
+    font-weight: 600
+}
+
+.sidebar-summary:hover {
+    background: rgba(255, 255, 255, .08)
+}
+
+.sidebar-summary::-webkit-details-marker {
+    display: none
+}
+
+.sidebar-group[open] .sidebar-summary>span:last-child {
+    transform: rotate(90deg)
+}
+
+.sidebar-submenu {
+    margin: .25rem 0 .45rem .75rem;
+    border-left: 1px solid rgba(255, 255, 255, .16);
+    padding-left: .65rem
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: .6rem;
+    padding: .58rem .7rem;
+    color: #c8e7f9;
+    font-size: .875rem
+}
+
+.sidebar-link:hover {
+    background: rgba(255, 255, 255, .08);
+    color: #fff
+}
+
+.sidebar-link.is-active {
+    background: var(--brand-500);
+    color: #fff;
+    box-shadow: inset 3px 0 0 var(--accent)
+}
+
+.sidebar-count {
+    min-width: 1.35rem;
+    border-radius: 999px;
+    background: var(--accent);
+    padding: .1rem .4rem;
+    text-align: center;
+    color: var(--brand-950);
+    font-size: .7rem;
+    font-weight: 800
+}
+
+.app-alert {
+    border-width: 1px;
+    border-radius: .75rem;
+    padding: .75rem 1rem;
+    font-size: .875rem
+}
+
+.app-alert--error {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b
+}
+
+.app-alert--success {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+    color: #166534
+}
+
+.app-alert--warning {
+    border-color: #fde68a;
+    background: #fffbeb;
+    color: #92400e
+}
+
+.app-alert--info {
+    border-color: #bae6fd;
+    background: #f0f9ff;
+    color: #075985
+}
+
+.app-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center
+}
+
+.app-loader[hidden] {
+    display: none
+}
+
+.app-loader__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 34, 56, .36);
+    backdrop-filter: blur(2px)
+}
+
+.app-loader__panel {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    border: 1px solid rgba(255, 255, 255, .7);
+    border-radius: 1rem;
+    background: #fff;
+    padding: 1rem 1.25rem;
+    color: var(--brand-900);
+    box-shadow: 0 20px 60px rgba(2, 34, 56, .24);
+    font-weight: 600
+}
+
+.app-loader__spinner {
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 3px solid #d9effd;
+    border-top-color: var(--brand-600);
+    border-radius: 999px;
+    animation: app-spin .75s linear infinite
+}
+
+@keyframes app-spin {
+    to {
+        transform: rotate(360deg)
+    }
+}
+
+.is-loading {
+    pointer-events: none;
+    opacity: .75
+}
+
+.button-spinner {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    margin-right: .45rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    vertical-align: -.15em;
+    animation: app-spin .7s linear infinite
+}
+
+/* Harmonisation non destructive des tableaux existants */
+table {
+    border-collapse: separate;
+    border-spacing: 0
+}
+
+thead.bg-slate-800 {
+    background: var(--brand-800) !important
+}
+
+tbody tr:hover {
+    background: #f4faff !important
+}
+
+th {
+    letter-spacing: .01em
+}
+
+a.text-brand-600 {
+    color: var(--brand-600)
+}
+
+.bg-brand-600 {
+    background-color: var(--brand-600) !important
+}
+
+.hover\:bg-brand-700:hover {
+    background-color: var(--brand-700) !important
+}
+
+.border-brand-600 {
+    border-color: var(--brand-600) !important
+}
+
+.text-brand-700 {
+    color: var(--brand-700) !important
+}
+
+.focus\:ring-brand-500:focus {
+    --tw-ring-color: var(--brand-500) !important
+}
+
+.hp-wrapper {
+    position: absolute !important;
+    left: -10000px !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important
+}
+
+.is-invalid {
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, .12)
+}
+
+@media(prefers-reduced-motion:reduce) {
+
+    *,
+    *:before,
+    *:after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important
+    }
+}
 
 .stepper-item {
-  position: relative;
+    position: relative;
 }
 
 .stepper-item:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: 16px;
-  left: 55%;
-  width: 90%;
-  height: 2px;
-  background-color: #e2e8f0; /* slate-200 */
-  z-index: 0;
+    content: "";
+    position: absolute;
+    top: 16px;
+    left: 55%;
+    width: 90%;
+    height: 2px;
+    background-color: #e2e8f0;
+    /* slate-200 */
+    z-index: 0;
 }
 
 .stepper-item.done:not(:last-child)::after {
-  background-color: #16a34a; /* green-600 */
+    background-color: #16a34a;
+    /* green-600 */
 }
 
 .stepper-item.active .stepper-circle {
-  background-color: #0984D3; /* brand-500 (bleu du logo) */
-  color: #fff;
+    background-color: #0984D3;
+    /* brand-500 (bleu du logo) */
+    color: #fff;
 }
+
 .stepper-item.active .stepper-label {
-  color: #0984D3;
-  font-weight: 600;
+    color: #0984D3;
+    font-weight: 600;
 }
+
 .stepper-item.done .stepper-circle {
-  background-color: #16a34a; /* green-600 */
-  color: #fff;
+    background-color: #16a34a;
+    /* green-600 */
+    color: #fff;
 }
+
 .stepper-item.done .stepper-label {
-  color: #16a34a;
+    color: #16a34a;
 }
 
 @media (max-width: 420px) {
-  .stepper-label {
-    display: none;
-  }
+    .stepper-label {
+        display: none;
+    }
 }
 
 /* Bordure rouge sur les champs invalides, ajoutée dynamiquement par wizard.js */
 .is-invalid {
-  border-color: #dc2626 !important; /* red-600 */
+    border-color: #dc2626 !important;
+    /* red-600 */
 }
 
 /* Piège anti-robot : masqué visuellement (hors écran), mais toujours
    présent dans le DOM. On évite display:none, que certains robots
    ignorent lors du remplissage automatique des formulaires. */
 .hp-wrapper {
-  position: absolute;
-  left: -9999px;
-  top: -9999px;
-  height: 0;
-  width: 0;
-  overflow: hidden;
+    position: absolute;
+    left: -9999px;
+    top: -9999px;
+    height: 0;
+    width: 0;
+    overflow: hidden;
 }
 
 /* Prévisualisation des photos */
 .photo-preview-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.75rem;
 }
 
 .photo-preview-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
-  overflow: hidden;
-  background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: #ffffff;
 }
 
 .photo-preview-card img {
-  display: block;
-  width: 100%;
-  height: 110px;
-  object-fit: cover;
+    display: block;
+    width: 100%;
+    height: 110px;
+    object-fit: cover;
 }
 
 .photo-preview-caption {
-  padding: 0.4rem 0.5rem;
-  font-size: 0.75rem;
-  color: #475569;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.75rem;
+    color: #475569;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* États visibles de la géolocalisation */
 .gps-status-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  border-radius: 0.75rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
-  color: #334155;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #334155;
 }
 
 .gps-found {
-  border-color: #86efac;
-  background: #f0fdf4;
-  color: #166534;
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #166534;
 }
 
 .gps-insufficient,
 .gps-retry,
 .gps-cancelled {
-  border-color: #fcd34d;
-  background: #fffbeb;
-  color: #92400e;
+    border-color: #fcd34d;
+    background: #fffbeb;
+    color: #92400e;
 }
 
 .gps-error {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #991b1b;
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
 }
 
 .gps-spinner {
-  flex: 0 0 auto;
-  width: 1rem;
-  height: 1rem;
-  margin-top: 0.1rem;
-  border-radius: 9999px;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  animation: gps-spin 0.8s linear infinite;
+    flex: 0 0 auto;
+    width: 1rem;
+    height: 1rem;
+    margin-top: 0.1rem;
+    border-radius: 9999px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    animation: gps-spin 0.8s linear infinite;
 }
 
 .photo-preview-item {
@@ -182,14 +457,98 @@
 }
 
 @keyframes gps-spin {
-  to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Bouton inactif : modifications manager/superviseur sans motif */
 .btn-disabled,
 button:disabled,
 input[type="submit"]:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  filter: grayscale(20%);
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(20%);
+}
+
+/* Carte : couleurs stables par district et statut par contour */
+.map-legend-card {
+    display: grid;
+    gap: .75rem;
+    border: 1px solid var(--line);
+    border-radius: .9rem;
+    background: var(--surface);
+    padding: .8rem 1rem;
+    box-shadow: 0 6px 20px rgba(2, 34, 56, .05);
+}
+
+.map-legend-section {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem .8rem;
+}
+
+.map-legend-title {
+    color: #334155;
+    font-size: .75rem;
+    font-weight: 700;
+}
+
+.district-legend {
+    display: flex;
+    max-height: 7.5rem;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: .4rem .75rem;
+    overflow-y: auto;
+    padding-right: .25rem;
+}
+
+.district-legend-item,
+.map-status-item {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    color: #475569;
+    font-size: .75rem;
+}
+
+.district-legend-swatch {
+    width: .8rem;
+    height: .8rem;
+    flex: 0 0 auto;
+    border: 1px solid rgba(15, 23, 42, .15);
+    border-radius: 999px;
+}
+
+.map-status-legend {
+    border-top: 1px solid #e2e8f0;
+    padding-top: .65rem;
+}
+
+.map-status-dot {
+    width: .9rem;
+    height: .9rem;
+    border: 3px solid;
+    border-radius: 999px;
+    background: #fff;
+}
+
+.map-status-dot--validated { border-color: #16a34a; }
+.map-status-dot--province { border-color: #f59e0b; }
+.map-status-dot--district { border-color: #64748b; }
+
+@media (min-width: 768px) {
+    .map-legend-card {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+    }
+
+    .map-status-legend {
+        border-top: 0;
+        border-left: 1px solid #e2e8f0;
+        padding-top: 0;
+        padding-left: 1rem;
+    }
 }
