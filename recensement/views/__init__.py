@@ -80,7 +80,7 @@ from .legacy_user_views import (  # noqa: F401
     utilisateur_toggle_actif,
     utilisateur_update,
 )
-from .public_views import landing, post_login_redirect, healthcheck
+from .public_views import healthcheck, landing, post_login_redirect
 
 # --- Workflow de validation ------------------------------------------------
 from .validation_views import fiche_a_valider, fiche_valider
