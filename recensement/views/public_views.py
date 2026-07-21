@@ -5,7 +5,14 @@ from django.shortcuts import redirect, render
 
 from ..models import Profil
 from ..permissions import get_role
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 
+
+@require_http_methods(["GET"])
+def healthcheck(request):
+    """Vue de health check minimaliste pour le CI/CD."""
+    return JsonResponse({"status": "ok"}, status=200)
 
 def landing(request):
     if request.user.is_authenticated:

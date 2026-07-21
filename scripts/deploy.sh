@@ -141,13 +141,7 @@ for i in $(seq 1 $HEALTH_CHECK_RETRIES); do
 
     if [ "$PORTAL_STATUS" = "running" ]; then
         # Vérifier que Gunicorn répond réellement
-        if docker exec ecc-portal python -c "
-import django
-django.setup()
-from django.db import connection
-connection.ensure_connection()
-print('OK')
-" 2>/dev/null | grep -q "OK"; then
+        if docker exec ecc-portal curl -f http://localhost:8000/healthcheck/ 2>/dev/null; then
             echo "[deploy] ✅ Django est opérationnel (tentative $i/$HEALTH_CHECK_RETRIES)"
             break
         fi
