@@ -1,0 +1,95 @@
+{% comment %}
+Carte d'information résumant le rôle et le périmètre de l'utilisateur connecté.
+Utilise la variable « user_scope » fournie par le context processor role_context.
+
+Usage : {% include "recensement/includes/_user_scope_summary.html" %}
+{% endcomment %}
+
+{% if user_scope %}
+<div class="rounded-xl border border-slate-200 bg-white px-4 py-3 mb-5 sm:px-5 sm:py-4">
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+
+    {# ——— Colonne principale : rôle + périmètre ——— #}
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold
+          {% if is_super_admin %}bg-purple-50 text-purple-700
+          {% elif is_op_province %}bg-blue-50 text-blue-700
+          {% elif is_op_district %}bg-cyan-50 text-cyan-700
+          {% elif is_op_zone %}bg-teal-50 text-teal-700
+          {% else %}bg-slate-100 text-slate-700{% endif %}">
+          {% if is_super_admin %}
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>
+          {% endif %}
+          {{ user_scope.role_label }}
+        </span>
+        <span class="text-xs text-slate-400">{{ user.get_full_name|default:user.get_username }}</span>
+      </div>
+
+      {# ——— Périmètre principal ——— #}
+      <div class="mt-2 text-sm text-slate-600">
+        {% if is_super_admin %}
+          <span class="text-slate-500">{{ user_scope.couverture_label }}</span>
+
+        {% elif is_op_province %}
+          <span class="font-medium text-slate-700">Province :</span> {{ user_scope.province_nom|default:"—" }}
+          {% if user_scope.region_nom %}
+            <span class="text-slate-400 mx-1">·</span>
+            <span class="text-slate-500">Région : {{ user_scope.region_nom }}</span>
+          {% endif %}
+
+        {% elif is_op_district %}
+          <span class="font-medium text-slate-700">District :</span> {{ user_scope.district_nom|default:"—" }}
+          {% if user_scope.province_nom %}
+            <span class="text-slate-400 mx-1">·</span>
+            <span class="text-slate-500">Province : {{ user_scope.province_nom }}</span>
+          {% endif %}
+
+        {% elif is_op_zone %}
+          <span class="font-medium text-slate-700">Zone :</span> {{ user_scope.zone_nom|default:"—" }}
+          {% if user_scope.district_nom %}
+            <span class="text-slate-400 mx-1">·</span>
+            <span class="text-slate-500">District : {{ user_scope.district_nom }}</span>
+          {% endif %}
+          {% if user_scope.province_nom %}
+            <span class="text-slate-400 mx-1">·</span>
+            <span class="text-slate-500">Province : {{ user_scope.province_nom }}</span>
+          {% endif %}
+
+        {% elif is_agent %}
+          <span class="font-medium text-slate-700">Zone principale :</span> {{ user_scope.zone_nom|default:"—" }}
+          {% if user_scope.district_nom %}
+            <span class="text-slate-400 mx-1">·</span>
+            <span class="text-slate-500">District : {{ user_scope.district_nom }}</span>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    {# ——— Colonne droite : couverture + affectations sup ——— #}
+    {% if not is_super_admin %}
+    <div class="shrink-0 text-right sm:text-right">
+      <div class="text-xs text-slate-500">{{ user_scope.couverture_label }}</div>
+
+      {% if user_scope.nb_affectations_sup > 0 %}
+        <button type="button"
+                onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('span').textContent = this.nextElementSibling.classList.contains('hidden') ? 'Voir' : 'Masquer';"
+                class="mt-1 text-xs font-medium text-brand-600 hover:text-brand-700 hover:underline">
+          <span>Voir</span> {{ user_scope.nb_affectations_sup }} affectation{{ user_scope.nb_affectations_sup|pluralize }} supp.
+        </button>
+        <div class="hidden mt-2 text-left">
+          <div class="flex flex-wrap gap-1.5">
+            {% for aff in user_scope.affectations_sup %}
+              <span class="inline-flex items-center rounded-md bg-slate-50 border border-slate-200 px-2 py-0.5 text-xs text-slate-600">
+                {{ aff.nom }}
+              </span>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}

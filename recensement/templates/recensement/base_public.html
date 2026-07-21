@@ -4,7 +4,7 @@
 <head>{% include "recensement/includes/_head.html" %}</head>
 <body class="app-body flex min-h-screen flex-col bg-slate-50 text-slate-800">
   {% include "recensement/includes/_loader.html" %}
-  <nav class="app-public-nav text-white shadow-sm"><div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+  <nav class="app-public-nav sticky top-0 z-50 text-white shadow-sm"><div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
     <a href="{% url 'recensement:landing' %}" class="flex items-center gap-3 font-semibold"><img src="{% static 'recensement/img/logo-cst.png' %}" alt="CST" class="h-10 w-10 rounded-full bg-white p-1 object-contain"><span class="hidden sm:inline">Recensement des paroisses</span><span class="sm:hidden">Recensement</span></a>
     {% if not user.is_authenticated %}<a href="{% url 'login' %}" class="rounded-lg bg-accent-400 px-4 py-2 text-sm font-semibold text-brand-950 hover:bg-accent-300">Connexion</a>{% endif %}
   </div></nav>
@@ -15,7 +15,11 @@
     </p>
 
     <p class="mt-2">
-      Développé par
+      Projet initié et supervisé par le
+      <span class="font-semibold text-slate-700">
+        Conseil Supérieur de Transition (CST)
+      </span>
+      — Développé par
       <a
         href="https://chablis-mahutin.onrender.com"
         target="_blank"

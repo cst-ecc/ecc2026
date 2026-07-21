@@ -1,122 +1,30 @@
+"""Formulaires liés aux fiches de recensement des paroisses.
+
+Regroupe :
+- ``FicheParoisseForm`` : saisie et modification d'une fiche ;
+- ``MotifModificationForm`` : motif obligatoire avant modification ;
+- ``PhotosParoisseForm`` : upload multiple de photos de la paroisse.
+
+Extrait tel quel de l'ancien ``forms.py``. Aucune règle métier ni aucune
+validation n'a été modifiée.
+"""
+
 import re
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal
 
 from django import forms
-from django.contrib.auth.forms import SetPasswordForm
-from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 
-from .models import District, FicheParoisse, Profil, Province, Region, Village, Zone
-from .permissions import get_role, peut_creer_dans_zone, zones_autorisees
-
-# ---------------------------------------------------------------------------
-# Validation téléphonique internationale
-# ---------------------------------------------------------------------------
-
-def valider_telephone_international(value):
-    """Accepte tout numéro national ou international (E.164 informel).
-    Retrait des espaces/tirets/points avant validation — on accepte les formats
-    saisis par l'utilisateur, la valeur normalisée est stockée."""
-    if not value:
-        return
-    numero = str(value).strip()
-    numero_normalise = re.sub(r"[\s\-.()]", "", numero)
-    if numero_normalise.startswith("+"):
-        chiffres = numero_normalise[1:]
-    else:
-        chiffres = numero_normalise
-    if not chiffres.isdigit():
-        raise ValidationError(
-            "Numéro de téléphone invalide. Saisissez un numéro valide "
-            "avec ou sans indicatif international."
-        )
-    if len(chiffres) < 6 or len(chiffres) > 15:
-        raise ValidationError(
-            "Numéro de téléphone invalide. Le numéro doit contenir entre 6 et 15 chiffres."
-        )
-
-
-MAX_ANNEE_FONDATION = 2100
-
-# --- Photos ---
-TAILLE_MAX_IMAGE_OCTETS = 5 * 1024 * 1024  # 5 Mo
-EXTENSIONS_IMAGE_AUTORISEES = {"jpg", "jpeg", "png", "webp"}
-NB_MAX_PHOTOS_PAROISSE = 3
-
-
-def valider_image(fichier):
-    """Valide l'extension et la taille d'un fichier image uploadé."""
-    nom = getattr(fichier, "name", "") or ""
-    extension = nom.rsplit(".", 1)[-1].lower() if "." in nom else ""
-    if extension not in EXTENSIONS_IMAGE_AUTORISEES:
-        raise forms.ValidationError(
-            f"« {nom} » : format non autorisé (jpg, jpeg, png ou webp uniquement)."
-        )
-    taille = getattr(fichier, "size", 0) or 0
-    if taille > TAILLE_MAX_IMAGE_OCTETS:
-        raise forms.ValidationError(
-            f"« {nom} » dépasse la taille maximale autorisée (5 Mo)."
-        )
-
-
-# ---------------------------------------------------------------------------
-# Champs spécialisés
-# ---------------------------------------------------------------------------
-
-class GPSDecimalField(forms.DecimalField):
-    """Champ décimal qui normalise automatiquement une valeur GPS."""
-
-    def __init__(self, *args, precision=7, **kwargs):
-        self.gps_precision = precision
-        self.quantizer = Decimal("1").scaleb(-precision)
-        super().__init__(*args, **kwargs)
-
-    def to_python(self, value):
-        decimal_value = super().to_python(value)
-        if decimal_value is None:
-            return None
-        try:
-            return decimal_value.quantize(self.quantizer, rounding=ROUND_HALF_UP)
-        except (InvalidOperation, ValueError, TypeError):
-            raise ValidationError(
-                "La position GPS reçue n'est pas exploitable. "
-                "Veuillez relancer la géolocalisation.",
-                code="invalid_gps",
-            )
-
-
-class MultipleFileInput(forms.ClearableFileInput):
-    allow_multiple_selected = True
-
-
-class MultipleFileField(forms.FileField):
-    """Champ fichier acceptant une sélection multiple."""
-
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault("widget", MultipleFileInput())
-        super().__init__(*args, **kwargs)
-
-    def clean(self, data, initial=None):
-        single_file_clean = super().clean
-        if isinstance(data, (list, tuple)):
-            return [single_file_clean(d, initial) for d in data]
-        return single_file_clean(data, initial)
-
-
-# Classes Tailwind communes
-INPUT_CSS = (
-    "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base "
-    "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+from ..models import District, FicheParoisse, Profil, Province, Region, Village, Zone
+from ..permissions import get_role, peut_creer_dans_zone, zones_autorisees
+from .base import (
+    GPSDecimalField,
+    INPUT_CSS,
+    MultipleImageField,
+    RegionModelChoiceField,
+    SELECT_CSS,
 )
-SELECT_CSS = INPUT_CSS + " bg-white"
-
-
-class RegionModelChoiceField(forms.ModelChoiceField):
-    """Affiche le libellé institutionnel sans modifier la valeur enregistrée."""
-
-    def label_from_instance(self, obj):
-        return obj.libelle_selection
+from .validators import MAX_ANNEE_FONDATION, valider_image, valider_telephone_international
 
 
 # ---------------------------------------------------------------------------
@@ -430,114 +338,8 @@ class FicheParoisseForm(forms.ModelForm):
 
 
 # ---------------------------------------------------------------------------
-# Gestion des comptes utilisateurs
+# Motif de modification d'une fiche
 # ---------------------------------------------------------------------------
-
-class ProfilForm(forms.ModelForm):
-    """Rôle + périmètre hiérarchique complet (region, province, district, zone).
-
-    La liste des rôles disponibles est filtrée dynamiquement dans la vue
-    selon le rôle du créateur (roles_creables_par). Ce formulaire ne filtre
-    pas lui-même : la validation du périmètre est faite dans la vue et dans
-    permissions.py.
-    """
-
-    class Meta:
-        model = Profil
-        fields = ["role", "region", "province", "district", "zone"]
-        widgets = {
-            "role":     forms.Select(attrs={"class": SELECT_CSS, "id": "id_role"}),
-            "region":   forms.Select(attrs={"class": SELECT_CSS, "id": "id_region_profil"}),
-            "province": forms.Select(attrs={"class": SELECT_CSS, "id": "id_province_profil"}),
-            "district": forms.Select(attrs={"class": SELECT_CSS, "id": "id_district_profil"}),
-            "zone":     forms.Select(attrs={"class": SELECT_CSS, "id": "id_zone_profil"}),
-        }
-        labels = {
-            "role":     "Rôle",
-            "region":   "Région ecclésiale",
-            "province": "Province ecclésiale",
-            "district": "District ecclésial",
-            "zone":     "Zone ecclésiale",
-        }
-
-    def __init__(self, *args, createur=None, **kwargs):
-        """
-        `createur` : l'utilisateur connecté qui crée ou modifie le compte.
-        Sert à filtrer les rôles disponibles et à restreindre les périmètres.
-        """
-        super().__init__(*args, **kwargs)
-        self.createur = createur
-
-        # Tous les champs sont optionnels au niveau du formulaire ;
-        # la validation sémantique est faite dans clean() et dans la vue.
-        for field_name in ["region", "province", "district", "zone"]:
-            self.fields[field_name].required = False
-
-        # Restriction des rôles proposés selon le créateur.
-        if createur is not None:
-            from .permissions import roles_creables_par
-            roles_autorisés = roles_creables_par(createur)
-            self.fields["role"].choices = [
-                (value, label)
-                for value, label in Profil.Role.choices
-                if value in roles_autorisés
-            ]
-
-    def clean(self):
-        cleaned_data = super().clean()
-        role = cleaned_data.get("role")
-        if not role:
-            return cleaned_data
-
-        # Validation que les champs hiérarchiques obligatoires sont présents.
-        if role == Profil.Role.OP_PROVINCE:
-            if not cleaned_data.get("region"):
-                self.add_error("region", "Une région est requise pour le rôle OP PROVINCE.")
-            if not cleaned_data.get("province"):
-                self.add_error("province", "Une province est requise pour le rôle OP PROVINCE.")
-
-        elif role == Profil.Role.OP_DISTRICT:
-            if not cleaned_data.get("region"):
-                self.add_error("region", "Une région est requise pour le rôle OP DISTRICT.")
-            if not cleaned_data.get("province"):
-                self.add_error("province", "Une province est requise pour le rôle OP DISTRICT.")
-            if not cleaned_data.get("district"):
-                self.add_error("district", "Un district est requis pour le rôle OP DISTRICT.")
-
-        elif role in (Profil.Role.OP_ZONE, Profil.Role.AGENT):
-            if not cleaned_data.get("region"):
-                self.add_error("region", "Une région est requise pour ce rôle.")
-            if not cleaned_data.get("province"):
-                self.add_error("province", "Une province est requise pour ce rôle.")
-            if not cleaned_data.get("district"):
-                self.add_error("district", "Un district est requis pour ce rôle.")
-            if not cleaned_data.get("zone"):
-                self.add_error("zone", "Une zone est requise pour ce rôle.")
-
-        # Vérification de la cohérence de la cascade géographique.
-        region = cleaned_data.get("region")
-        province = cleaned_data.get("province")
-        district = cleaned_data.get("district")
-        zone = cleaned_data.get("zone")
-
-        if province and region and province.region_id != region.id:
-            self.add_error("province", "Cette province n'appartient pas à la région sélectionnée.")
-        if district and province and district.province_id != province.id:
-            self.add_error("district", "Ce district n'appartient pas à la province sélectionnée.")
-        if zone and district and zone.district_id != district.id:
-            self.add_error("zone", "Cette zone n'appartient pas au district sélectionné.")
-
-        return cleaned_data
-
-
-class TailwindSetPasswordForm(SetPasswordForm):
-    """Réinitialisation de mot de passe par un opérateur habilité."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field in self.fields.values():
-            field.widget.attrs["class"] = INPUT_CSS
-
 
 class MotifModificationForm(forms.Form):
     """Motif obligatoire avant toute modification d'une fiche."""
@@ -560,26 +362,9 @@ class MotifModificationForm(forms.Form):
     )
 
 
-class MultipleImageInput(forms.ClearableFileInput):
-    allow_multiple_selected = True
-
-
-class MultipleImageField(forms.ImageField):
-    widget = MultipleImageInput
-
-    def clean(self, data, initial=None):
-        if not data:
-            return []
-        files = data if isinstance(data, (list, tuple)) else [data]
-        if len(files) > 3:
-            raise forms.ValidationError("Vous ne pouvez ajouter que trois photos au maximum.")
-        cleaned_files = []
-        for uploaded_file in files:
-            cleaned_file = super().clean(uploaded_file, initial)
-            valider_image(cleaned_file)
-            cleaned_files.append(cleaned_file)
-        return cleaned_files
-
+# ---------------------------------------------------------------------------
+# Photos de la paroisse
+# ---------------------------------------------------------------------------
 
 class PhotosParoisseForm(forms.Form):
     photos = MultipleImageField(

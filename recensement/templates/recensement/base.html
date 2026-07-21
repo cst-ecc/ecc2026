@@ -14,7 +14,8 @@
     </div>
     <nav class="min-h-0 flex-1 overflow-y-auto px-3 py-4">{% include "recensement/includes/_sidebar_nav.html" %}</nav>
     <div class="shrink-0 border-t border-white/10 p-3">
-      <div class="mb-2 truncate text-sm text-brand-100">{{ user.get_full_name|default:user.get_username }}</div>
+      <div class="mb-0.5 truncate text-sm text-brand-100">{{ user.get_full_name|default:user.get_username }}</div>
+      {% if user_scope %}<div class="mb-2 truncate text-[11px] text-brand-200/70">{{ user_scope.role_label }}</div>{% else %}<div class="mb-2"></div>{% endif %}
       <form method="post" action="{% url 'logout' %}" data-loader-message="Déconnexion en cours…">{% csrf_token %}<button type="submit" class="w-full rounded-lg px-3 py-2 text-left text-sm text-brand-100 hover:bg-white/10 hover:text-white">Se déconnecter</button></form>
     </div>
   </aside>
@@ -28,7 +29,11 @@
       </p>
 
       <p class="mt-2">
-        Développé par
+        Projet initié et supervisé par le
+        <span class="font-semibold text-slate-700">
+          Conseil Supérieur de Transition (CST)
+        </span>
+        — Développé par
         <a
           href="https://chablis-mahutin.onrender.com"
           target="_blank"
