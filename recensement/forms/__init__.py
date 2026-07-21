@@ -17,14 +17,14 @@ Aucun comportement n'a été modifié — refactor purement structurel.
 """
 
 from .base import (
-    GPSDecimalField,
     INPUT_CSS,
+    SELECT_CSS,
+    GPSDecimalField,
     MultipleFileField,
     MultipleFileInput,
     MultipleImageField,
     MultipleImageInput,
     RegionModelChoiceField,
-    SELECT_CSS,
 )
 from .fiche_forms import (
     FicheParoisseForm,

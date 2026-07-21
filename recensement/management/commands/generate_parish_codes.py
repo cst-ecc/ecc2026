@@ -14,22 +14,20 @@ from recensement.models import FicheParoisse
 
 class Command(BaseCommand):
     help = (
-        "Génère les codes officiels pour toutes les fiches de paroisse validées "
-        "qui n'en ont pas encore. Idempotente."
+        "Génère les codes officiels pour toutes les fiches de paroisse validées qui n'en ont pas encore. Idempotente."
     )
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--verbose", action="store_true",
+            "--verbose",
+            action="store_true",
             help="Affichage détaillé pour chaque paroisse.",
         )
 
     def handle(self, *args, **options):
-        verbose = options.get('verbose', False)
+        verbose = options.get("verbose", False)
 
-        nb_total = FicheParoisse.objects.filter(
-            statut_validation=FicheParoisse.StatutValidation.VALIDEE
-        ).count()
+        nb_total = FicheParoisse.objects.filter(statut_validation=FicheParoisse.StatutValidation.VALIDEE).count()
 
         nb_deja = FicheParoisse.objects.filter(
             statut_validation=FicheParoisse.StatutValidation.VALIDEE,
@@ -45,12 +43,8 @@ class Command(BaseCommand):
         )
 
         if nb_a_faire == 0:
-            self.stdout.write(self.style.WARNING(
-                "→ Aucune fiche à codifier."
-            ))
+            self.stdout.write(self.style.WARNING("→ Aucune fiche à codifier."))
             return
 
         nb_generees = generer_codes_retroactifs(verbose=verbose)
-        self.stdout.write(self.style.SUCCESS(
-            f"\n✓ {nb_generees} code(s) généré(s)."
-        ))
+        self.stdout.write(self.style.SUCCESS(f"\n✓ {nb_generees} code(s) généré(s)."))

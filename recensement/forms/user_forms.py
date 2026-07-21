@@ -33,18 +33,18 @@ class ProfilForm(forms.ModelForm):
         model = Profil
         fields = ["role", "region", "province", "district", "zone"]
         widgets = {
-            "role":     forms.Select(attrs={"class": SELECT_CSS, "id": "id_role"}),
-            "region":   forms.Select(attrs={"class": SELECT_CSS, "id": "id_region_profil"}),
+            "role": forms.Select(attrs={"class": SELECT_CSS, "id": "id_role"}),
+            "region": forms.Select(attrs={"class": SELECT_CSS, "id": "id_region_profil"}),
             "province": forms.Select(attrs={"class": SELECT_CSS, "id": "id_province_profil"}),
             "district": forms.Select(attrs={"class": SELECT_CSS, "id": "id_district_profil"}),
-            "zone":     forms.Select(attrs={"class": SELECT_CSS, "id": "id_zone_profil"}),
+            "zone": forms.Select(attrs={"class": SELECT_CSS, "id": "id_zone_profil"}),
         }
         labels = {
-            "role":     "Rôle",
-            "region":   "Région ecclésiale",
+            "role": "Rôle",
+            "region": "Région ecclésiale",
             "province": "Province ecclésiale",
             "district": "District ecclésial",
-            "zone":     "Zone ecclésiale",
+            "zone": "Zone ecclésiale",
         }
 
     def __init__(self, *args, createur=None, **kwargs):
@@ -63,11 +63,10 @@ class ProfilForm(forms.ModelForm):
         # Restriction des rôles proposés selon le créateur.
         if createur is not None:
             from ..permissions import roles_creables_par
+
             roles_autorisés = roles_creables_par(createur)
             self.fields["role"].choices = [
-                (value, label)
-                for value, label in Profil.Role.choices
-                if value in roles_autorisés
+                (value, label) for value, label in Profil.Role.choices if value in roles_autorisés
             ]
 
     def clean(self):

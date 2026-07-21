@@ -144,18 +144,13 @@ def changer_statut_affectation(*, attributeur, affectation, action, motif=""):
     # transaction. Les relations sont ensuite chargées par une seconde requête
     # non verrouillante, ce qui reste sûr puisque la ligne d'affectation est
     # déjà protégée contre une modification concurrente.
-    AffectationTerritoriale.objects.select_for_update().only("pk").get(
-        pk=affectation_id
-    )
+    AffectationTerritoriale.objects.select_for_update().only("pk").get(pk=affectation_id)
 
-    affectation = (
-        AffectationTerritoriale.objects.select_related(
-            "utilisateur__profil",
-            "district__province",
-            "zone__district__province",
-        )
-        .get(pk=affectation_id)
-    )
+    affectation = AffectationTerritoriale.objects.select_related(
+        "utilisateur__profil",
+        "district__province",
+        "zone__district__province",
+    ).get(pk=affectation_id)
 
     if not peut_modifier_affectation(attributeur, affectation):
         raise PermissionDenied("Vous ne pouvez pas modifier cette affectation.")
@@ -178,9 +173,7 @@ def changer_statut_affectation(*, attributeur, affectation, action, motif=""):
             raise ValidationError("Cette affectation ne peut pas être réactivée.")
 
         if affectation.niveau == AffectationTerritoriale.Niveau.DISTRICT:
-            if not peut_attribuer_district(
-                attributeur, affectation.utilisateur, affectation.district
-            ):
+            if not peut_attribuer_district(attributeur, affectation.utilisateur, affectation.district):
                 raise PermissionDenied("Ce district est désormais hors de votre périmètre.")
             doublon = AffectationTerritoriale.objects.filter(
                 utilisateur=affectation.utilisateur,
@@ -189,9 +182,7 @@ def changer_statut_affectation(*, attributeur, affectation, action, motif=""):
                 statut=AffectationTerritoriale.Statut.ACTIVE,
             ).exclude(pk=affectation.pk)
         else:
-            if not peut_attribuer_zone(
-                attributeur, affectation.utilisateur, affectation.zone
-            ):
+            if not peut_attribuer_zone(attributeur, affectation.utilisateur, affectation.zone):
                 raise PermissionDenied("Cette zone est désormais hors de votre périmètre.")
             doublon = AffectationTerritoriale.objects.filter(
                 utilisateur=affectation.utilisateur,
@@ -237,9 +228,7 @@ def changer_statut_affectation(*, attributeur, affectation, action, motif=""):
 
 
 @transaction.atomic
-def journaliser_modification_principale(
-    *, utilisateur, effectue_par, ancien_profil, nouveau_profil, motif=""
-):
+def journaliser_modification_principale(*, utilisateur, effectue_par, ancien_profil, nouveau_profil, motif=""):
     """Journalise un changement réel de rôle ou d'affectation principale."""
     if ancien_profil == nouveau_profil:
         return None

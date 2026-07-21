@@ -36,25 +36,27 @@ def fiches_geojson(request):
     features = []
     for f in fiches:
         agent = f.cree_par.get_full_name() or f.cree_par.get_username() if f.cree_par else "—"
-        features.append({
-            "type": "Feature",
-            "geometry": {"type": "Point", "coordinates": [float(f.longitude), float(f.latitude)]},
-            "properties": {
-                "id": f.pk,
-                "nom": f.nom_paroisse,
-                "localite": f.localite,
-                "zone": f.zone.nom,
-                "districtId": f.district_id,
-                "district": f.district.nom,
-                "province": f.province.nom,
-                "region": f.region.nom,
-                "chargeParoisse": f.parish_shepherd,
-                "agent": agent,
-                "statutCode": f.statut_validation,
-                "statutLabel": f.get_statut_validation_display(),
-                "precisionGps": f.precision_gps,
-                "url": reverse("recensement:fiche_detail", args=[f.pk]),
-            },
-        })
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [float(f.longitude), float(f.latitude)]},
+                "properties": {
+                    "id": f.pk,
+                    "nom": f.nom_paroisse,
+                    "localite": f.localite,
+                    "zone": f.zone.nom,
+                    "districtId": f.district_id,
+                    "district": f.district.nom,
+                    "province": f.province.nom,
+                    "region": f.region.nom,
+                    "chargeParoisse": f.parish_shepherd,
+                    "agent": agent,
+                    "statutCode": f.statut_validation,
+                    "statutLabel": f.get_statut_validation_display(),
+                    "precisionGps": f.precision_gps,
+                    "url": reverse("recensement:fiche_detail", args=[f.pk]),
+                },
+            }
+        )
 
     return JsonResponse({"type": "FeatureCollection", "features": features})

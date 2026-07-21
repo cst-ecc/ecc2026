@@ -14,9 +14,7 @@ from ..permissions import role_required
 @require_GET
 def dashboard(request):
     total_general = FicheParoisse.objects.count()
-    total_valide = FicheParoisse.objects.filter(
-        statut_validation=FicheParoisse.StatutValidation.VALIDEE
-    ).count()
+    total_valide = FicheParoisse.objects.filter(statut_validation=FicheParoisse.StatutValidation.VALIDEE).count()
     total_attente_superviseur = FicheParoisse.objects.filter(
         statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
     ).count()
@@ -25,8 +23,7 @@ def dashboard(request):
     ).count()
 
     par_district = list(
-        FicheParoisse.objects
-        .filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR)
+        FicheParoisse.objects.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR)
         .values("district_id", "district__nom")
         .annotate(nb=Count("id"))
         .order_by("-nb")
@@ -35,13 +32,12 @@ def dashboard(request):
         responsables = Profil.objects.filter(
             role=Profil.Role.OP_DISTRICT, district_id=ligne["district_id"]
         ).select_related("user")
-        ligne["responsables"] = [
-            (p.user.get_full_name() or p.user.get_username()) for p in responsables
-        ] or ["Aucun OP DISTRICT assigné"]
+        ligne["responsables"] = [(p.user.get_full_name() or p.user.get_username()) for p in responsables] or [
+            "Aucun OP DISTRICT assigné"
+        ]
 
     par_province = list(
-        FicheParoisse.objects
-        .filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER)
+        FicheParoisse.objects.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER)
         .values("province_id", "province__nom")
         .annotate(nb=Count("id"))
         .order_by("-nb")
@@ -50,9 +46,9 @@ def dashboard(request):
         responsables = Profil.objects.filter(
             role=Profil.Role.OP_PROVINCE, province_id=ligne["province_id"]
         ).select_related("user")
-        ligne["responsables"] = [
-            (p.user.get_full_name() or p.user.get_username()) for p in responsables
-        ] or ["Aucun OP PROVINCE assigné"]
+        ligne["responsables"] = [(p.user.get_full_name() or p.user.get_username()) for p in responsables] or [
+            "Aucun OP PROVINCE assigné"
+        ]
 
     context = {
         "total_general": total_general,
@@ -69,7 +65,7 @@ def dashboard(request):
 @role_required(Profil.Role.SUPER_ADMIN)
 @require_GET
 def suivi_modifications(request):
-    historique = HistoriqueModification.objects.select_related(
-        "fiche", "modifie_par"
-    ).order_by("-date_modification")[:500]
+    historique = HistoriqueModification.objects.select_related("fiche", "modifie_par").order_by("-date_modification")[
+        :500
+    ]
     return render(request, "recensement/suivi_modifications.html", {"historique": historique})

@@ -7,7 +7,6 @@ en complément des contraintes de base de données (qui sont le filet de sécuri
 """
 
 from django.core.exceptions import ValidationError
-from django.db.models import Q
 
 from .models import Profil
 
@@ -31,17 +30,17 @@ def valider_operator_unique_par_circonscription(profil, user=None):
     # Déterminer la circonscription et le champ correspondant
     if role == Profil.Role.OP_PROVINCE:
         circonscription = profil.province
-        champ = 'province'
+        champ = "province"
         label = f"Province {circonscription.nom if circonscription else 'non définie'}"
 
     elif role == Profil.Role.OP_DISTRICT:
         circonscription = profil.district
-        champ = 'district'
+        champ = "district"
         label = f"District {circonscription.nom if circonscription else 'non défini'}"
 
     elif role == Profil.Role.OP_ZONE:
         circonscription = profil.zone
-        champ = 'zone'
+        champ = "zone"
         label = f"Zone {circonscription.nom if circonscription else 'non définie'}"
 
     else:
@@ -50,16 +49,14 @@ def valider_operator_unique_par_circonscription(profil, user=None):
 
     # Si la circonscription est None, impossible d'appliquer la contrainte
     if not circonscription:
-        raise ValidationError(
-            f"Impossible de valider l'opérateur : {champ.title()} manquant."
-        )
+        raise ValidationError(f"Impossible de valider l'opérateur : {champ.title()} manquant.")
 
     # Chercher un autre profil du même rôle, dans la même circonscription,
     # avec un utilisateur ACTIF (is_active=True)
     kwargs_filter = {
-        'role': role,
-        champ + '_id': circonscription.id,
-        'user__is_active': True,
+        "role": role,
+        champ + "_id": circonscription.id,
+        "user__is_active": True,
     }
 
     # Exclure le profil actuel (lors d'une modification)
@@ -92,22 +89,20 @@ def valider_remplacement_operateur(ancien_profil, nouveau_profil):
         circonscription_id = None
 
         if ancien_profil.role == Profil.Role.OP_PROVINCE:
-            champ = 'province'
+            champ = "province"
             circonscription_id = ancien_profil.province_id
         elif ancien_profil.role == Profil.Role.OP_DISTRICT:
-            champ = 'district'
+            champ = "district"
             circonscription_id = ancien_profil.district_id
         elif ancien_profil.role == Profil.Role.OP_ZONE:
-            champ = 'zone'
+            champ = "zone"
             circonscription_id = ancien_profil.zone_id
 
         if champ and circonscription_id:
             kwargs_filter = {
-                'role': ancien_profil.role,
-                champ + '_id': circonscription_id,
-                'user__is_active': True,
+                "role": ancien_profil.role,
+                champ + "_id": circonscription_id,
+                "user__is_active": True,
             }
             if Profil.objects.filter(**kwargs_filter).exists():
-                raise ValidationError(
-                    "Vous devez désactiver l'opérateur existant avant de le remplacer."
-                )
+                raise ValidationError("Vous devez désactiver l'opérateur existant avant de le remplacer.")

@@ -43,8 +43,15 @@ from django.utils import timezone
 
 from recensement.codification import generer_codes_retroactifs
 from recensement.models import (
-    District, FicheParoisse, HistoriqueModification, PhotoParoisse,
-    Profil, Province, Region, Village, Zone,
+    District,
+    FicheParoisse,
+    HistoriqueModification,
+    PhotoParoisse,
+    Profil,
+    Province,
+    Region,
+    Village,
+    Zone,
 )
 
 # ---------------------------------------------------------------------------
@@ -57,108 +64,229 @@ MDP_PAR_DEFAUT = "ECC@2026!"
 # Structure : liste de (nom_région, ordre, [(nom_province, [(nom_district,
 #   [(nom_zone, [villages])])]) ]) )
 GEO_MINIMAL = [
-    ("Porto-Novo", 1, [
-        ("Ouémé", [
-            ("Porto-Novo", [
-                ("Porto-Novo Centre", ["Aguégués", "Avrankou", "Akpro-Missérété"]),
-                ("Adjarra", ["Adjarra", "Dangbo"]),
-            ]),
-            ("Adjohoun", [
-                ("Adjohoun", ["Adjohoun", "Bonou", "Dangbo"]),
-            ]),
-        ]),
-        ("Plateau", [
-            ("Pobè", [
-                ("Pobè", ["Pobè", "Kétou", "Sakété"]),
-                ("Adja-Ouèrè", ["Adja-Ouèrè", "Ifangni"]),
-            ]),
-        ]),
-    ]),
-    ("Borgou-Alibori", 2, [
-        ("Borgou", [
-            ("N'Dali", [
-                ("N'Dali", ["N'Dali", "Bembereke", "Sinendé"]),
-                ("Banikoara", ["Banikoara", "Gogounou", "Kandi"]),
-            ]),
-            ("Parakou", [
-                ("Parakou Centre", ["Parakou 1", "Parakou 2", "Parakou 3"]),
-                ("Tchaourou", ["Tchaourou", "Bassila"]),
-            ]),
-        ]),
-        ("Alibori", [
-            ("Kandi", [
-                ("Kandi", ["Kandi", "Ségbana", "Malanville"]),
-            ]),
-        ]),
-    ]),
-    ("Atacora-Donga", 3, [
-        ("Atacora", [
-            ("Natitingou", [
-                ("Natitingou", ["Natitingou", "Toucountouna", "Boukoumbé"]),
-                ("Tanguiéta", ["Tanguiéta", "Matéri", "Cobly"]),
-            ]),
-        ]),
-        ("Donga", [
-            ("Djougou", [
-                ("Djougou", ["Djougou", "Copargo", "Ouaké"]),
-            ]),
-        ]),
-    ]),
-    ("Atlantique-Littoral", 4, [
-        ("Atlantique", [
-            ("Allada", [
-                ("Allada", ["Allada", "Toffo", "Zè"]),
-                ("Abomey-Calavi", ["Abomey-Calavi", "Godomey", "Calavi"]),
-            ]),
-            ("Ouidah", [
-                ("Ouidah", ["Ouidah", "Kpomassè", "Tori-Bossito"]),
-            ]),
-        ]),
-        ("Littoral", [
-            ("Cotonou", [
-                ("Cotonou 1er", ["Akpakpa", "Fidjrosse", "Cadjèhoun"]),
-                ("Cotonou 2ème", ["Sainte-Rita", "Gbégamey", "Zogbo"]),
-            ]),
-        ]),
-    ]),
-    ("Zou-Collines", 5, [
-        ("Zou", [
-            ("Abomey", [
-                ("Abomey", ["Abomey", "Agbangnizoun", "Bohicon"]),
-                ("Covè", ["Covè", "Zagnanado", "Ouinhi"]),
-            ]),
-        ]),
-        ("Collines", [
-            ("Savalou", [
-                ("Savalou", ["Savalou", "Bantè", "Glazoué"]),
-            ]),
-        ]),
-    ]),
-    ("Mono-Couffo", 6, [
-        ("Mono", [
-            ("Lokossa", [
-                ("Lokossa", ["Lokossa", "Athiémé", "Bopa"]),
-                ("Grand-Popo", ["Grand-Popo", "Comè", "Houéyogbé"]),
-            ]),
-        ]),
-        ("Couffo", [
-            ("Aplahoué", [
-                ("Aplahoué", ["Aplahoué", "Djakotomey", "Dogbo"]),
-            ]),
-        ]),
-    ]),
-    ("Ouémé-Plateau", 7, [
-        ("Ouémé Nord", [
-            ("Akpro-Missérété", [
-                ("Akpro-Missérété", ["Akpro-Missérété", "Avrankou"]),
-            ]),
-        ]),
-        ("Plateau Est", [
-            ("Kétou", [
-                ("Kétou", ["Kétou", "Idigny", "Adakplamè"]),
-            ]),
-        ]),
-    ]),
+    (
+        "Porto-Novo",
+        1,
+        [
+            (
+                "Ouémé",
+                [
+                    (
+                        "Porto-Novo",
+                        [
+                            ("Porto-Novo Centre", ["Aguégués", "Avrankou", "Akpro-Missérété"]),
+                            ("Adjarra", ["Adjarra", "Dangbo"]),
+                        ],
+                    ),
+                    (
+                        "Adjohoun",
+                        [
+                            ("Adjohoun", ["Adjohoun", "Bonou", "Dangbo"]),
+                        ],
+                    ),
+                ],
+            ),
+            (
+                "Plateau",
+                [
+                    (
+                        "Pobè",
+                        [
+                            ("Pobè", ["Pobè", "Kétou", "Sakété"]),
+                            ("Adja-Ouèrè", ["Adja-Ouèrè", "Ifangni"]),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    ),
+    (
+        "Borgou-Alibori",
+        2,
+        [
+            (
+                "Borgou",
+                [
+                    (
+                        "N'Dali",
+                        [
+                            ("N'Dali", ["N'Dali", "Bembereke", "Sinendé"]),
+                            ("Banikoara", ["Banikoara", "Gogounou", "Kandi"]),
+                        ],
+                    ),
+                    (
+                        "Parakou",
+                        [
+                            ("Parakou Centre", ["Parakou 1", "Parakou 2", "Parakou 3"]),
+                            ("Tchaourou", ["Tchaourou", "Bassila"]),
+                        ],
+                    ),
+                ],
+            ),
+            (
+                "Alibori",
+                [
+                    (
+                        "Kandi",
+                        [
+                            ("Kandi", ["Kandi", "Ségbana", "Malanville"]),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    ),
+    (
+        "Atacora-Donga",
+        3,
+        [
+            (
+                "Atacora",
+                [
+                    (
+                        "Natitingou",
+                        [
+                            ("Natitingou", ["Natitingou", "Toucountouna", "Boukoumbé"]),
+                            ("Tanguiéta", ["Tanguiéta", "Matéri", "Cobly"]),
+                        ],
+                    ),
+                ],
+            ),
+            (
+                "Donga",
+                [
+                    (
+                        "Djougou",
+                        [
+                            ("Djougou", ["Djougou", "Copargo", "Ouaké"]),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    ),
+    (
+        "Atlantique-Littoral",
+        4,
+        [
+            (
+                "Atlantique",
+                [
+                    (
+                        "Allada",
+                        [
+                            ("Allada", ["Allada", "Toffo", "Zè"]),
+                            ("Abomey-Calavi", ["Abomey-Calavi", "Godomey", "Calavi"]),
+                        ],
+                    ),
+                    (
+                        "Ouidah",
+                        [
+                            ("Ouidah", ["Ouidah", "Kpomassè", "Tori-Bossito"]),
+                        ],
+                    ),
+                ],
+            ),
+            (
+                "Littoral",
+                [
+                    (
+                        "Cotonou",
+                        [
+                            ("Cotonou 1er", ["Akpakpa", "Fidjrosse", "Cadjèhoun"]),
+                            ("Cotonou 2ème", ["Sainte-Rita", "Gbégamey", "Zogbo"]),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    ),
+    (
+        "Zou-Collines",
+        5,
+        [
+            (
+                "Zou",
+                [
+                    (
+                        "Abomey",
+                        [
+                            ("Abomey", ["Abomey", "Agbangnizoun", "Bohicon"]),
+                            ("Covè", ["Covè", "Zagnanado", "Ouinhi"]),
+                        ],
+                    ),
+                ],
+            ),
+            (
+                "Collines",
+                [
+                    (
+                        "Savalou",
+                        [
+                            ("Savalou", ["Savalou", "Bantè", "Glazoué"]),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    ),
+    (
+        "Mono-Couffo",
+        6,
+        [
+            (
+                "Mono",
+                [
+                    (
+                        "Lokossa",
+                        [
+                            ("Lokossa", ["Lokossa", "Athiémé", "Bopa"]),
+                            ("Grand-Popo", ["Grand-Popo", "Comè", "Houéyogbé"]),
+                        ],
+                    ),
+                ],
+            ),
+            (
+                "Couffo",
+                [
+                    (
+                        "Aplahoué",
+                        [
+                            ("Aplahoué", ["Aplahoué", "Djakotomey", "Dogbo"]),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    ),
+    (
+        "Ouémé-Plateau",
+        7,
+        [
+            (
+                "Ouémé Nord",
+                [
+                    (
+                        "Akpro-Missérété",
+                        [
+                            ("Akpro-Missérété", ["Akpro-Missérété", "Avrankou"]),
+                        ],
+                    ),
+                ],
+            ),
+            (
+                "Plateau Est",
+                [
+                    (
+                        "Kétou",
+                        [
+                            ("Kétou", ["Kétou", "Idigny", "Adakplamè"]),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    ),
 ]
 
 # Données des fiches de recensement de démonstration.
@@ -321,9 +449,20 @@ FICHES_DEMO = [
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _creer_ou_maj_utilisateur(username, mdp, role, region=None, province=None,
-                               district=None, zone=None, cree_par=None,
-                               prenom="", nom="", is_superuser=False):
+
+def _creer_ou_maj_utilisateur(
+    username,
+    mdp,
+    role,
+    region=None,
+    province=None,
+    district=None,
+    zone=None,
+    cree_par=None,
+    prenom="",
+    nom="",
+    is_superuser=False,
+):
     """Crée ou met à jour un utilisateur et son profil de démonstration.
     Retourne l'objet User."""
     user, created = User.objects.get_or_create(username=username)
@@ -362,6 +501,7 @@ def _get_or_none(model, **kwargs):
 # Commande
 # ---------------------------------------------------------------------------
 
+
 class Command(BaseCommand):
     help = (
         "Charge les données de démonstration : cartographie géo-ecclésiale, "
@@ -371,18 +511,19 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--no-cartographie", action="store_true",
+            "--no-cartographie",
+            action="store_true",
             help="Ne relance pas import_cartographie (utile si la carte est déjà en base).",
         )
         parser.add_argument(
-            "--flush", action="store_true",
-            help=(
-                "Supprime TOUTES les données existantes avant de remplir. "
-                "À n'utiliser qu'en développement."
-            ),
+            "--flush",
+            action="store_true",
+            help=("Supprime TOUTES les données existantes avant de remplir. À n'utiliser qu'en développement."),
         )
         parser.add_argument(
-            "--mdp", type=str, default=MDP_PAR_DEFAUT,
+            "--mdp",
+            type=str,
+            default=MDP_PAR_DEFAUT,
             help=f"Mot de passe commun à tous les comptes de démo (défaut : {MDP_PAR_DEFAUT}).",
         )
 
@@ -395,9 +536,7 @@ class Command(BaseCommand):
         # 0. Flush (développement uniquement)
         # ----------------------------------------------------------------
         if flush:
-            self.stdout.write(self.style.WARNING(
-                "⚠  --flush : suppression de toutes les données…"
-            ))
+            self.stdout.write(self.style.WARNING("⚠  --flush : suppression de toutes les données…"))
             with transaction.atomic():
                 HistoriqueModification.objects.all().delete()
                 PhotoParoisse.objects.all().delete()
@@ -420,53 +559,45 @@ class Command(BaseCommand):
 
         # S'assurer qu'il y a au moins un minimum de données géo.
         if Region.objects.count() == 0:
-            self.stdout.write(self.style.WARNING(
-                "Aucune région en base. Chargement du référentiel minimal intégré…"
-            ))
+            self.stdout.write(self.style.WARNING("Aucune région en base. Chargement du référentiel minimal intégré…"))
             self._charger_geo_minimal()
 
-        self.stdout.write(self.style.SUCCESS(
-            f"Référentiel : {Region.objects.count()} régions, "
-            f"{Province.objects.count()} provinces, "
-            f"{District.objects.count()} districts, "
-            f"{Zone.objects.count()} zones."
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Référentiel : {Region.objects.count()} régions, "
+                f"{Province.objects.count()} provinces, "
+                f"{District.objects.count()} districts, "
+                f"{Zone.objects.count()} zones."
+            )
+        )
 
         # ----------------------------------------------------------------
         # 2. Utilisateurs
         # ----------------------------------------------------------------
         self.stdout.write("\n── Étape 2/5 : Utilisateurs ──")
         comptes = self._creer_utilisateurs(mdp)
-        self.stdout.write(self.style.SUCCESS(
-            f"{len(comptes)} comptes créés/mis à jour."
-        ))
+        self.stdout.write(self.style.SUCCESS(f"{len(comptes)} comptes créés/mis à jour."))
 
         # ----------------------------------------------------------------
         # 3. Fiches de recensement
         # ----------------------------------------------------------------
         self.stdout.write("\n── Étape 3/5 : Fiches de recensement ──")
         fiches = self._creer_fiches(comptes)
-        self.stdout.write(self.style.SUCCESS(
-            f"{len(fiches)} fiches créées/mises à jour."
-        ))
+        self.stdout.write(self.style.SUCCESS(f"{len(fiches)} fiches créées/mises à jour."))
 
         # ----------------------------------------------------------------
         # 4. Codification officielle des fiches validées
         # ----------------------------------------------------------------
         self.stdout.write("\n── Étape 4/6 : Codification officielle ──")
         nb_codes = generer_codes_retroactifs(verbose=False)
-        self.stdout.write(self.style.SUCCESS(
-            f"{nb_codes} code(s) officiel(s) généré(s) pour les fiches validées."
-        ))
+        self.stdout.write(self.style.SUCCESS(f"{nb_codes} code(s) officiel(s) généré(s) pour les fiches validées."))
 
         # ----------------------------------------------------------------
         # 5. Historiques de modification
         # ----------------------------------------------------------------
         self.stdout.write("\n── Étape 5/6 : Historiques de modification ──")
         nb_histo = self._creer_historiques(fiches, comptes)
-        self.stdout.write(self.style.SUCCESS(
-            f"{nb_histo} historiques créés."
-        ))
+        self.stdout.write(self.style.SUCCESS(f"{nb_histo} historiques créés."))
 
         # ----------------------------------------------------------------
         # 6. Résumé final
@@ -482,15 +613,15 @@ class Command(BaseCommand):
         """Tente de lancer import_cartographie. Si le fichier Excel est absent,
         charge le référentiel géo minimal intégré à la place."""
         from django.conf import settings
+
         xlsx = settings.BASE_DIR / "recensement" / "data" / "cartographie_benin.xlsx"
         if xlsx.exists():
             self.stdout.write(f"Fichier trouvé : {xlsx}")
             call_command("import_cartographie", verbosity=1)
         else:
-            self.stdout.write(self.style.WARNING(
-                f"Fichier Excel absent ({xlsx}). "
-                "Chargement du référentiel géo minimal intégré…"
-            ))
+            self.stdout.write(
+                self.style.WARNING(f"Fichier Excel absent ({xlsx}). Chargement du référentiel géo minimal intégré…")
+            )
             self._charger_geo_minimal()
 
     def _charger_geo_minimal(self):
@@ -500,9 +631,7 @@ class Command(BaseCommand):
         stats = {"regions": 0, "provinces": 0, "districts": 0, "zones": 0, "villages": 0}
 
         for nom_region, ordre, provinces in GEO_MINIMAL:
-            region, cr = Region.objects.get_or_create(
-                nom=nom_region, defaults={"ordre": ordre}
-            )
+            region, cr = Region.objects.get_or_create(nom=nom_region, defaults={"ordre": ordre})
             if not region.code:
                 region.code = f"R{ordre:02d}"
                 region.save(update_fields=["code"])
@@ -510,9 +639,7 @@ class Command(BaseCommand):
                 stats["regions"] += 1
 
             for idx_p, (nom_province, districts) in enumerate(provinces, start=1):
-                province, cr = Province.objects.get_or_create(
-                    region=region, nom=nom_province
-                )
+                province, cr = Province.objects.get_or_create(region=region, nom=nom_province)
                 if not province.code:
                     province.code = f"P{idx_p:02d}"
                     province.save(update_fields=["code"])
@@ -520,9 +647,7 @@ class Command(BaseCommand):
                     stats["provinces"] += 1
 
                 for idx_d, (nom_district, zones) in enumerate(districts, start=1):
-                    district, cr = District.objects.get_or_create(
-                        province=province, nom=nom_district
-                    )
+                    district, cr = District.objects.get_or_create(province=province, nom=nom_district)
                     if not district.code:
                         district.code = f"D{idx_d:02d}"
                         district.save(update_fields=["code"])
@@ -530,9 +655,7 @@ class Command(BaseCommand):
                         stats["districts"] += 1
 
                     for idx_z, (nom_zone, villages) in enumerate(zones, start=1):
-                        zone, cr = Zone.objects.get_or_create(
-                            district=district, nom=nom_zone
-                        )
+                        zone, cr = Zone.objects.get_or_create(district=district, nom=nom_zone)
                         if not zone.code:
                             zone.code = f"Z{idx_z:03d}"
                             zone.save(update_fields=["code"])
@@ -540,18 +663,18 @@ class Command(BaseCommand):
                             stats["zones"] += 1
 
                         for nom_village in villages:
-                            _, cr = Village.objects.get_or_create(
-                                zone=zone, nom=nom_village[:200]
-                            )
+                            _, cr = Village.objects.get_or_create(zone=zone, nom=nom_village[:200])
                             if cr:
                                 stats["villages"] += 1
 
-        self.stdout.write(self.style.SUCCESS(
-            f"Référentiel minimal chargé : "
-            f"{stats['regions']} régions, {stats['provinces']} provinces, "
-            f"{stats['districts']} districts, {stats['zones']} zones, "
-            f"{stats['villages']} villages."
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Référentiel minimal chargé : "
+                f"{stats['regions']} régions, {stats['provinces']} provinces, "
+                f"{stats['districts']} districts, {stats['zones']} zones, "
+                f"{stats['villages']} villages."
+            )
+        )
 
     # ====================================================================
     # Étape 2 : Utilisateurs
@@ -563,8 +686,7 @@ class Command(BaseCommand):
 
         # ---- Récupération des entités géo ----
         # Région 1 (Porto-Novo / Région mère)
-        r1 = (Region.objects.filter(ordre=1).first()
-              or Region.objects.order_by("ordre", "nom").first())
+        r1 = Region.objects.filter(ordre=1).first() or Region.objects.order_by("ordre", "nom").first()
         if not r1:
             raise RuntimeError("Aucune région en base. Lancez d'abord import_cartographie.")
 
@@ -573,8 +695,7 @@ class Command(BaseCommand):
         z1 = Zone.objects.filter(district=d1).order_by("nom").first() if d1 else None
 
         # Région 2 (Borgou-Alibori)
-        r2 = (Region.objects.filter(ordre=2).first()
-              or Region.objects.exclude(pk=r1.pk).order_by("ordre", "nom").first())
+        r2 = Region.objects.filter(ordre=2).first() or Region.objects.exclude(pk=r1.pk).order_by("ordre", "nom").first()
         p2 = Province.objects.filter(region=r2).order_by("nom").first() if r2 else None
         d2 = District.objects.filter(province=p2).order_by("nom").first() if p2 else None
         z2 = Zone.objects.filter(district=d2).order_by("nom").first() if d2 else None
@@ -588,7 +709,7 @@ class Command(BaseCommand):
             nom="Agbossou",
             is_superuser=True,
         )
-        self.stdout.write(f"  ✓ SA001 (Super Administrateur)")
+        self.stdout.write("  ✓ SA001 (Super Administrateur)")
 
         # ---- OP PROVINCE — Région 1 ----
         opp1 = None
@@ -598,7 +719,8 @@ class Command(BaseCommand):
                 username=username_opp1,
                 mdp=mdp,
                 role=Profil.Role.OP_PROVINCE,
-                region=r1, province=p1,
+                region=r1,
+                province=p1,
                 cree_par=sa,
                 prenom="Honoré",
                 nom="Degbey",
@@ -613,7 +735,9 @@ class Command(BaseCommand):
                 username=username_opd1,
                 mdp=mdp,
                 role=Profil.Role.OP_DISTRICT,
-                region=r1, province=p1, district=d1,
+                region=r1,
+                province=p1,
+                district=d1,
                 cree_par=opp1 or sa,
                 prenom="Théodore",
                 nom="Azonho",
@@ -628,7 +752,10 @@ class Command(BaseCommand):
                 username=username_opz1,
                 mdp=mdp,
                 role=Profil.Role.OP_ZONE,
-                region=r1, province=p1, district=d1, zone=z1,
+                region=r1,
+                province=p1,
+                district=d1,
+                zone=z1,
                 cree_par=opd1 or sa,
                 prenom="Sylvestre",
                 nom="Koutchika",
@@ -643,7 +770,10 @@ class Command(BaseCommand):
                 username=username_ag1,
                 mdp=mdp,
                 role=Profil.Role.AGENT,
-                region=r1, province=p1, district=d1, zone=z1,
+                region=r1,
+                province=p1,
+                district=d1,
+                zone=z1,
                 cree_par=opd1 or sa,
                 prenom="Jérémie",
                 nom="Houssou",
@@ -658,7 +788,10 @@ class Command(BaseCommand):
                 username=username_ag2,
                 mdp=mdp,
                 role=Profil.Role.AGENT,
-                region=r1, province=p1, district=d1, zone=z1,
+                region=r1,
+                province=p1,
+                district=d1,
+                zone=z1,
                 cree_par=opd1 or sa,
                 prenom="Victorine",
                 nom="Gbèdo",
@@ -673,7 +806,8 @@ class Command(BaseCommand):
                 username=username_opp2,
                 mdp=mdp,
                 role=Profil.Role.OP_PROVINCE,
-                region=r2, province=p2,
+                region=r2,
+                province=p2,
                 cree_par=sa,
                 prenom="Prosper",
                 nom="Biaou",
@@ -688,7 +822,9 @@ class Command(BaseCommand):
                 username=username_opd2,
                 mdp=mdp,
                 role=Profil.Role.OP_DISTRICT,
-                region=r2, province=p2, district=d2,
+                region=r2,
+                province=p2,
+                district=d2,
                 cree_par=opp2 or sa,
                 prenom="Euloge",
                 nom="Sossou",
@@ -703,7 +839,10 @@ class Command(BaseCommand):
                 username=username_ag3,
                 mdp=mdp,
                 role=Profil.Role.AGENT,
-                region=r2, province=p2, district=d2, zone=z2,
+                region=r2,
+                province=p2,
+                district=d2,
+                zone=z2,
                 cree_par=opd2 or sa,
                 prenom="Barnabé",
                 nom="Tamou",
@@ -712,12 +851,23 @@ class Command(BaseCommand):
 
         return {
             "sa": sa,
-            "opp1": opp1, "opd1": opd1, "opz1": opz1,
-            "ag1": ag1, "ag2": ag2,
-            "opp2": opp2, "opd2": opd2, "ag3": ag3,
+            "opp1": opp1,
+            "opd1": opd1,
+            "opz1": opz1,
+            "ag1": ag1,
+            "ag2": ag2,
+            "opp2": opp2,
+            "opd2": opd2,
+            "ag3": ag3,
             # Entités géo pour les étapes suivantes
-            "_r1": r1, "_p1": p1, "_d1": d1, "_z1": z1,
-            "_r2": r2, "_p2": p2, "_d2": d2, "_z2": z2,
+            "_r1": r1,
+            "_p1": p1,
+            "_d1": d1,
+            "_z1": z1,
+            "_r2": r2,
+            "_p2": p2,
+            "_d2": d2,
+            "_z2": z2,
         }
 
     # ====================================================================
@@ -728,19 +878,19 @@ class Command(BaseCommand):
         """Crée les fiches de recensement en les répartissant sur les zones
         disponibles. Utilise update_or_create sur (zone, nom_paroisse, parish_shepherd)
         pour être idempotent."""
-        r1  = comptes["_r1"]
-        p1  = comptes["_p1"]
-        d1  = comptes["_d1"]
-        z1  = comptes["_z1"]
-        r2  = comptes["_r2"]
-        p2  = comptes["_p2"]
-        d2  = comptes["_d2"]
-        z2  = comptes["_z2"]
+        r1 = comptes["_r1"]
+        p1 = comptes["_p1"]
+        d1 = comptes["_d1"]
+        z1 = comptes["_z1"]
+        r2 = comptes["_r2"]
+        p2 = comptes["_p2"]
+        d2 = comptes["_d2"]
+        z2 = comptes["_z2"]
 
         ag1 = comptes.get("ag1")
         ag2 = comptes.get("ag2")
         ag3 = comptes.get("ag3")
-        sa  = comptes["sa"]
+        sa = comptes["sa"]
 
         # On distribue les fiches sur les zones disponibles.
         # Si une zone est None (géo insuffisante), on essaie de récupérer
@@ -748,30 +898,26 @@ class Command(BaseCommand):
         def fallback_zone(z, r, p, d):
             if z:
                 return r, p, d, z
-            z_any = Zone.objects.select_related(
-                "district__province__region"
-            ).first()
+            z_any = Zone.objects.select_related("district__province__region").first()
             if z_any:
-                return (z_any.district.province.region,
-                        z_any.district.province,
-                        z_any.district, z_any)
+                return (z_any.district.province.region, z_any.district.province, z_any.district, z_any)
             return None, None, None, None
 
         # Attribution zone / créateur pour chaque fiche
         assignments = [
             # Fiches de la région 1 zone 1 (agents 1 et 2)
-            (r1, p1, d1, z1, ag1 or sa, "validee"),       # 0
+            (r1, p1, d1, z1, ag1 or sa, "validee"),  # 0
             (r1, p1, d1, z1, ag2 or sa, "attente_manager"),  # 1
             (r1, p1, d1, z1, ag1 or sa, "attente_superviseur"),  # 2
             # Zone 2 (dans un autre district si dispo, sinon même district)
-            (r2, p2, d2, z2, ag3 or sa, "validee"),        # 3
+            (r2, p2, d2, z2, ag3 or sa, "validee"),  # 3
             (r2, p2, d2, z2, ag3 or sa, "attente_superviseur"),  # 4
             (r2, p2, d2, z2, ag3 or sa, "attente_superviseur"),  # 5
             # Fiches variées
-            (r1, p1, d1, z1, sa, "validee"),                # 6
-            (r1, p1, d1, z1, ag2 or sa, "attente_manager"), # 7
+            (r1, p1, d1, z1, sa, "validee"),  # 6
+            (r1, p1, d1, z1, ag2 or sa, "attente_manager"),  # 7
             (r2, p2, d2, z2, ag3 or sa, "attente_superviseur"),  # 8
-            (r1, p1, d1, z1, ag1 or sa, "validee"),         # 9
+            (r1, p1, d1, z1, ag1 or sa, "validee"),  # 9
         ]
 
         fiches_creees = []
@@ -783,9 +929,9 @@ class Command(BaseCommand):
             r, p, d, z, agent, statut_impose = assignments[i]
             r, p, d, z = fallback_zone(z, r, p, d)
             if not z:
-                self.stdout.write(self.style.WARNING(
-                    f"  ⚠ Fiche « {data['nom_paroisse']} » ignorée : aucune zone disponible."
-                ))
+                self.stdout.write(
+                    self.style.WARNING(f"  ⚠ Fiche « {data['nom_paroisse']} » ignorée : aucune zone disponible.")
+                )
                 continue
 
             # Village : on essaie de trouver un village de la zone
@@ -888,10 +1034,7 @@ class Command(BaseCommand):
             HistoriqueModification.objects.create(
                 fiche=fiche,
                 modifie_par=modificateur,
-                motif=(
-                    f"Correction du nom du chargé de paroisse : "
-                    f"faute de frappe détectée lors de la validation."
-                ),
+                motif=("Correction du nom du chargé de paroisse : faute de frappe détectée lors de la validation."),
                 donnees_avant=avant,
                 donnees_apres=apres,
             )
@@ -904,42 +1047,36 @@ class Command(BaseCommand):
     # ====================================================================
 
     def _afficher_resume(self, mdp):
-        self.stdout.write(self.style.SUCCESS("""
+        self.stdout.write(
+            self.style.SUCCESS(f"""
 ╔══════════════════════════════════════════════════════════════════════╗
 ║            SEED DEMO — DONNÉES CHARGÉES AVEC SUCCÈS                 ║
 ╚══════════════════════════════════════════════════════════════════════╝
 
 Référentiel géo-ecclésial
-  Régions    : {nb_r}
-  Provinces  : {nb_p}
-  Districts  : {nb_d}
-  Zones      : {nb_z}
-  Villages   : {nb_v}
+  Régions    : {Region.objects.count()}
+  Provinces  : {Province.objects.count()}
+  Districts  : {District.objects.count()}
+  Zones      : {Zone.objects.count()}
+  Villages   : {Village.objects.count()}
 
 Utilisateurs (mot de passe commun : {mdp})
-""".format(
-            nb_r=Region.objects.count(),
-            nb_p=Province.objects.count(),
-            nb_d=District.objects.count(),
-            nb_z=Zone.objects.count(),
-            nb_v=Village.objects.count(),
-            mdp=mdp,
-        )))
+""")
+        )
 
         for u in User.objects.select_related("profil").order_by("username"):
             profil = getattr(u, "profil", None)
             role_label = profil.get_role_display() if profil else "—"
             perimetre = profil.perimetre_display() if profil else "—"
-            self.stdout.write(
-                f"  {u.username:<35} {role_label:<30} {perimetre}"
-            )
+            self.stdout.write(f"  {u.username:<35} {role_label:<30} {perimetre}")
 
-        self.stdout.write(self.style.SUCCESS(f"""
+        self.stdout.write(
+            self.style.SUCCESS(f"""
 Fiches de recensement
   Total                   : {FicheParoisse.objects.count()}
-  Validées                : {FicheParoisse.objects.filter(statut_validation='validee').count()}
-  En attente OP PROVINCE  : {FicheParoisse.objects.filter(statut_validation='attente_manager').count()}
-  En attente OP DISTRICT  : {FicheParoisse.objects.filter(statut_validation='attente_superviseur').count()}
+  Validées                : {FicheParoisse.objects.filter(statut_validation="validee").count()}
+  En attente OP PROVINCE  : {FicheParoisse.objects.filter(statut_validation="attente_manager").count()}
+  En attente OP DISTRICT  : {FicheParoisse.objects.filter(statut_validation="attente_superviseur").count()}
 
 Codes officiels générés   : {FicheParoisse.objects.exclude(code_officiel__isnull=True).exclude(code_officiel="").count()}
 Historiques de modification : {HistoriqueModification.objects.count()}
@@ -949,4 +1086,5 @@ Connexion rapide :
   http://localhost:8000/recensement/          (page d'accueil)
   http://localhost:8000/recensement/liste/    (liste des fiches)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"""))
+""")
+        )

@@ -39,7 +39,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     # App métier
     "recensement",
 ]
@@ -128,10 +127,10 @@ LOGOUT_REDIRECT_URL = "recensement:landing"
 # ---------------------------------------------------------------------------
 # Sécurité — applicable en permanence, DEBUG ou non
 # ---------------------------------------------------------------------------
-SECURE_CONTENT_TYPE_NOSNIFF = True   # empêche le navigateur de "deviner" un type MIME
-X_FRAME_OPTIONS = "DENY"             # anti-clickjacking (interdit l'inclusion en <iframe>)
-CSRF_COOKIE_HTTPONLY = True          # le cookie CSRF n'est jamais lisible en JS (anti-XSS)
-SESSION_COOKIE_HTTPONLY = True       # idem pour le cookie de session (comportement par défaut de Django, explicité ici)
+SECURE_CONTENT_TYPE_NOSNIFF = True  # empêche le navigateur de "deviner" un type MIME
+X_FRAME_OPTIONS = "DENY"  # anti-clickjacking (interdit l'inclusion en <iframe>)
+CSRF_COOKIE_HTTPONLY = True  # le cookie CSRF n'est jamais lisible en JS (anti-XSS)
+SESSION_COOKIE_HTTPONLY = True  # idem pour le cookie de session (comportement par défaut de Django, explicité ici)
 
 # ---------------------------------------------------------------------------
 # Sécurité — appliquée uniquement quand DEBUG=False (production)
@@ -185,4 +184,3 @@ LOGGING = {
         },
     },
 }
-

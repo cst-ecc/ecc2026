@@ -35,20 +35,33 @@ class AffectationsTerritorialesTests(TestCase):
 
         self.superadmin = User.objects.create_superuser("sa", "sa@example.com", "pass")
         self.op_province = self._user(
-            "opp", Profil.Role.OP_PROVINCE,
-            region=self.r1, province=self.p1,
+            "opp",
+            Profil.Role.OP_PROVINCE,
+            region=self.r1,
+            province=self.p1,
         )
         self.op_district = self._user(
-            "opd", Profil.Role.OP_DISTRICT,
-            region=self.r1, province=self.p1, district=self.d1,
+            "opd",
+            Profil.Role.OP_DISTRICT,
+            region=self.r1,
+            province=self.p1,
+            district=self.d1,
         )
         self.op_zone = self._user(
-            "opz", Profil.Role.OP_ZONE,
-            region=self.r1, province=self.p1, district=self.d1, zone=self.z1,
+            "opz",
+            Profil.Role.OP_ZONE,
+            region=self.r1,
+            province=self.p1,
+            district=self.d1,
+            zone=self.z1,
         )
         self.agent = self._user(
-            "agent", Profil.Role.AGENT,
-            region=self.r1, province=self.p1, district=self.d1, zone=self.z1,
+            "agent",
+            Profil.Role.AGENT,
+            region=self.r1,
+            province=self.p1,
+            district=self.d1,
+            zone=self.z1,
         )
 
     def _user(self, username, role, **scope):
@@ -203,9 +216,7 @@ class AffectationsTerritorialesTests(TestCase):
             motif="Retrait",
         )
         actions = list(
-            HistoriqueAffectationTerritoriale.objects.filter(
-                affectation=affectation
-            ).values_list("action", flat=True)
+            HistoriqueAffectationTerritoriale.objects.filter(affectation=affectation).values_list("action", flat=True)
         )
         self.assertCountEqual(actions, ["ajout", "suspension", "reactivation", "retrait"])
 

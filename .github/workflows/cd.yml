@@ -84,7 +84,7 @@ jobs:
       - name: Envoyer un email d'alerte
         uses: dawidd6/action-send-mail@v3
         with:
-          server_address: smtp.gmail.com
+          server_address: mail.ecc.bj
           server_port: 587
           secure: true
           username: ${{ secrets.ALERT_EMAIL_FROM }}

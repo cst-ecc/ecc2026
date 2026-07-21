@@ -10,7 +10,6 @@ du package ``views``. Le comportement est strictement identique à l'original.
 
 from ..permissions import fiches_visibles_pour
 
-
 # Caractères qu'un tableur peut interpréter comme début de formule (OWASP CSV Injection).
 _CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
@@ -24,13 +23,26 @@ def _csv_safe(value):
 
 # Associe chaque champ du wizard à son étape (index JS, base 0).
 _CHAMP_VERS_ETAPE = {
-    "region": 0, "province": 0, "district": 0, "zone": 0, "village": 0,
+    "region": 0,
+    "province": 0,
+    "district": 0,
+    "zone": 0,
+    "village": 0,
     "nouvelle_localite_nom": 0,
-    "nom_paroisse": 1, "annee_fondation": 1, "statut_batiment": 1, "nombre_fideles_estime": 1,
+    "nom_paroisse": 1,
+    "annee_fondation": 1,
+    "statut_batiment": 1,
+    "nombre_fideles_estime": 1,
     "photos": 1,
-    "parish_shepherd": 2, "contact_responsable": 2, "photo_charge": 2,
-    "latitude": 3, "longitude": 3, "precision_gps": 3, "observations": 3,
-    "nom_informateur": 4, "contact_informateur": 4,
+    "parish_shepherd": 2,
+    "contact_responsable": 2,
+    "photo_charge": 2,
+    "latitude": 3,
+    "longitude": 3,
+    "precision_gps": 3,
+    "observations": 3,
+    "nom_informateur": 4,
+    "contact_informateur": 4,
 }
 
 

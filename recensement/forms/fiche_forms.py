@@ -18,18 +18,18 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from ..models import District, FicheParoisse, Profil, Province, Region, Village, Zone
 from ..permissions import get_role, peut_creer_dans_zone, zones_autorisees
 from .base import (
-    GPSDecimalField,
     INPUT_CSS,
+    SELECT_CSS,
+    GPSDecimalField,
     MultipleImageField,
     RegionModelChoiceField,
-    SELECT_CSS,
 )
 from .validators import MAX_ANNEE_FONDATION, valider_image, valider_telephone_international
-
 
 # ---------------------------------------------------------------------------
 # Formulaire de saisie de fiche de recensement
 # ---------------------------------------------------------------------------
+
 
 class FicheParoisseForm(forms.ModelForm):
     region = RegionModelChoiceField(
@@ -62,12 +62,14 @@ class FicheParoisseForm(forms.ModelForm):
     # Champ "honeypot" anti-robot
     site_web = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={
-            "autocomplete": "off",
-            "tabindex": "-1",
-            "class": "hp-field",
-            "aria-hidden": "true",
-        }),
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "off",
+                "tabindex": "-1",
+                "class": "hp-field",
+                "aria-hidden": "true",
+            }
+        ),
     )
 
     def __init__(self, *args, user=None, **kwargs):
@@ -81,23 +83,17 @@ class FicheParoisseForm(forms.ModelForm):
             return
 
         zone_ids = zones_autorisees(user) or set()
-        zones_qs = Zone.objects.filter(pk__in=zone_ids).select_related(
-            "district__province__region"
-        ).order_by("nom")
+        zones_qs = Zone.objects.filter(pk__in=zone_ids).select_related("district__province__region").order_by("nom")
 
         self.fields["zone"].queryset = zones_qs
-        self.fields["district"].queryset = District.objects.filter(
-            zones__in=zones_qs
-        ).distinct().order_by("nom")
-        self.fields["province"].queryset = Province.objects.filter(
-            districts__zones__in=zones_qs
-        ).distinct().order_by("nom")
-        self.fields["region"].queryset = Region.objects.filter(
-            provinces__districts__zones__in=zones_qs
-        ).distinct().order_by("ordre", "nom")
-        self.fields["village"].queryset = Village.objects.filter(
-            zone_id__in=zone_ids
-        ).order_by("nom")
+        self.fields["district"].queryset = District.objects.filter(zones__in=zones_qs).distinct().order_by("nom")
+        self.fields["province"].queryset = (
+            Province.objects.filter(districts__zones__in=zones_qs).distinct().order_by("nom")
+        )
+        self.fields["region"].queryset = (
+            Region.objects.filter(provinces__districts__zones__in=zones_qs).distinct().order_by("ordre", "nom")
+        )
+        self.fields["village"].queryset = Village.objects.filter(zone_id__in=zone_ids).order_by("nom")
 
         # Une seule zone effective : préremplissage complet. Le verrouillage
         # visuel est appliqué dans cascade.js, tandis que la validation serveur
@@ -112,46 +108,68 @@ class FicheParoisseForm(forms.ModelForm):
 
     contact_responsable = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={
-            "class": INPUT_CSS, "placeholder": "Ex : 01 96 35 56 21 ou +2290196355621",
-        }),
+        widget=forms.TextInput(
+            attrs={
+                "class": INPUT_CSS,
+                "placeholder": "Ex : 01 96 35 56 21 ou +2290196355621",
+            }
+        ),
         label="Contact du chargé de paroisse",
     )
     contact_informateur = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={
-            "class": INPUT_CSS, "placeholder": "Ex : 01 96 35 56 21 ou +2290196355621",
-        }),
+        widget=forms.TextInput(
+            attrs={
+                "class": INPUT_CSS,
+                "placeholder": "Ex : 01 96 35 56 21 ou +2290196355621",
+            }
+        ),
         label="Contact de l'informateur",
     )
     photo_charge = forms.ImageField(
         required=False,
         validators=[valider_image],
-        widget=forms.ClearableFileInput(attrs={
-            "class": INPUT_CSS, "accept": "image/jpeg,image/png,image/webp",
-        }),
+        widget=forms.ClearableFileInput(
+            attrs={
+                "class": INPUT_CSS,
+                "accept": "image/jpeg,image/png,image/webp",
+            }
+        ),
         label="Photo du chargé de paroisse (facultative)",
     )
     annee_fondation = forms.IntegerField(
         required=False,
         validators=[MinValueValidator(1900), MaxValueValidator(MAX_ANNEE_FONDATION)],
-        widget=forms.NumberInput(attrs={
-            "class": INPUT_CSS, "min": 1900, "max": MAX_ANNEE_FONDATION,
-            "placeholder": "Ex : 1998",
-        }),
+        widget=forms.NumberInput(
+            attrs={
+                "class": INPUT_CSS,
+                "min": 1900,
+                "max": MAX_ANNEE_FONDATION,
+                "placeholder": "Ex : 1998",
+            }
+        ),
         label="Année de fondation (si connue)",
     )
     nombre_fideles_estime = forms.IntegerField(
         required=False,
         validators=[MinValueValidator(0), MaxValueValidator(1_000_000)],
-        widget=forms.NumberInput(attrs={
-            "class": INPUT_CSS, "min": 0, "max": 1_000_000, "placeholder": "Estimation",
-        }),
+        widget=forms.NumberInput(
+            attrs={
+                "class": INPUT_CSS,
+                "min": 0,
+                "max": 1_000_000,
+                "placeholder": "Estimation",
+            }
+        ),
         label="Nombre de fidèles estimé",
     )
     latitude = GPSDecimalField(
-        required=False, precision=7, max_digits=10, decimal_places=7,
-        min_value=Decimal("-90"), max_value=Decimal("90"),
+        required=False,
+        precision=7,
+        max_digits=10,
+        decimal_places=7,
+        min_value=Decimal("-90"),
+        max_value=Decimal("90"),
         widget=forms.HiddenInput(attrs={"id": "id_latitude"}),
         error_messages={
             "invalid": "La latitude reçue n'est pas valide. Veuillez relancer la géolocalisation.",
@@ -162,8 +180,12 @@ class FicheParoisseForm(forms.ModelForm):
         },
     )
     longitude = GPSDecimalField(
-        required=False, precision=7, max_digits=10, decimal_places=7,
-        min_value=Decimal("-180"), max_value=Decimal("180"),
+        required=False,
+        precision=7,
+        max_digits=10,
+        decimal_places=7,
+        min_value=Decimal("-180"),
+        max_value=Decimal("180"),
         widget=forms.HiddenInput(attrs={"id": "id_longitude"}),
         error_messages={
             "invalid": "La longitude reçue n'est pas valide. Veuillez relancer la géolocalisation.",
@@ -174,7 +196,10 @@ class FicheParoisseForm(forms.ModelForm):
         },
     )
     precision_gps = GPSDecimalField(
-        required=False, precision=2, max_digits=8, decimal_places=2,
+        required=False,
+        precision=2,
+        max_digits=8,
+        decimal_places=2,
         min_value=Decimal("0"),
         widget=forms.HiddenInput(attrs={"id": "id_precision_gps"}),
         error_messages={
@@ -188,41 +213,67 @@ class FicheParoisseForm(forms.ModelForm):
     class Meta:
         model = FicheParoisse
         fields = [
-            "region", "province", "district", "zone", "village",
+            "region",
+            "province",
+            "district",
+            "zone",
+            "village",
             "nouvelle_localite_nom",
-            "nom_paroisse", "annee_fondation",
-            "parish_shepherd", "contact_responsable", "photo_charge",
+            "nom_paroisse",
+            "annee_fondation",
+            "parish_shepherd",
+            "contact_responsable",
+            "photo_charge",
             "nombre_fideles_estime",
             "statut_batiment",
-            "latitude", "longitude", "precision_gps",
-            "nom_informateur", "contact_informateur",
+            "latitude",
+            "longitude",
+            "precision_gps",
+            "nom_informateur",
+            "contact_informateur",
             "observations",
         ]
         widgets = {
-            "nouvelle_localite_nom": forms.TextInput(attrs={
-                "class": INPUT_CSS, "id": "id_nouvelle_localite_nom",
-                "placeholder": "Nom de la localité si absente de la liste ci-dessus",
-            }),
-            "nom_paroisse": forms.TextInput(attrs={
-                "class": INPUT_CSS, "placeholder": "Ex : Paroisse Bethel de..."
-            }),
-            "annee_fondation": forms.NumberInput(attrs={
-                "class": INPUT_CSS, "min": 1900, "max": 2100, "placeholder": "Ex : 1998",
-            }),
-            "parish_shepherd": forms.TextInput(attrs={
-                "class": INPUT_CSS, "placeholder": "Nom complet du chargé de paroisse"
-            }),
-            "photo_charge": forms.ClearableFileInput(attrs={
-                "class": INPUT_CSS, "accept": "image/jpeg,image/png,image/webp",
-            }),
+            "nouvelle_localite_nom": forms.TextInput(
+                attrs={
+                    "class": INPUT_CSS,
+                    "id": "id_nouvelle_localite_nom",
+                    "placeholder": "Nom de la localité si absente de la liste ci-dessus",
+                }
+            ),
+            "nom_paroisse": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : Paroisse Bethel de..."}),
+            "annee_fondation": forms.NumberInput(
+                attrs={
+                    "class": INPUT_CSS,
+                    "min": 1900,
+                    "max": 2100,
+                    "placeholder": "Ex : 1998",
+                }
+            ),
+            "parish_shepherd": forms.TextInput(
+                attrs={"class": INPUT_CSS, "placeholder": "Nom complet du chargé de paroisse"}
+            ),
+            "photo_charge": forms.ClearableFileInput(
+                attrs={
+                    "class": INPUT_CSS,
+                    "accept": "image/jpeg,image/png,image/webp",
+                }
+            ),
             "statut_batiment": forms.Select(attrs={"class": SELECT_CSS}),
-            "nom_informateur": forms.TextInput(attrs={
-                "class": INPUT_CSS, "placeholder": "Nom de la personne rencontrée sur place",
-            }),
-            "observations": forms.Textarea(attrs={
-                "class": INPUT_CSS, "rows": 3, "maxlength": 2000,
-                "placeholder": "Toute information complémentaire utile...",
-            }),
+            "nom_informateur": forms.TextInput(
+                attrs={
+                    "class": INPUT_CSS,
+                    "placeholder": "Nom de la personne rencontrée sur place",
+                }
+            ),
+            "observations": forms.Textarea(
+                attrs={
+                    "class": INPUT_CSS,
+                    "rows": 3,
+                    "maxlength": 2000,
+                    "placeholder": "Toute information complémentaire utile...",
+                }
+            ),
         }
         labels = {
             "nom_paroisse": "Nom de la paroisse",
@@ -278,8 +329,7 @@ class FicheParoisseForm(forms.ModelForm):
         if not village and not nouvelle_localite:
             self.add_error(
                 "nouvelle_localite_nom",
-                "Sélectionnez un village dans la liste, ou précisez le nom de la localité "
-                "si elle n'y figure pas.",
+                "Sélectionnez un village dans la liste, ou précisez le nom de la localité si elle n'y figure pas.",
             )
 
         region = cleaned_data.get("region")
@@ -341,6 +391,7 @@ class FicheParoisseForm(forms.ModelForm):
 # Motif de modification d'une fiche
 # ---------------------------------------------------------------------------
 
+
 class MotifModificationForm(forms.Form):
     """Motif obligatoire avant toute modification d'une fiche."""
 
@@ -349,11 +400,16 @@ class MotifModificationForm(forms.Form):
         min_length=10,
         max_length=1000,
         label="Motif de la modification",
-        widget=forms.Textarea(attrs={
-            "class": INPUT_CSS, "rows": 3, "minlength": 10, "maxlength": 1000,
-            "placeholder": "Expliquez pourquoi cette fiche doit être corrigée "
-                           "(ex : nom du chargé de paroisse mal orthographié par l'agent)...",
-        }),
+        widget=forms.Textarea(
+            attrs={
+                "class": INPUT_CSS,
+                "rows": 3,
+                "minlength": 10,
+                "maxlength": 1000,
+                "placeholder": "Expliquez pourquoi cette fiche doit être corrigée "
+                "(ex : nom du chargé de paroisse mal orthographié par l'agent)...",
+            }
+        ),
         error_messages={
             "required": "Le motif de la modification est obligatoire.",
             "min_length": "Merci de détailler un peu plus le motif (au moins 10 caractères).",
@@ -365,6 +421,7 @@ class MotifModificationForm(forms.Form):
 # ---------------------------------------------------------------------------
 # Photos de la paroisse
 # ---------------------------------------------------------------------------
+
 
 class PhotosParoisseForm(forms.Form):
     photos = MultipleImageField(

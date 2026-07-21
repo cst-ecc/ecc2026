@@ -10,11 +10,20 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from ..forms import FicheParoisseForm, MotifModificationForm, PhotosParoisseForm
 from ..models import (
-    District, FicheParoisse, HistoriqueModification, PhotoParoisse, Profil,
-    Province, Region, Zone,
+    District,
+    FicheParoisse,
+    HistoriqueModification,
+    PhotoParoisse,
+    Profil,
+    Province,
+    Region,
+    Zone,
 )
 from ..permissions import (
-    fiche_dans_perimetre, get_role, peut_modifier_fiche, peut_valider_fiche,
+    fiche_dans_perimetre,
+    get_role,
+    peut_modifier_fiche,
+    peut_valider_fiche,
     role_required,
 )
 from .helpers import _fiches_visibles_pour, _premiere_etape_en_erreur, _snapshot_fiche
@@ -59,14 +68,18 @@ def fiche_create(request):
         "village": form["village"].value(),
     }
 
-    return render(request, "recensement/fiche_form.html", {
-        "form": form,
-        "photos_form": photos_form,
-        "initial_ids_json": json.dumps(initial_ids),
-        "etape_erreur_json": json.dumps(etape_erreur),
-        "current_role": get_role(request.user),
-        "is_super_admin": get_role(request.user) == Profil.Role.SUPER_ADMIN,
-    })
+    return render(
+        request,
+        "recensement/fiche_form.html",
+        {
+            "form": form,
+            "photos_form": photos_form,
+            "initial_ids_json": json.dumps(initial_ids),
+            "etape_erreur_json": json.dumps(etape_erreur),
+            "current_role": get_role(request.user),
+            "is_super_admin": get_role(request.user) == Profil.Role.SUPER_ADMIN,
+        },
+    )
 
 
 @login_required
@@ -78,8 +91,6 @@ def fiche_update(request, pk):
     fiche = get_object_or_404(FicheParoisse, pk=pk)
 
     if not peut_modifier_fiche(request.user, fiche):
-        role = get_role(request.user)
-        profil = getattr(request.user, "profil", None)
         hors_perimetre = not fiche_dans_perimetre(request.user, fiche)
         if hors_perimetre:
             messages.error(request, "Cette fiche n'est pas dans votre périmètre (district/province).")
@@ -124,14 +135,18 @@ def fiche_update(request, pk):
         "village": fiche.village_id,
     }
 
-    return render(request, "recensement/fiche_edit_form.html", {
-        "form": form,
-        "motif_form": motif_form,
-        "fiche": fiche,
-        "initial_ids_json": json.dumps(initial_ids),
-        "current_role": get_role(request.user),
-        "is_super_admin": get_role(request.user) == Profil.Role.SUPER_ADMIN,
-    })
+    return render(
+        request,
+        "recensement/fiche_edit_form.html",
+        {
+            "form": form,
+            "motif_form": motif_form,
+            "fiche": fiche,
+            "initial_ids_json": json.dumps(initial_ids),
+            "current_role": get_role(request.user),
+            "is_super_admin": get_role(request.user) == Profil.Role.SUPER_ADMIN,
+        },
+    )
 
 
 @login_required
@@ -175,19 +190,13 @@ def fiche_list(request):
         statut_filtre = request.GET.get("statut", "")
 
         if statut_filtre == "attente_superviseur":
-            fiches = fiches.filter(
-                statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
-            )
+            fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR)
         elif statut_filtre == "attente_manager":
-            fiches = fiches.filter(
-                statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER
-            )
+            fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER)
         elif statut_filtre == "tous":
             pass
         else:
-            fiches = fiches.filter(
-                statut_validation=FicheParoisse.StatutValidation.VALIDEE
-            )
+            fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.VALIDEE)
             statut_filtre = "validees"
 
         def get_valid_id(param_name, model):
@@ -234,19 +243,13 @@ def fiche_list(request):
 
         paroisses_qs = _fiches_visibles_pour(request.user)
         if statut_filtre == "attente_superviseur":
-            paroisses_qs = paroisses_qs.filter(
-                statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
-            )
+            paroisses_qs = paroisses_qs.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR)
         elif statut_filtre == "attente_manager":
-            paroisses_qs = paroisses_qs.filter(
-                statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER
-            )
+            paroisses_qs = paroisses_qs.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER)
         elif statut_filtre == "tous":
             pass
         else:
-            paroisses_qs = paroisses_qs.filter(
-                statut_validation=FicheParoisse.StatutValidation.VALIDEE
-            )
+            paroisses_qs = paroisses_qs.filter(statut_validation=FicheParoisse.StatutValidation.VALIDEE)
 
         if zone_id:
             paroisses_qs = paroisses_qs.filter(zone_id=zone_id)
@@ -257,17 +260,10 @@ def fiche_list(request):
         elif region_id:
             paroisses_qs = paroisses_qs.filter(region_id=region_id)
 
-        paroisses = (
-            paroisses_qs
-            .order_by("nom_paroisse")
-            .values_list("nom_paroisse", flat=True)
-            .distinct()
-        )
+        paroisses = paroisses_qs.order_by("nom_paroisse").values_list("nom_paroisse", flat=True).distinct()
 
     context = {
-        "fiches": fiches.select_related(
-            "region", "province", "district", "zone", "cree_par"
-        )[:500],
+        "fiches": fiches.select_related("region", "province", "district", "zone", "cree_par")[:500],
         "regions": regions,
         "provinces": provinces,
         "districts": districts,

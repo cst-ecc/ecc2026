@@ -20,7 +20,6 @@ from .models import (
     Profil,
 )
 
-
 _RANG_ROLE = {
     Profil.Role.AGENT: 10,
     Profil.Role.OP_ZONE: 20,
@@ -33,6 +32,7 @@ _RANG_ROLE = {
 # ---------------------------------------------------------------------------
 # Rôle et profil
 # ---------------------------------------------------------------------------
+
 
 def get_role(user):
     if not getattr(user, "is_authenticated", False):
@@ -61,6 +61,7 @@ def est_strictement_subordonne(cible, responsable):
 # Périmètres effectifs
 # ---------------------------------------------------------------------------
 
+
 def districts_autorises(user):
     """Retourne les IDs des districts actifs de l'utilisateur.
 
@@ -79,10 +80,7 @@ def districts_autorises(user):
     if role == Profil.Role.OP_PROVINCE:
         if not profil.province_id:
             return set()
-        return set(
-            District.objects.filter(province_id=profil.province_id)
-            .values_list("id", flat=True)
-        )
+        return set(District.objects.filter(province_id=profil.province_id).values_list("id", flat=True))
 
     district_ids = set()
     if profil.district_id:
@@ -122,19 +120,13 @@ def zones_autorisees(user):
     if role == Profil.Role.OP_PROVINCE:
         if not profil.province_id:
             return set()
-        return set(
-            Zone.objects.filter(district__province_id=profil.province_id)
-            .values_list("id", flat=True)
-        )
+        return set(Zone.objects.filter(district__province_id=profil.province_id).values_list("id", flat=True))
 
     if role == Profil.Role.OP_DISTRICT:
         district_ids = districts_autorises(user)
         if not district_ids:
             return set()
-        return set(
-            Zone.objects.filter(district_id__in=district_ids)
-            .values_list("id", flat=True)
-        )
+        return set(Zone.objects.filter(district_id__in=district_ids).values_list("id", flat=True))
 
     zone_ids = set()
     if profil.zone_id:
@@ -179,9 +171,7 @@ def fiche_dans_perimetre(user, fiche):
 def fiches_visibles_pour(user):
     from .models import FicheParoisse
 
-    qs = FicheParoisse.objects.select_related(
-        "region", "province", "district", "zone", "village", "cree_par"
-    )
+    qs = FicheParoisse.objects.select_related("region", "province", "district", "zone", "village", "cree_par")
     role = get_role(user)
     if role == Profil.Role.SUPER_ADMIN:
         return qs
@@ -201,25 +191,27 @@ def fiches_visibles_pour(user):
 # Utilisateurs visibles et gestion hiérarchique
 # ---------------------------------------------------------------------------
 
+
 def utilisateurs_visibles_pour(user):
     """Utilisateurs strictement subordonnés et situés dans le périmètre actif."""
     role = get_role(user)
-    qs = User.objects.select_related(
-        "profil",
-        "profil__region",
-        "profil__province",
-        "profil__district",
-        "profil__zone",
-        "profil__cree_par",
-    ).prefetch_related("affectations_territoriales").order_by("username")
+    qs = (
+        User.objects.select_related(
+            "profil",
+            "profil__region",
+            "profil__province",
+            "profil__district",
+            "profil__zone",
+            "profil__cree_par",
+        )
+        .prefetch_related("affectations_territoriales")
+        .order_by("username")
+    )
 
     if role == Profil.Role.SUPER_ADMIN:
         return qs
 
-    roles_inferieurs = [
-        valeur for valeur, _ in Profil.Role.choices
-        if _RANG_ROLE.get(valeur, 0) < rang_role(user)
-    ]
+    roles_inferieurs = [valeur for valeur, _ in Profil.Role.choices if _RANG_ROLE.get(valeur, 0) < rang_role(user)]
     qs = qs.filter(profil__role__in=roles_inferieurs)
 
     profil = get_profil(user)
@@ -238,8 +230,7 @@ def utilisateurs_visibles_pour(user):
         if not district_ids:
             return qs.none()
         return qs.filter(
-            Q(profil__district_id__in=district_ids)
-            | Q(profil__zone__district_id__in=district_ids)
+            Q(profil__district_id__in=district_ids) | Q(profil__zone__district_id__in=district_ids)
         ).distinct()
 
     if role == Profil.Role.OP_ZONE:
@@ -276,11 +267,7 @@ def peut_attribuer_district(attributeur, cible, district):
     if role == Profil.Role.SUPER_ADMIN:
         return True
     profil = get_profil(attributeur)
-    return bool(
-        role == Profil.Role.OP_PROVINCE
-        and profil
-        and profil.province_id == district.province_id
-    )
+    return bool(role == Profil.Role.OP_PROVINCE and profil and profil.province_id == district.province_id)
 
 
 def peut_attribuer_zone(attributeur, cible, zone):
@@ -317,30 +304,26 @@ def peut_modifier_affectation(attributeur, affectation):
     if affectation.niveau == AffectationTerritoriale.Niveau.DISTRICT:
         return bool(
             affectation.district_id
-            and peut_attribuer_district(
-                attributeur, affectation.utilisateur, affectation.district
-            )
+            and peut_attribuer_district(attributeur, affectation.utilisateur, affectation.district)
         )
-    return bool(
-        affectation.zone_id
-        and peut_attribuer_zone(attributeur, affectation.utilisateur, affectation.zone)
-    )
+    return bool(affectation.zone_id and peut_attribuer_zone(attributeur, affectation.utilisateur, affectation.zone))
 
 
 # ---------------------------------------------------------------------------
 # Décorateurs et permissions sur les fiches
 # ---------------------------------------------------------------------------
 
+
 def role_required(*allowed_roles):
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped(request, *args, **kwargs):
             if get_role(request.user) not in allowed_roles:
-                raise PermissionDenied(
-                    "Vous n'avez pas les droits nécessaires pour accéder à cette page."
-                )
+                raise PermissionDenied("Vous n'avez pas les droits nécessaires pour accéder à cette page.")
             return view_func(request, *args, **kwargs)
+
         return _wrapped
+
     return decorator
 
 
@@ -435,6 +418,7 @@ def perimetre_creation_autorise(createur, profil_cible_data):
 # ---------------------------------------------------------------------------
 # Affectations supplémentaires et codification
 # ---------------------------------------------------------------------------
+
 
 def peut_affecter_zone(attributeur, zone):
     role = get_role(attributeur)

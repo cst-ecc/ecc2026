@@ -43,15 +43,14 @@ def role_context(request):
         "is_op_district": role == Profil.Role.OP_DISTRICT,
         "is_op_zone": role == Profil.Role.OP_ZONE,
         "is_agent": role == Profil.Role.AGENT,
-
         # Alias de compatibilité avec les anciens templates.
         "is_manager": role == Profil.Role.OP_PROVINCE,
         "is_superviseur": role == Profil.Role.OP_DISTRICT,
-
         # Droits dérivés pour l'interface.
         "peut_creer_fiche": role in (Profil.Role.AGENT, Profil.Role.SUPER_ADMIN),
         "peut_valider_fiches": role in (Profil.Role.OP_DISTRICT, Profil.Role.OP_PROVINCE),
-        "peut_voir_carte": role in (
+        "peut_voir_carte": role
+        in (
             Profil.Role.SUPER_ADMIN,
             Profil.Role.OP_PROVINCE,
             Profil.Role.OP_DISTRICT,
@@ -60,7 +59,6 @@ def role_context(request):
         "peut_gerer_utilisateurs": peut_gerer_utilisateurs,
         "peut_voir_historique_affectations": role == Profil.Role.SUPER_ADMIN,
         "nb_a_valider": nb_a_valider,
-
         # Périmètre utilisateur pour l'affichage dans les templates.
         "user_scope": _build_user_scope(user, role),
     }
@@ -131,10 +129,12 @@ def _build_user_scope(user, role):
         )
         aff_list = []
         for aff in actives:
-            aff_list.append({
-                "niveau": aff.get_niveau_display(),
-                "nom": aff.libelle_perimetre,
-            })
+            aff_list.append(
+                {
+                    "niveau": aff.get_niveau_display(),
+                    "nom": aff.libelle_perimetre,
+                }
+            )
         scope["affectations_sup"] = aff_list
         scope["nb_affectations_sup"] = len(aff_list)
 
@@ -143,12 +143,9 @@ def _build_user_scope(user, role):
         scope["couverture_label"] = "Accès global à l'ensemble du système"
     elif role == Profil.Role.OP_PROVINCE:
         from .models import District as DistrictModel
-        nb = DistrictModel.objects.filter(
-            province_id=profil.province_id
-        ).count() if profil.province_id else 0
-        scope["couverture_label"] = (
-            f"{nb} district{'s' if nb > 1 else ''} dans la province"
-        )
+
+        nb = DistrictModel.objects.filter(province_id=profil.province_id).count() if profil.province_id else 0
+        scope["couverture_label"] = f"{nb} district{'s' if nb > 1 else ''} dans la province"
     elif role == Profil.Role.OP_DISTRICT:
         d_ids = districts_autorises(user) or set()
         scope["couverture_label"] = (

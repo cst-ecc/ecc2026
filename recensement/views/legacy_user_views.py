@@ -33,7 +33,9 @@ from ..forms import ProfilForm, TailwindSetPasswordForm
 from ..identifiants import generer_identifiant, generer_mot_de_passe_provisoire
 from ..models import Profil, Province, Region
 from ..permissions import (
-    get_role, peut_creer_utilisateur, perimetre_creation_autorise,
+    get_role,
+    perimetre_creation_autorise,
+    peut_creer_utilisateur,
 )
 
 
@@ -48,8 +50,12 @@ def _utilisateurs_visibles_pour(user):
     """
     role = get_role(user)
     qs = User.objects.select_related(
-        "profil", "profil__region", "profil__province",
-        "profil__district", "profil__zone", "profil__cree_par",
+        "profil",
+        "profil__region",
+        "profil__province",
+        "profil__district",
+        "profil__zone",
+        "profil__cree_par",
     ).order_by("username")
 
     if role == Profil.Role.SUPER_ADMIN:
@@ -77,6 +83,7 @@ def utilisateur_list(request):
     """Liste des utilisateurs — accessible aux opérateurs habilités à créer."""
     if not peut_creer_utilisateur(request.user):
         from django.core.exceptions import PermissionDenied
+
         raise PermissionDenied("Vous n'avez pas les droits nécessaires pour accéder à cette page.")
 
     utilisateurs = _utilisateurs_visibles_pour(request.user)
@@ -101,17 +108,21 @@ def utilisateur_list(request):
         if filtre_zone.isdigit():
             utilisateurs = utilisateurs.filter(profil__zone_id=int(filtre_zone))
 
-    return render(request, "recensement/utilisateur_list.html", {
-        "utilisateurs": utilisateurs,
-        "roles": Profil.Role.choices,
-        "regions": Region.objects.all() if role == Profil.Role.SUPER_ADMIN else [],
-        "provinces": Province.objects.all() if role == Profil.Role.SUPER_ADMIN else [],
-        "filtre_role": filtre_role,
-        "filtre_region": filtre_region,
-        "filtre_province": filtre_province,
-        "filtre_district": filtre_district,
-        "filtre_zone": filtre_zone,
-    })
+    return render(
+        request,
+        "recensement/utilisateur_list.html",
+        {
+            "utilisateurs": utilisateurs,
+            "roles": Profil.Role.choices,
+            "regions": Region.objects.all() if role == Profil.Role.SUPER_ADMIN else [],
+            "provinces": Province.objects.all() if role == Profil.Role.SUPER_ADMIN else [],
+            "filtre_role": filtre_role,
+            "filtre_region": filtre_region,
+            "filtre_province": filtre_province,
+            "filtre_district": filtre_district,
+            "filtre_zone": filtre_zone,
+        },
+    )
 
 
 @login_required
@@ -125,6 +136,7 @@ def utilisateur_create(request):
     """
     if not peut_creer_utilisateur(request.user):
         from django.core.exceptions import PermissionDenied
+
         raise PermissionDenied("Vous n'avez pas les droits nécessaires.")
 
     if request.method == "POST":
@@ -138,19 +150,27 @@ def utilisateur_create(request):
 
             # Vérification du périmètre (sécurité serveur, ne se base pas
             # uniquement sur ce que le formulaire propose).
-            ok, msg = perimetre_creation_autorise(request.user, {
-                "region_id":   region.pk if region else None,
-                "province_id": province.pk if province else None,
-                "district_id": district.pk if district else None,
-                "zone_id":     zone.pk if zone else None,
-            })
+            ok, msg = perimetre_creation_autorise(
+                request.user,
+                {
+                    "region_id": region.pk if region else None,
+                    "province_id": province.pk if province else None,
+                    "district_id": district.pk if district else None,
+                    "zone_id": zone.pk if zone else None,
+                },
+            )
             if not ok:
                 messages.error(request, msg)
-                return render(request, "recensement/utilisateur_form.html", {
-                    "profil_form": profil_form, "is_edit": False,
-                    "regions": _regions_disponibles(request.user),
-                    "provinces": _provinces_disponibles(request.user),
-                })
+                return render(
+                    request,
+                    "recensement/utilisateur_form.html",
+                    {
+                        "profil_form": profil_form,
+                        "is_edit": False,
+                        "regions": _regions_disponibles(request.user),
+                        "provinces": _provinces_disponibles(request.user),
+                    },
+                )
 
             try:
                 with transaction.atomic():
@@ -185,11 +205,16 @@ def utilisateur_create(request):
 
             except ValueError as e:
                 messages.error(request, f"Erreur de génération de l'identifiant : {e}")
-                return render(request, "recensement/utilisateur_form.html", {
-                    "profil_form": profil_form, "is_edit": False,
-                    "regions": _regions_disponibles(request.user),
-                    "provinces": _provinces_disponibles(request.user),
-                })
+                return render(
+                    request,
+                    "recensement/utilisateur_form.html",
+                    {
+                        "profil_form": profil_form,
+                        "is_edit": False,
+                        "regions": _regions_disponibles(request.user),
+                        "provinces": _provinces_disponibles(request.user),
+                    },
+                )
 
             return redirect("recensement:utilisateur_created", pk=nouvel_utilisateur.pk)
 
@@ -197,12 +222,16 @@ def utilisateur_create(request):
     else:
         profil_form = ProfilForm(createur=request.user)
 
-    return render(request, "recensement/utilisateur_form.html", {
-        "profil_form": profil_form,
-        "is_edit": False,
-        "regions": _regions_disponibles(request.user),
-        "provinces": _provinces_disponibles(request.user),
-    })
+    return render(
+        request,
+        "recensement/utilisateur_form.html",
+        {
+            "profil_form": profil_form,
+            "is_edit": False,
+            "regions": _regions_disponibles(request.user),
+            "provinces": _provinces_disponibles(request.user),
+        },
+    )
 
 
 @login_required
@@ -216,6 +245,7 @@ def utilisateur_created(request, pk):
     """
     if not peut_creer_utilisateur(request.user):
         from django.core.exceptions import PermissionDenied
+
         raise PermissionDenied()
 
     utilisateur = get_object_or_404(User, pk=pk)
@@ -229,10 +259,14 @@ def utilisateur_created(request, pk):
     if mdp_username != utilisateur.username:
         mdp = None
 
-    return render(request, "recensement/utilisateur_created.html", {
-        "utilisateur": utilisateur,
-        "mdp_provisoire": mdp,
-    })
+    return render(
+        request,
+        "recensement/utilisateur_created.html",
+        {
+            "utilisateur": utilisateur,
+            "mdp_provisoire": mdp,
+        },
+    )
 
 
 @login_required
@@ -241,6 +275,7 @@ def utilisateur_update(request, pk):
     """Modification d'un utilisateur — accessible aux opérateurs habilités."""
     if not peut_creer_utilisateur(request.user):
         from django.core.exceptions import PermissionDenied
+
         raise PermissionDenied()
 
     utilisateur = get_object_or_404(_utilisateurs_visibles_pour(request.user), pk=pk)
@@ -249,18 +284,20 @@ def utilisateur_update(request, pk):
     if request.method == "POST":
         profil_form = ProfilForm(request.POST, instance=profil, createur=request.user)
         if profil_form.is_valid():
-            role_cible = profil_form.cleaned_data["role"]
             province = profil_form.cleaned_data.get("province")
             district = profil_form.cleaned_data.get("district")
             zone = profil_form.cleaned_data.get("zone")
             region = profil_form.cleaned_data.get("region")
 
-            ok, msg = perimetre_creation_autorise(request.user, {
-                "region_id":   region.pk if region else None,
-                "province_id": province.pk if province else None,
-                "district_id": district.pk if district else None,
-                "zone_id":     zone.pk if zone else None,
-            })
+            ok, msg = perimetre_creation_autorise(
+                request.user,
+                {
+                    "region_id": region.pk if region else None,
+                    "province_id": province.pk if province else None,
+                    "district_id": district.pk if district else None,
+                    "zone_id": zone.pk if zone else None,
+                },
+            )
             if not ok:
                 messages.error(request, msg)
             else:
@@ -275,15 +312,19 @@ def utilisateur_update(request, pk):
     else:
         profil_form = ProfilForm(instance=profil, createur=request.user)
 
-    return render(request, "recensement/utilisateur_form.html", {
-        "profil_form": profil_form,
-        "is_edit": True,
-        "utilisateur": utilisateur,
-        "regions": _regions_disponibles(request.user),
-        "provinces": _provinces_disponibles(request.user),
-        "province_du_district_id": profil.district.province_id if profil.district_id else None,
-        "zone_du_district_id": profil.zone.district_id if profil.zone_id else None,
-    })
+    return render(
+        request,
+        "recensement/utilisateur_form.html",
+        {
+            "profil_form": profil_form,
+            "is_edit": True,
+            "utilisateur": utilisateur,
+            "regions": _regions_disponibles(request.user),
+            "provinces": _provinces_disponibles(request.user),
+            "province_du_district_id": profil.district.province_id if profil.district_id else None,
+            "zone_du_district_id": profil.zone.district_id if profil.zone_id else None,
+        },
+    )
 
 
 @login_required
@@ -292,6 +333,7 @@ def utilisateur_reset_password(request, pk):
     """Réinitialisation du mot de passe — accessible aux opérateurs habilités."""
     if not peut_creer_utilisateur(request.user):
         from django.core.exceptions import PermissionDenied
+
         raise PermissionDenied()
 
     utilisateur = get_object_or_404(_utilisateurs_visibles_pour(request.user), pk=pk)
@@ -306,9 +348,14 @@ def utilisateur_reset_password(request, pk):
     else:
         form = TailwindSetPasswordForm(utilisateur)
 
-    return render(request, "recensement/utilisateur_reset_password.html", {
-        "form": form, "utilisateur": utilisateur,
-    })
+    return render(
+        request,
+        "recensement/utilisateur_reset_password.html",
+        {
+            "form": form,
+            "utilisateur": utilisateur,
+        },
+    )
 
 
 @login_required
@@ -317,6 +364,7 @@ def utilisateur_toggle_actif(request, pk):
     """Activation/désactivation d'un compte — accessible aux opérateurs habilités."""
     if not peut_creer_utilisateur(request.user):
         from django.core.exceptions import PermissionDenied
+
         raise PermissionDenied()
 
     utilisateur = get_object_or_404(_utilisateurs_visibles_pour(request.user), pk=pk)
@@ -337,6 +385,7 @@ def utilisateur_delete(request, pk):
     role = get_role(request.user)
     if role != Profil.Role.SUPER_ADMIN:
         from django.core.exceptions import PermissionDenied
+
         raise PermissionDenied()
 
     utilisateur = get_object_or_404(User, pk=pk)
@@ -356,6 +405,7 @@ def utilisateur_delete(request, pk):
 # ---------------------------------------------------------------------------
 # Helpers internes : périmètres disponibles selon le créateur
 # ---------------------------------------------------------------------------
+
 
 def _regions_disponibles(user):
     """Régions que le créateur connecté peut sélectionner pour un nouveau compte."""

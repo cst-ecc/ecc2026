@@ -22,7 +22,6 @@ import hashlib
 from django.db import transaction
 from django.utils import timezone
 
-
 # ---------------------------------------------------------------------------
 # Constantes
 # ---------------------------------------------------------------------------
@@ -34,6 +33,7 @@ ANNEE_PAR_DEFAUT = 2000
 # ---------------------------------------------------------------------------
 # Composition du code officiel
 # ---------------------------------------------------------------------------
+
 
 def _obtenir_annee_creation(fiche):
     """Retourne l'année de création de la paroisse."""
@@ -52,32 +52,31 @@ def _obtenir_codes_geographiques(fiche):
 
     if not fiche.region or not fiche.region.code:
         raise ValueError("Région manquante ou sans code.")
-    codes['region_code'] = fiche.region.code
+    codes["region_code"] = fiche.region.code
 
     if not fiche.province or not fiche.province.code:
         raise ValueError("Province manquante ou sans code.")
-    codes['province_code'] = fiche.province.code
+    codes["province_code"] = fiche.province.code
 
     if not fiche.district or not fiche.district.code:
         raise ValueError("District manquant ou sans code.")
-    codes['district_code'] = fiche.district.code
+    codes["district_code"] = fiche.district.code
 
     if not fiche.zone or not fiche.zone.code:
         raise ValueError("Zone manquante ou sans code.")
-    codes['zone_code'] = fiche.zone.code
+    codes["zone_code"] = fiche.zone.code
 
     # Village : soit référentiel avec code, soit fallback
     if fiche.village and fiche.village.code:
-        codes['village_code'] = fiche.village.code
+        codes["village_code"] = fiche.village.code
     elif fiche.village:
         from .models import FicheParoisse
-        village_num = FicheParoisse.objects.filter(
-            village=fiche.village, code_officiel__isnull=False
-        ).count() + 1
-        codes['village_code'] = f"Q{village_num:03d}"
+
+        village_num = FicheParoisse.objects.filter(village=fiche.village, code_officiel__isnull=False).count() + 1
+        codes["village_code"] = f"Q{village_num:03d}"
     elif fiche.nouvelle_localite_nom:
         h = int(hashlib.md5(fiche.nouvelle_localite_nom.encode()).hexdigest(), 16) % 999 + 1
-        codes['village_code'] = f"Q{h:03d}"
+        codes["village_code"] = f"Q{h:03d}"
     else:
         raise ValueError("Village ou localité manquant.")
 
@@ -94,10 +93,8 @@ def _obtenir_numero_enregistrement(fiche_id):
     """
     from .models import FicheParoisse
 
-    fiches_codifiees = (
-        FicheParoisse.objects
-        .filter(code_officiel__isnull=False)
-        .order_by('annee_fondation', 'date_validation_manager', 'id')
+    fiches_codifiees = FicheParoisse.objects.filter(code_officiel__isnull=False).order_by(
+        "annee_fondation", "date_validation_manager", "id"
     )
 
     rank = 1
@@ -132,20 +129,21 @@ def composer_code_officiel(fiche):
     )
 
     return code_officiel, {
-        'pays': CODE_PAYS_BENIN,
-        'annee': annee,
-        'region_code': codes_geo['region_code'],
-        'province_code': codes_geo['province_code'],
-        'district_code': codes_geo['district_code'],
-        'zone_code': codes_geo['zone_code'],
-        'village_code': codes_geo['village_code'],
-        'numero_enregistrement': numero,
+        "pays": CODE_PAYS_BENIN,
+        "annee": annee,
+        "region_code": codes_geo["region_code"],
+        "province_code": codes_geo["province_code"],
+        "district_code": codes_geo["district_code"],
+        "zone_code": codes_geo["zone_code"],
+        "village_code": codes_geo["village_code"],
+        "numero_enregistrement": numero,
     }
 
 
 # ---------------------------------------------------------------------------
 # Génération et persistance
 # ---------------------------------------------------------------------------
+
 
 @transaction.atomic
 def generer_code_paroisse(fiche, genere_par=None):
@@ -154,12 +152,11 @@ def generer_code_paroisse(fiche, genere_par=None):
     Idempotente : si le code existe déjà, le retourne sans modification.
     Lève ValueError si la paroisse n'est pas complètement validée.
     """
-    from .models import FicheParoisse, CodeParoisseHistorique
+    from .models import CodeParoisseHistorique, FicheParoisse
 
     if fiche.statut_validation != FicheParoisse.StatutValidation.VALIDEE:
         raise ValueError(
-            f"La fiche n'est pas complètement validée. "
-            f"Statut actuel : {fiche.get_statut_validation_display()}."
+            f"La fiche n'est pas complètement validée. Statut actuel : {fiche.get_statut_validation_display()}."
         )
 
     if fiche.code_officiel:
@@ -168,19 +165,15 @@ def generer_code_paroisse(fiche, genere_par=None):
     try:
         code_officiel, donnees_composition = composer_code_officiel(fiche)
     except ValueError as e:
-        raise ValueError(
-            f"Impossible de générer le code pour « {fiche.nom_paroisse} » : {e}"
-        ) from e
+        raise ValueError(f"Impossible de générer le code pour « {fiche.nom_paroisse} » : {e}") from e
 
     if FicheParoisse.objects.filter(code_officiel=code_officiel).exists():
-        raise ValueError(
-            f"Le code {code_officiel} est déjà attribué à une autre paroisse."
-        )
+        raise ValueError(f"Le code {code_officiel} est déjà attribué à une autre paroisse.")
 
     fiche.code_officiel = code_officiel
     fiche.date_generation_code = timezone.now()
     fiche.genere_par = genere_par
-    fiche.save(update_fields=['code_officiel', 'date_generation_code', 'genere_par'])
+    fiche.save(update_fields=["code_officiel", "date_generation_code", "genere_par"])
 
     CodeParoisseHistorique.objects.create(
         fiche=fiche,
@@ -204,7 +197,7 @@ def generer_codes_retroactifs(verbose=False):
     fiches_a_codifier = FicheParoisse.objects.filter(
         statut_validation=FicheParoisse.StatutValidation.VALIDEE,
         code_officiel__isnull=True,
-    ).order_by('annee_fondation', 'date_validation_manager', 'id')
+    ).order_by("annee_fondation", "date_validation_manager", "id")
 
     nb_generees = 0
     for fiche in fiches_a_codifier:

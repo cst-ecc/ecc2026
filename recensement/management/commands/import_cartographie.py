@@ -43,6 +43,7 @@ DEFAULT_FILE = settings.BASE_DIR / "recensement" / "data" / "cartographie_benin.
 # Fonctions de nettoyage du texte brut de la feuille Excel
 # ---------------------------------------------------------------------------
 
+
 def clean_region(text):
     """'BORGOU-ALIBORI (2ème Région ecclésiale)' -> ('BORGOU-ALIBORI', 2)"""
     text = text.strip()
@@ -58,25 +59,21 @@ def _strip_prefix(text, prefixes):
     low = text.lower()
     for p in prefixes:
         if low.startswith(p.lower()):
-            text = text[len(p):].strip()
+            text = text[len(p) :].strip()
             break
     return text
 
 
 def clean_province(text):
     """'↳ Province ecclésiale de Ouémé [Ouémé]' -> 'Ouémé'"""
-    text = _strip_prefix(
-        text, ["Province ecclésiale de ", "Province ecclésiale d'", "Province ecclésiale "]
-    )
+    text = _strip_prefix(text, ["Province ecclésiale de ", "Province ecclésiale d'", "Province ecclésiale "])
     text = re.sub(r"\s*\[.*?\]\s*$", "", text).strip()
     return text
 
 
 def clean_district(text):
     """'↳ District ecclésial de Porto-Novo (Porto-Novo)' -> 'Porto-Novo'"""
-    text = _strip_prefix(
-        text, ["District ecclésial de ", "District ecclésial d'", "District ecclésial "]
-    )
+    text = _strip_prefix(text, ["District ecclésial de ", "District ecclésial d'", "District ecclésial "])
     text = re.sub(r"\s*\(.*?\)\s*$", "", text).strip()
     return text
 
@@ -86,9 +83,7 @@ def clean_zone(text):
     '• Site de la nativité de SÈMÈ PLAGE' -> 'Site de la nativité de SÈMÈ PLAGE'
     (les 'Sites particuliers' gardent leur nom complet, seul le puce est retiré)."""
     text = text.strip().lstrip("•").strip()
-    text = _strip_prefix(
-        text, ["Zone ecclésiale de ", "Zone ecclésiale d'", "Zone ecclésiale "]
-    )
+    text = _strip_prefix(text, ["Zone ecclésiale de ", "Zone ecclésiale d'", "Zone ecclésiale "])
     return text
 
 
@@ -111,6 +106,7 @@ def split_villages(raw):
 # ---------------------------------------------------------------------------
 # Génération des codes courts après import
 # ---------------------------------------------------------------------------
+
 
 def _generer_codes(stdout, style):
     """
@@ -161,18 +157,21 @@ def _generer_codes(stdout, style):
             modifies["zones"] += 1
             compteur += 1
 
-    stdout.write(style.SUCCESS(
-        "Codes courts générés :\n"
-        f"  Régions    : {modifies['regions']}\n"
-        f"  Provinces  : {modifies['provinces']}\n"
-        f"  Districts  : {modifies['districts']}\n"
-        f"  Zones      : {modifies['zones']}"
-    ))
+    stdout.write(
+        style.SUCCESS(
+            "Codes courts générés :\n"
+            f"  Régions    : {modifies['regions']}\n"
+            f"  Provinces  : {modifies['provinces']}\n"
+            f"  Districts  : {modifies['districts']}\n"
+            f"  Zones      : {modifies['zones']}"
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
 # Commande Django
 # ---------------------------------------------------------------------------
+
 
 class Command(BaseCommand):
     help = (
@@ -183,19 +182,25 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--file", type=str, default=str(DEFAULT_FILE),
+            "--file",
+            type=str,
+            default=str(DEFAULT_FILE),
             help="Chemin vers le fichier Excel (par défaut : recensement/data/cartographie_benin.xlsx)",
         )
         parser.add_argument(
-            "--sheet", type=str, default=DEFAULT_SHEET,
+            "--sheet",
+            type=str,
+            default=DEFAULT_SHEET,
             help="Nom de la feuille à lire (par défaut : la feuille avec les villages).",
         )
         parser.add_argument(
-            "--dry-run", action="store_true",
+            "--dry-run",
+            action="store_true",
             help="Analyse le fichier et affiche le résumé sans rien écrire en base.",
         )
         parser.add_argument(
-            "--codes-seulement", action="store_true",
+            "--codes-seulement",
+            action="store_true",
             help=(
                 "Ne relance pas l'import Excel : génère uniquement les codes courts "
                 "sur les entités existantes qui n'en ont pas encore."
@@ -219,13 +224,15 @@ class Command(BaseCommand):
             raise CommandError(f"Fichier introuvable : {filepath}")
 
         if sheet_name not in wb.sheetnames:
-            raise CommandError(
-                f"Feuille '{sheet_name}' introuvable. Feuilles disponibles : {wb.sheetnames}"
-            )
+            raise CommandError(f"Feuille '{sheet_name}' introuvable. Feuilles disponibles : {wb.sheetnames}")
         ws = wb[sheet_name]
 
         stats = {
-            "regions": 0, "provinces": 0, "districts": 0, "zones": 0, "villages": 0,
+            "regions": 0,
+            "provinces": 0,
+            "districts": 0,
+            "zones": 0,
+            "villages": 0,
             "lignes_ignorees": 0,
         }
 
@@ -246,9 +253,7 @@ class Command(BaseCommand):
                         if not nom:
                             stats["lignes_ignorees"] += 1
                             continue
-                        region_obj, created = Region.objects.get_or_create(
-                            nom=nom, defaults={"ordre": ordre}
-                        )
+                        region_obj, created = Region.objects.get_or_create(nom=nom, defaults={"ordre": ordre})
                         if not created and region_obj.ordre != ordre and ordre:
                             region_obj.ordre = ordre
                             region_obj.save(update_fields=["ordre"])
@@ -268,9 +273,7 @@ class Command(BaseCommand):
                         if not nom:
                             stats["lignes_ignorees"] += 1
                             continue
-                        province_obj, created = Province.objects.get_or_create(
-                            region=current_region, nom=nom
-                        )
+                        province_obj, created = Province.objects.get_or_create(region=current_region, nom=nom)
                         if created:
                             stats["provinces"] += 1
                         current_province = province_obj
@@ -286,9 +289,7 @@ class Command(BaseCommand):
                         if not nom:
                             stats["lignes_ignorees"] += 1
                             continue
-                        district_obj, created = District.objects.get_or_create(
-                            province=current_province, nom=nom
-                        )
+                        district_obj, created = District.objects.get_or_create(province=current_province, nom=nom)
                         if created:
                             stats["districts"] += 1
                         current_district = district_obj
@@ -303,44 +304,38 @@ class Command(BaseCommand):
                         if not nom:
                             stats["lignes_ignorees"] += 1
                             continue
-                        zone_obj, created = Zone.objects.get_or_create(
-                            district=current_district, nom=nom
-                        )
+                        zone_obj, created = Zone.objects.get_or_create(district=current_district, nom=nom)
                         if created:
                             stats["zones"] += 1
 
                         for village_nom in split_villages(e):
                             village_nom = village_nom[:200]
-                            _, v_created = Village.objects.get_or_create(
-                                zone=zone_obj, nom=village_nom
-                            )
+                            _, v_created = Village.objects.get_or_create(zone=zone_obj, nom=village_nom)
                             if v_created:
                                 stats["villages"] += 1
                         continue
 
                 except Exception as exc:  # pragma: no cover
-                    self.stderr.write(
-                        self.style.WARNING(f"Ligne {i} ignorée ({exc}) : {row}")
-                    )
+                    self.stderr.write(self.style.WARNING(f"Ligne {i} ignorée ({exc}) : {row}"))
                     stats["lignes_ignorees"] += 1
 
             if dry_run:
                 transaction.savepoint_rollback(sid)
-                self.stdout.write(self.style.WARNING(
-                    "--dry-run : aucune donnée n'a été écrite en base."
-                ))
+                self.stdout.write(self.style.WARNING("--dry-run : aucune donnée n'a été écrite en base."))
             else:
                 transaction.savepoint_commit(sid)
 
-        self.stdout.write(self.style.SUCCESS(
-            "Import terminé :\n"
-            f"  Régions ajoutées   : {stats['regions']}\n"
-            f"  Provinces ajoutées : {stats['provinces']}\n"
-            f"  Districts ajoutés  : {stats['districts']}\n"
-            f"  Zones ajoutées     : {stats['zones']}\n"
-            f"  Villages ajoutés   : {stats['villages']}\n"
-            f"  Lignes ignorées    : {stats['lignes_ignorees']}"
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                "Import terminé :\n"
+                f"  Régions ajoutées   : {stats['regions']}\n"
+                f"  Provinces ajoutées : {stats['provinces']}\n"
+                f"  Districts ajoutés  : {stats['districts']}\n"
+                f"  Zones ajoutées     : {stats['zones']}\n"
+                f"  Villages ajoutés   : {stats['villages']}\n"
+                f"  Lignes ignorées    : {stats['lignes_ignorees']}"
+            )
+        )
 
         # Génération des codes courts (idempotente — ne touche pas les codes déjà renseignés)
         if not dry_run:

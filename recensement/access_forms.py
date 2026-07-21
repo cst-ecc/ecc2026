@@ -19,7 +19,6 @@ from .permissions import (
     zones_autorisees,
 )
 
-
 INPUT_CSS = (
     "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base "
     "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
@@ -79,11 +78,7 @@ class ProfilTerritorialForm(forms.ModelForm):
             return
 
         roles = roles_creables_par(responsable)
-        self.fields["role"].choices = [
-            (value, label)
-            for value, label in Profil.Role.choices
-            if value in roles
-        ]
+        self.fields["role"].choices = [(value, label) for value, label in Profil.Role.choices if value in roles]
 
         role_responsable = get_role(responsable)
         profil_responsable = getattr(responsable, "profil", None)
@@ -109,12 +104,8 @@ class ProfilTerritorialForm(forms.ModelForm):
             district_ids = districts_autorises(responsable) or set()
             districts = District.objects.filter(pk__in=district_ids)
             self.fields["district"].queryset = districts
-            self.fields["province"].queryset = Province.objects.filter(
-                districts__in=districts
-            ).distinct()
-            self.fields["region"].queryset = Region.objects.filter(
-                provinces__districts__in=districts
-            ).distinct()
+            self.fields["province"].queryset = Province.objects.filter(districts__in=districts).distinct()
+            self.fields["region"].queryset = Region.objects.filter(provinces__districts__in=districts).distinct()
             self.fields["zone"].queryset = Zone.objects.filter(district_id__in=district_ids)
 
         elif role_responsable == Profil.Role.OP_ZONE:
@@ -122,12 +113,8 @@ class ProfilTerritorialForm(forms.ModelForm):
             zones = Zone.objects.filter(pk__in=zone_ids)
             self.fields["zone"].queryset = zones
             self.fields["district"].queryset = District.objects.filter(zones__in=zones).distinct()
-            self.fields["province"].queryset = Province.objects.filter(
-                districts__zones__in=zones
-            ).distinct()
-            self.fields["region"].queryset = Region.objects.filter(
-                provinces__districts__zones__in=zones
-            ).distinct()
+            self.fields["province"].queryset = Province.objects.filter(districts__zones__in=zones).distinct()
+            self.fields["region"].queryset = Region.objects.filter(provinces__districts__zones__in=zones).distinct()
 
     def clean(self):
         cleaned = super().clean()
@@ -214,21 +201,27 @@ class ProfilTerritorialForm(forms.ModelForm):
                     "Retirez d'abord les affectations supplémentaires incompatibles avec le nouveau rôle.",
                 )
 
-            if district and affectations_non_revoquees.filter(
-                niveau=AffectationTerritoriale.Niveau.DISTRICT,
-                district=district,
-                statut=AffectationTerritoriale.Statut.ACTIVE,
-            ).exists():
+            if (
+                district
+                and affectations_non_revoquees.filter(
+                    niveau=AffectationTerritoriale.Niveau.DISTRICT,
+                    district=district,
+                    statut=AffectationTerritoriale.Statut.ACTIVE,
+                ).exists()
+            ):
                 self.add_error(
                     "district",
                     "Ce district est déjà une affectation supplémentaire active. Retirez-la avant d'en faire l'affectation principale.",
                 )
 
-            if zone and affectations_non_revoquees.filter(
-                niveau=AffectationTerritoriale.Niveau.ZONE,
-                zone=zone,
-                statut=AffectationTerritoriale.Statut.ACTIVE,
-            ).exists():
+            if (
+                zone
+                and affectations_non_revoquees.filter(
+                    niveau=AffectationTerritoriale.Niveau.ZONE,
+                    zone=zone,
+                    statut=AffectationTerritoriale.Statut.ACTIVE,
+                ).exists()
+            ):
                 self.add_error(
                     "zone",
                     "Cette zone est déjà une affectation supplémentaire active. Retirez-la avant d'en faire l'affectation principale.",

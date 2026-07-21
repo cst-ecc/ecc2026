@@ -22,19 +22,13 @@ def _fiches_export_filtrees(request):
     statut_filtre = request.GET.get("statut", "")
     if role == Profil.Role.SUPER_ADMIN:
         if statut_filtre == "attente_superviseur":
-            fiches = fiches.filter(
-                statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
-            )
+            fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR)
         elif statut_filtre == "attente_manager":
-            fiches = fiches.filter(
-                statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER
-            )
+            fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER)
         elif statut_filtre == "tous":
             pass
         else:
-            fiches = fiches.filter(
-                statut_validation=FicheParoisse.StatutValidation.VALIDEE
-            )
+            fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.VALIDEE)
 
     def valid_id(param_name):
         value = (request.GET.get(param_name) or "").strip()
@@ -57,10 +51,12 @@ def _fiches_export_filtrees(request):
     if paroisse:
         fiches = fiches.filter(nom_paroisse__icontains=paroisse)
 
-    return fiches.select_related(
-        "region", "province", "district", "zone", "village"
-    ).order_by(
-        "region__nom", "province__nom", "district__nom", "zone__nom", "nom_paroisse",
+    return fiches.select_related("region", "province", "district", "zone", "village").order_by(
+        "region__nom",
+        "province__nom",
+        "district__nom",
+        "zone__nom",
+        "nom_paroisse",
     )
 
 
@@ -82,9 +78,19 @@ def fiche_export_preview(request):
         hierarchy[region_nom][province_nom][district_nom].setdefault(zone_nom, [])
         hierarchy[region_nom][province_nom][district_nom][zone_nom].append(fiche)
 
-    region = Region.objects.filter(pk=request.GET.get("region")).first() if request.GET.get("region", "").isdigit() else None
-    province = Province.objects.filter(pk=request.GET.get("province")).first() if request.GET.get("province", "").isdigit() else None
-    district = District.objects.filter(pk=request.GET.get("district")).first() if request.GET.get("district", "").isdigit() else None
+    region = (
+        Region.objects.filter(pk=request.GET.get("region")).first() if request.GET.get("region", "").isdigit() else None
+    )
+    province = (
+        Province.objects.filter(pk=request.GET.get("province")).first()
+        if request.GET.get("province", "").isdigit()
+        else None
+    )
+    district = (
+        District.objects.filter(pk=request.GET.get("district")).first()
+        if request.GET.get("district", "").isdigit()
+        else None
+    )
     zone = Zone.objects.filter(pk=request.GET.get("zone")).first() if request.GET.get("zone", "").isdigit() else None
 
     filters = {
@@ -96,12 +102,16 @@ def fiche_export_preview(request):
         "paroisse": request.GET.get("paroisse", ""),
     }
 
-    return render(request, "recensement/fiche_export_preview.html", {
-        "hierarchy": hierarchy,
-        "total": total,
-        "filters": filters,
-        "query_string": request.GET.urlencode(),
-    })
+    return render(
+        request,
+        "recensement/fiche_export_preview.html",
+        {
+            "hierarchy": hierarchy,
+            "total": total,
+            "filters": filters,
+            "query_string": request.GET.urlencode(),
+        },
+    )
 
 
 @login_required
@@ -109,8 +119,9 @@ def fiche_export_preview(request):
 @require_GET
 def fiche_export_excel(request):
     from io import BytesIO
+
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
     fiches = _fiches_export_filtrees(request)
     wb = Workbook()
@@ -136,14 +147,16 @@ def fiche_export_excel(request):
         cell.border = border
 
     for fiche in fiches:
-        ws.append([
-            fiche.code_officiel or "Code officiel en attente",
-            fiche.region.nom if fiche.region else "",
-            fiche.province.nom if fiche.province else "",
-            fiche.district.nom if fiche.district else "",
-            fiche.zone.nom if fiche.zone else "",
-            fiche.nom_paroisse or "",
-        ])
+        ws.append(
+            [
+                fiche.code_officiel or "Code officiel en attente",
+                fiche.region.nom if fiche.region else "",
+                fiche.province.nom if fiche.province else "",
+                fiche.district.nom if fiche.district else "",
+                fiche.zone.nom if fiche.zone else "",
+                fiche.nom_paroisse or "",
+            ]
+        )
 
     for row in ws.iter_rows(min_row=2):
         for cell in row:

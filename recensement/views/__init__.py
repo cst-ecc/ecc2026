@@ -27,10 +27,22 @@ validation n'a été modifiée.
 """
 
 # --- Pages publiques / aiguillage -----------------------------------------
-from .public_views import landing, post_login_redirect
+# --- AJAX cascade ----------------------------------------------------------
+from .ajax_views import (
+    ajax_districts,
+    ajax_provinces,
+    ajax_villages,
+    ajax_zones,
+)
+
+# --- Carte -----------------------------------------------------------------
+from .carte_views import carte_paroisses, fiches_geojson
 
 # --- Tableau de bord -------------------------------------------------------
 from .dashboard_views import dashboard, suivi_modifications
+
+# --- Export ----------------------------------------------------------------
+from .export_views import fiche_export_excel, fiche_export_preview
 
 # --- Fiches de recensement -------------------------------------------------
 from .fiche_views import (
@@ -41,21 +53,14 @@ from .fiche_views import (
     fiche_update,
 )
 
-# --- Workflow de validation ------------------------------------------------
-from .validation_views import fiche_a_valider, fiche_valider
-
-# --- Carte -----------------------------------------------------------------
-from .carte_views import carte_paroisses, fiches_geojson
-
-# --- Export ----------------------------------------------------------------
-from .export_views import fiche_export_excel, fiche_export_preview
-
-# --- AJAX cascade ----------------------------------------------------------
-from .ajax_views import (
-    ajax_districts,
-    ajax_provinces,
-    ajax_villages,
-    ajax_zones,
+# --- Helpers internes (réexportés pour compat des imports existants) -------
+from .helpers import (
+    _CHAMP_VERS_ETAPE,
+    _CSV_FORMULA_PREFIXES,
+    _csv_safe,
+    _fiches_visibles_pour,
+    _premiere_etape_en_erreur,
+    _snapshot_fiche,
 )
 
 # --- Vues « utilisateur » héritées (non routées, compat import) ------------
@@ -68,23 +73,10 @@ from .legacy_user_views import (
     utilisateur_toggle_actif,
     utilisateur_update,
 )
+from .public_views import landing, post_login_redirect
 
-# --- Helpers internes (réexportés pour compat des imports existants) -------
-from .helpers import (
-    _CHAMP_VERS_ETAPE,
-    _CSV_FORMULA_PREFIXES,
-    _csv_safe,
-    _fiches_visibles_pour,
-    _premiere_etape_en_erreur,
-    _snapshot_fiche,
-)
-from .export_views import _fiches_export_filtrees
-from .legacy_user_views import (
-    _provinces_disponibles,
-    _regions_disponibles,
-    _utilisateurs_visibles_pour,
-)
-
+# --- Workflow de validation ------------------------------------------------
+from .validation_views import fiche_a_valider, fiche_valider
 
 __all__ = [
     # Pages publiques

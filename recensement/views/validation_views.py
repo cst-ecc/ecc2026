@@ -37,9 +37,9 @@ def fiche_a_valider(request):
             province_id=profil.province_id if profil else None,
         )
 
-    fiches = fiches.select_related(
-        "region", "province", "district", "zone", "village", "cree_par"
-    ).order_by("date_recensement")
+    fiches = fiches.select_related("region", "province", "district", "zone", "village", "cree_par").order_by(
+        "date_recensement"
+    )
 
     return render(request, "recensement/fiche_a_valider.html", {"fiches": fiches, "role": role})
 
@@ -57,21 +57,24 @@ def fiche_valider(request, pk):
     """
     fiche = get_object_or_404(FicheParoisse, pk=pk)
     role = get_role(request.user)
-    profil = getattr(request.user, "profil", None)
 
     if not peut_valider_fiche(request.user, fiche):
-        messages.error(request, "Cette fiche n'est pas en attente de votre validation ou se trouve hors de votre périmètre.")
+        messages.error(
+            request, "Cette fiche n'est pas en attente de votre validation ou se trouve hors de votre périmètre."
+        )
         return redirect("recensement:fiche_a_valider")
 
     if role == Profil.Role.OP_DISTRICT:
         fiche.statut_validation = FicheParoisse.StatutValidation.ATTENTE_MANAGER
         fiche.valide_par_superviseur = request.user
         fiche.date_validation_superviseur = timezone.now()
-        fiche.save(update_fields=[
-            "statut_validation",
-            "valide_par_superviseur",
-            "date_validation_superviseur",
-        ])
+        fiche.save(
+            update_fields=[
+                "statut_validation",
+                "valide_par_superviseur",
+                "date_validation_superviseur",
+            ]
+        )
         messages.success(
             request,
             f"Fiche « {fiche.nom_paroisse} » validée, transmise à l'OP PROVINCE.",
@@ -83,23 +86,23 @@ def fiche_valider(request, pk):
                 fiche.statut_validation = FicheParoisse.StatutValidation.VALIDEE
                 fiche.valide_par_manager = request.user
                 fiche.date_validation_manager = timezone.now()
-                fiche.save(update_fields=[
-                    "statut_validation",
-                    "valide_par_manager",
-                    "date_validation_manager",
-                ])
+                fiche.save(
+                    update_fields=[
+                        "statut_validation",
+                        "valide_par_manager",
+                        "date_validation_manager",
+                    ]
+                )
                 code = generer_code_paroisse(fiche, genere_par=request.user)
 
             messages.success(
                 request,
-                f"Fiche « {fiche.nom_paroisse} » validée définitivement. "
-                f"Code officiel généré : {code}.",
+                f"Fiche « {fiche.nom_paroisse} » validée définitivement. Code officiel généré : {code}.",
             )
         except ValueError as exc:
             messages.error(
                 request,
-                "La validation finale n'a pas été enregistrée, car le code officiel "
-                f"n'a pas pu être généré : {exc}",
+                f"La validation finale n'a pas été enregistrée, car le code officiel n'a pas pu être généré : {exc}",
             )
 
     return redirect("recensement:fiche_a_valider")

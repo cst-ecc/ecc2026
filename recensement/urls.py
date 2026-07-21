@@ -18,17 +18,14 @@ urlpatterns = [
     path("fiche/<int:pk>/", views.fiche_detail, name="fiche_detail"),
     path("fiche/<int:pk>/modifier/", views.fiche_update, name="fiche_update"),
     path("fiche/<int:pk>/supprimer/", views.fiche_delete, name="fiche_delete"),
-
     # Workflow de validation hiérarchique (superviseur puis manager)
     path("a-valider/", views.fiche_a_valider, name="fiche_a_valider"),
     path("fiche/<int:pk>/valider/", views.fiche_valider, name="fiche_valider"),
-
     # Endpoints AJAX pour les listes en cascade
     path("ajax/provinces/<int:region_id>/", views.ajax_provinces, name="ajax_provinces"),
     path("ajax/districts/<int:province_id>/", views.ajax_districts, name="ajax_districts"),
     path("ajax/zones/<int:district_id>/", views.ajax_zones, name="ajax_zones"),
     path("ajax/villages/<int:zone_id>/", views.ajax_villages, name="ajax_villages"),
-
     # Gestion hiérarchique des comptes et accès territoriaux
     path("utilisateurs/", access_views.utilisateur_list, name="utilisateur_list"),
     path("utilisateurs/nouveau/", access_views.utilisateur_create, name="utilisateur_create"),
@@ -41,7 +38,15 @@ urlpatterns = [
         name="affectation_action",
     ),
     path("utilisateurs/historique-affectations/", access_views.historique_affectations, name="historique_affectations"),
-    path("utilisateurs/<int:pk>/mot-de-passe/", access_views.utilisateur_reset_password, name="utilisateur_reset_password"),
-    path("utilisateurs/<int:pk>/activer-desactiver/", access_views.utilisateur_toggle_actif, name="utilisateur_toggle_actif"),
+    path(
+        "utilisateurs/<int:pk>/mot-de-passe/",
+        access_views.utilisateur_reset_password,
+        name="utilisateur_reset_password",
+    ),
+    path(
+        "utilisateurs/<int:pk>/activer-desactiver/",
+        access_views.utilisateur_toggle_actif,
+        name="utilisateur_toggle_actif",
+    ),
     path("utilisateurs/<int:pk>/supprimer/", access_views.utilisateur_delete, name="utilisateur_delete"),
 ]

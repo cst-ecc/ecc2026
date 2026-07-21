@@ -14,10 +14,10 @@ import re
 from django import forms
 from django.core.exceptions import ValidationError
 
-
 # ---------------------------------------------------------------------------
 # Validation téléphonique internationale
 # ---------------------------------------------------------------------------
+
 
 def valider_telephone_international(value):
     """Accepte tout numéro national ou international (E.164 informel).
@@ -33,13 +33,10 @@ def valider_telephone_international(value):
         chiffres = numero_normalise
     if not chiffres.isdigit():
         raise ValidationError(
-            "Numéro de téléphone invalide. Saisissez un numéro valide "
-            "avec ou sans indicatif international."
+            "Numéro de téléphone invalide. Saisissez un numéro valide avec ou sans indicatif international."
         )
     if len(chiffres) < 6 or len(chiffres) > 15:
-        raise ValidationError(
-            "Numéro de téléphone invalide. Le numéro doit contenir entre 6 et 15 chiffres."
-        )
+        raise ValidationError("Numéro de téléphone invalide. Le numéro doit contenir entre 6 et 15 chiffres.")
 
 
 MAX_ANNEE_FONDATION = 2100
@@ -55,11 +52,7 @@ def valider_image(fichier):
     nom = getattr(fichier, "name", "") or ""
     extension = nom.rsplit(".", 1)[-1].lower() if "." in nom else ""
     if extension not in EXTENSIONS_IMAGE_AUTORISEES:
-        raise forms.ValidationError(
-            f"« {nom} » : format non autorisé (jpg, jpeg, png ou webp uniquement)."
-        )
+        raise forms.ValidationError(f"« {nom} » : format non autorisé (jpg, jpeg, png ou webp uniquement).")
     taille = getattr(fichier, "size", 0) or 0
     if taille > TAILLE_MAX_IMAGE_OCTETS:
-        raise forms.ValidationError(
-            f"« {nom} » dépasse la taille maximale autorisée (5 Mo)."
-        )
+        raise forms.ValidationError(f"« {nom} » dépasse la taille maximale autorisée (5 Mo).")

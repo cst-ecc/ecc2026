@@ -63,8 +63,9 @@ def _contexte_formulaire(request, *, profil_form, utilisateur=None, is_edit=Fals
             .order_by("-date_attribution")
         )
         historique = list(
-            HistoriqueAffectationTerritoriale.objects.filter(utilisateur=utilisateur)
-            .select_related("effectue_par", "affectation")[:100]
+            HistoriqueAffectationTerritoriale.objects.filter(utilisateur=utilisateur).select_related(
+                "effectue_par", "affectation"
+            )[:100]
         )
 
     return {
@@ -78,8 +79,7 @@ def _contexte_formulaire(request, *, profil_form, utilisateur=None, is_edit=Fals
             affectation_form
             and affectation_form.niveau
             and any(
-                field_name in affectation_form.fields
-                and affectation_form.fields[field_name].queryset.exists()
+                field_name in affectation_form.fields and affectation_form.fields[field_name].queryset.exists()
                 for field_name in ("district", "zone")
             )
         ),
@@ -351,9 +351,9 @@ def historique_affectations(request):
     if get_role(request.user) != Profil.Role.SUPER_ADMIN:
         raise PermissionDenied("Seul le super administrateur peut consulter l'historique global.")
 
-    historique = HistoriqueAffectationTerritoriale.objects.select_related(
-        "utilisateur", "effectue_par", "affectation"
-    )[:1000]
+    historique = HistoriqueAffectationTerritoriale.objects.select_related("utilisateur", "effectue_par", "affectation")[
+        :1000
+    ]
     return render(
         request,
         "recensement/historique_affectations.html",

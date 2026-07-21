@@ -25,7 +25,6 @@ from django.db import transaction
 
 from .models import Profil
 
-
 # ---------------------------------------------------------------------------
 # Suffixes de rôle dans l'identifiant
 # ---------------------------------------------------------------------------
@@ -33,8 +32,8 @@ _SUFFIXE_ROLE = {
     Profil.Role.SUPER_ADMIN: "SA",
     Profil.Role.OP_PROVINCE: "OPP",
     Profil.Role.OP_DISTRICT: "OPD",
-    Profil.Role.OP_ZONE:     "OPZ",
-    Profil.Role.AGENT:       "AG",
+    Profil.Role.OP_ZONE: "OPZ",
+    Profil.Role.AGENT: "AG",
 }
 
 
@@ -49,10 +48,7 @@ def _prochain_numero(prefixe):
     """
     # Pattern : le username commence par le préfixe puis des chiffres
     utilisateurs_existants = (
-        User.objects
-        .select_for_update()
-        .filter(username__startswith=prefixe)
-        .values_list("username", flat=True)
+        User.objects.select_for_update().filter(username__startswith=prefixe).values_list("username", flat=True)
     )
 
     max_num = 0
@@ -126,10 +122,7 @@ def generer_identifiant(role, region=None, province=None, district=None, zone=No
     elif role == Profil.Role.OP_DISTRICT:
         if not region or not province or not district:
             raise ValueError("OP DISTRICT nécessite une région, une province et un district.")
-        prefixe = (
-            f"{_code_region(region)}-{_code_province(province)}"
-            f"-{_code_district(district)}-OPD"
-        )
+        prefixe = f"{_code_region(region)}-{_code_province(province)}-{_code_district(district)}-OPD"
 
     elif role in (Profil.Role.OP_ZONE, Profil.Role.AGENT):
         if not region or not province or not district or not zone:

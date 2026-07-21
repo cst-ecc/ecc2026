@@ -10,13 +10,12 @@ comportement est strictement inchangé — seul l'emplacement a changé, afin
 qu'un formulaire donné puisse importer uniquement ce dont il a besoin.
 """
 
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django import forms
 from django.core.exceptions import ValidationError
 
 from .validators import valider_image
-
 
 # ---------------------------------------------------------------------------
 # Classes Tailwind communes
@@ -32,6 +31,7 @@ SELECT_CSS = INPUT_CSS + " bg-white"
 # ---------------------------------------------------------------------------
 # Champs spécialisés
 # ---------------------------------------------------------------------------
+
 
 class GPSDecimalField(forms.DecimalField):
     """Champ décimal qui normalise automatiquement une valeur GPS."""
@@ -49,8 +49,7 @@ class GPSDecimalField(forms.DecimalField):
             return decimal_value.quantize(self.quantizer, rounding=ROUND_HALF_UP)
         except (InvalidOperation, ValueError, TypeError):
             raise ValidationError(
-                "La position GPS reçue n'est pas exploitable. "
-                "Veuillez relancer la géolocalisation.",
+                "La position GPS reçue n'est pas exploitable. Veuillez relancer la géolocalisation.",
                 code="invalid_gps",
             )
 
