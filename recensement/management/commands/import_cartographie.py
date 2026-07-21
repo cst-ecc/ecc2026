@@ -221,7 +221,7 @@ class Command(BaseCommand):
         try:
             wb = openpyxl.load_workbook(filepath, data_only=True)
         except FileNotFoundError:
-            raise CommandError(f"Fichier introuvable : {filepath}")
+            raise CommandError(f"Fichier introuvable : {filepath}") from None
 
         if sheet_name not in wb.sheetnames:
             raise CommandError(f"Feuille '{sheet_name}' introuvable. Feuilles disponibles : {wb.sheetnames}")

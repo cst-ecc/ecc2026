@@ -42,7 +42,11 @@ from .carte_views import carte_paroisses, fiches_geojson
 from .dashboard_views import dashboard, suivi_modifications
 
 # --- Export ----------------------------------------------------------------
-from .export_views import fiche_export_excel, fiche_export_preview
+from .export_views import (  # noqa: F401
+    _fiches_export_filtrees,
+    fiche_export_excel,
+    fiche_export_preview,
+)
 
 # --- Fiches de recensement -------------------------------------------------
 from .fiche_views import (
@@ -54,7 +58,7 @@ from .fiche_views import (
 )
 
 # --- Helpers internes (réexportés pour compat des imports existants) -------
-from .helpers import (
+from .helpers import (  # noqa: F401
     _CHAMP_VERS_ETAPE,
     _CSV_FORMULA_PREFIXES,
     _csv_safe,
@@ -64,7 +68,10 @@ from .helpers import (
 )
 
 # --- Vues « utilisateur » héritées (non routées, compat import) ------------
-from .legacy_user_views import (
+from .legacy_user_views import (  # noqa: F401
+    _provinces_disponibles,
+    _regions_disponibles,
+    _utilisateurs_visibles_pour,
     utilisateur_create,
     utilisateur_created,
     utilisateur_delete,

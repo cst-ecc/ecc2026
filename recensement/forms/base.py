@@ -51,7 +51,7 @@ class GPSDecimalField(forms.DecimalField):
             raise ValidationError(
                 "La position GPS reçue n'est pas exploitable. Veuillez relancer la géolocalisation.",
                 code="invalid_gps",
-            )
+            ) from None
 
 
 class MultipleFileInput(forms.ClearableFileInput):

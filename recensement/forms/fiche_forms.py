@@ -317,7 +317,7 @@ class FicheParoisseForm(forms.ModelForm):
         value = (self.cleaned_data.get("observations") or "").strip()
         if len(value) > 2000:
             raise forms.ValidationError(
-                "Les observations sont limitées à 2000 caractères (actuellement %d)." % len(value)
+                f"Les observations sont limitées à 2000 caractères (actuellement {len(value)})."
             )
         return value
 
