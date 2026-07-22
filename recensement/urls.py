@@ -1,6 +1,6 @@
 from django.urls import path
 
-from recensement.views.healthcheck import healthcheck
+from recensement.healthcheck import healthcheck
 
 from . import access_views, views
 
