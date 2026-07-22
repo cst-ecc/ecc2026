@@ -1,11 +1,12 @@
 from django.urls import path
 
 from . import access_views, views
+from recensement.views.healthcheck import healthcheck
 
 app_name = "recensement"
 
 urlpatterns = [
-    path("healthcheck/", views.healthcheck, name="healthcheck"),
+    path("healthcheck/", healthcheck, name="healthcheck"),
     path("", views.landing, name="landing"),
     path("apres-connexion/", views.post_login_redirect, name="post_login_redirect"),
     path("tableau-de-bord/", views.dashboard, name="dashboard"),
