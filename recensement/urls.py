@@ -1,7 +1,8 @@
 from django.urls import path
 
-from . import access_views, views
 from recensement.views.healthcheck import healthcheck
+
+from . import access_views, views
 
 app_name = "recensement"
 
