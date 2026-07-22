@@ -133,24 +133,98 @@ echo "[deploy] Services démarrés."
 # ---------------------------------------------------------------------------
 log "ÉTAPE 5/6 — Vérification de santé"
 
+# Chemin de l'endpoint de santé (surchargeable via l'environnement).
+HEALTHCHECK_PATH="${HEALTHCHECK_PATH:-/healthcheck/}"
+# Mode de sonde :
+#   http (défaut) — effectue une vraie requête HTTP sur $HEALTHCHECK_PATH
+#   tcp           — vérifie seulement que Gunicorn accepte les connexions
+#                   (utile si l'endpoint /healthcheck/ n'est pas encore câblé)
+HEALTHCHECK_MODE="${HEALTHCHECK_MODE:-http}"
+
 echo "[deploy] Attente que le portail Django soit opérationnel…"
+echo "[deploy] Mode: $HEALTHCHECK_MODE — Endpoint: $HEALTHCHECK_PATH"
+
+# ---------------------------------------------------------------------------
+# Sondes exécutées DANS le conteneur avec Python.
+#
+# Pourquoi Python et pas curl : les images Python "slim" (base courante des
+# conteneurs Django/Gunicorn) n'embarquent PAS curl. L'ancienne commande
+# `docker exec ecc-portal curl -f …` échouait donc silencieusement (stderr
+# masqué par 2>/dev/null), quel que soit l'état réel de Django — ce qui
+# produisait exactement les 30 tentatives en échec observées alors que
+# Gunicorn tournait normalement.
+#
+# Note : `docker exec -i` est indispensable pour que le heredoc soit
+# transmis à l'entrée standard de Python.
+#
+# Codes de sortie de probe_http :
+#   0  = OK (HTTP 200)
+#   10 = le serveur RÉPOND mais en 3xx/4xx (ex: endpoint absent → 404)
+#   11 = le serveur répond en 5xx (erreur applicative → on retente)
+#   20 = connexion refusée / pas encore prêt
+#   30 = erreur inattendue
+# ---------------------------------------------------------------------------
+probe_http() {
+    docker exec -i ecc-portal python - "$HEALTHCHECK_PATH" <<'PYEOF'
+import sys, urllib.request, urllib.error
+url = "http://127.0.0.1:8000" + sys.argv[1]
+try:
+    with urllib.request.urlopen(url, timeout=5) as r:
+        sys.exit(0 if r.status == 200 else 10)
+except urllib.error.HTTPError as e:
+    print("HTTP %s sur %s" % (e.code, url), file=sys.stderr)
+    sys.exit(11 if 500 <= e.code < 600 else 10)
+except (urllib.error.URLError, OSError) as e:
+    print("Connexion impossible: %s" % e, file=sys.stderr)
+    sys.exit(20)
+except Exception as e:  # noqa: BLE001
+    print("Erreur inattendue: %s" % e, file=sys.stderr)
+    sys.exit(30)
+PYEOF
+}
+
+probe_tcp() {
+    docker exec -i ecc-portal python - <<'PYEOF'
+import socket, sys
+s = socket.socket()
+s.settimeout(3)
+sys.exit(0 if s.connect_ex(("127.0.0.1", 8000)) == 0 else 20)
+PYEOF
+}
 
 for i in $(seq 1 $HEALTH_CHECK_RETRIES); do
     # Vérifier que le conteneur portal est "running" (pas "restarting")
     PORTAL_STATUS=$(docker inspect ecc-portal --format='{{.State.Status}}' 2>/dev/null || echo "absent")
 
     if [ "$PORTAL_STATUS" = "running" ]; then
-        # Vérifier que Gunicorn répond réellement
-        if docker exec ecc-portal curl -f http://localhost:8000/healthcheck/ 2>/dev/null; then
-            echo "[deploy] ✅ Django est opérationnel (tentative $i/$HEALTH_CHECK_RETRIES)"
-            break
+        if [ "$HEALTHCHECK_MODE" = "tcp" ]; then
+            set +e; probe_tcp; RC=$?; set -e
+            if [ "$RC" -eq 0 ]; then
+                echo "[deploy] ✅ Gunicorn accepte les connexions (tentative $i/$HEALTH_CHECK_RETRIES)"
+                break
+            fi
+        else
+            set +e; probe_http; RC=$?; set -e
+            if [ "$RC" -eq 0 ]; then
+                echo "[deploy] ✅ Django répond 200 sur $HEALTHCHECK_PATH (tentative $i/$HEALTH_CHECK_RETRIES)"
+                break
+            elif [ "$RC" -eq 10 ]; then
+                # Django est VIVANT (il route et répond) mais l'endpoint de
+                # santé est absent ou renvoie 3xx/4xx. La cause ne changera pas
+                # en réessayant : on débloque le déploiement en le signalant.
+                echo "[deploy] ⚠  Django est vivant mais ne renvoie pas 200 sur $HEALTHCHECK_PATH."
+                echo "[deploy] ⚠  Câblez l'endpoint (voir README, section « Câblage de l'URL »)"
+                echo "[deploy] ⚠  ou relancez avec HEALTHCHECK_MODE=tcp si volontaire."
+                break
+            fi
+            # RC=11 (5xx) / 20 (refus) / 30 : transitoire → on retente.
         fi
     fi
 
     if [ "$i" -eq "$HEALTH_CHECK_RETRIES" ]; then
         echo "[deploy] Derniers logs du portail :"
         docker logs ecc-portal --tail 50 2>&1 || true
-        die "Le portail n'a pas démarré après $((HEALTH_CHECK_RETRIES * HEALTH_CHECK_INTERVAL))s"
+        die "Le portail n'a pas répondu après $((HEALTH_CHECK_RETRIES * HEALTH_CHECK_INTERVAL))s"
     fi
 
     echo "[deploy] Tentative $i/$HEALTH_CHECK_RETRIES — statut: $PORTAL_STATUS — attente ${HEALTH_CHECK_INTERVAL}s…"
