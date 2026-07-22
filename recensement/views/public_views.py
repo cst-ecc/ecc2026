@@ -1,13 +1,11 @@
 """Pages publiques et aiguillage après connexion."""
 
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
-from django.shortcuts import redirect, render
 from django.db import connection
 from django.http import JsonResponse
+from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
-
 
 from ..models import Profil
 from ..permissions import get_role
