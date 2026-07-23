@@ -1,0 +1,23 @@
+{{ niveau_relance_label|default:"Relance" }} — validation en attente
+
+Bonjour {{ destinataire_nom|default:"" }},
+
+{{ message_principal|default:"Une relance vous a été adressée concernant une fiche en attente." }}
+
+Détails :
+- Niveau : {{ niveau_relance_label|default:"Relance" }}
+- Fiche concernée : {{ fiche.nom_paroisse|default:"—" }}
+- Nombre de fiches concernées : {{ nb_fiches_concernees|default:"1" }}
+- Périmètre : {{ perimetre|default:"—" }}
+- Zone : {{ fiche.zone.nom|default:"—" }}
+- District : {{ fiche.district.nom|default:"—" }}
+- Auteur de la relance : {{ auteur|default:"Système" }}
+- Date : {{ date_relance|date:"d/m/Y à H:i" }}
+
+Action attendue :
+{{ message_action|default:"Merci de vous connecter à la plateforme pour traiter les fiches en attente." }}
+
+{% if action_url %}Lien : {{ action_url }}{% endif %}
+
+Cet e-mail a été généré automatiquement par la Plateforme ECC.
+Merci de ne pas répondre directement à ce message.

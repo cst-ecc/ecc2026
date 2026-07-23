@@ -1,0 +1,15 @@
+{% extends "recensement/emails/base_email.html" %}
+
+{% block content %}
+  {% include "recensement/emails/includes/email_badge.html" with badge_label=statut_label|default:"Validation" %}
+
+  <h1 style="margin:18px 0 10px 0; font-size:24px; line-height:1.25; color:#0f172a;">
+    {{ email_title|default:"Mise à jour de validation" }}
+  </h1>
+
+  <p style="margin:0 0 18px 0; font-size:15px; line-height:1.7; color:#334155;">
+    {{ message_principal|default:"Une fiche de recensement a changé de statut." }}
+  </p>
+
+  {% include "recensement/emails/includes/email_button.html" %}
+{% endblock %}

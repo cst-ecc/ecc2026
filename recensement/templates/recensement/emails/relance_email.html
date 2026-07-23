@@ -1,0 +1,65 @@
+{% extends "recensement/emails/base_email.html" %}
+
+{% block content %}
+  {% include "recensement/emails/includes/email_badge.html" with badge_label=niveau_relance_label %}
+
+  <h1 style="margin:18px 0 10px 0; font-size:24px; line-height:1.25; color:#0f172a;">
+    {{ email_title|default:"Vous avez une validation en attente" }}
+  </h1>
+
+  <p style="margin:0 0 16px 0; font-size:15px; line-height:1.7; color:#334155;">
+    Bonjour {{ destinataire_nom|default:"" }},
+  </p>
+
+  <p style="margin:0 0 18px 0; font-size:15px; line-height:1.7; color:#334155;">
+    {{ message_principal|default:"Une relance vous a été adressée concernant une fiche en attente." }}
+  </p>
+
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e2e8f0; border-radius:14px; overflow:hidden; margin:20px 0;">
+    <tr>
+      <td style="background:#f8fafc; padding:12px 16px; font-size:13px; font-weight:700; color:#334155;">
+        Détails de la relance
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:8px 16px 14px 16px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-bottom:1px solid #f1f5f9;">
+          <tr><td style="padding:10px 0; width:42%; font-size:13px; color:#64748b;">Niveau</td><td style="padding:10px 0; font-size:13px; color:#0f172a; font-weight:600;">{{ niveau_relance_label|default:"Relance" }}</td></tr>
+        </table>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-bottom:1px solid #f1f5f9;">
+          <tr><td style="padding:10px 0; width:42%; font-size:13px; color:#64748b;">Fiche concernée</td><td style="padding:10px 0; font-size:13px; color:#0f172a; font-weight:600;">{{ fiche.nom_paroisse|default:"—" }}</td></tr>
+        </table>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-bottom:1px solid #f1f5f9;">
+          <tr><td style="padding:10px 0; width:42%; font-size:13px; color:#64748b;">Nombre de fiches</td><td style="padding:10px 0; font-size:13px; color:#0f172a; font-weight:600;">{{ nb_fiches_concernees|default:"1" }}</td></tr>
+        </table>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-bottom:1px solid #f1f5f9;">
+          <tr><td style="padding:10px 0; width:42%; font-size:13px; color:#64748b;">Périmètre</td><td style="padding:10px 0; font-size:13px; color:#0f172a; font-weight:600;">{{ perimetre|default:"—" }}</td></tr>
+        </table>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-bottom:1px solid #f1f5f9;">
+          <tr><td style="padding:10px 0; width:42%; font-size:13px; color:#64748b;">Zone / District</td><td style="padding:10px 0; font-size:13px; color:#0f172a; font-weight:600;">{{ fiche.zone.nom|default:"—" }}{% if fiche.district %} — {{ fiche.district.nom }}{% endif %}</td></tr>
+        </table>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-bottom:1px solid #f1f5f9;">
+          <tr><td style="padding:10px 0; width:42%; font-size:13px; color:#64748b;">Auteur de la relance</td><td style="padding:10px 0; font-size:13px; color:#0f172a; font-weight:600;">{{ auteur|default:"Système" }}</td></tr>
+        </table>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+          <tr><td style="padding:10px 0; width:42%; font-size:13px; color:#64748b;">Date</td><td style="padding:10px 0; font-size:13px; color:#0f172a; font-weight:600;">{{ date_relance|date:"d/m/Y à H:i" }}</td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <div style="margin:20px 0; border-left:4px solid #f59e0b; background:#fffbeb; border-radius:12px; padding:14px 16px;">
+    <div style="font-size:13px; line-height:1.6; color:#92400e;">
+      {{ message_action|default:"Merci de vous connecter à la plateforme pour traiter les fiches en attente." }}
+    </div>
+  </div>
+
+  {% include "recensement/emails/includes/email_button.html" %}
+
+  {% if action_url %}
+    <p style="margin:0 0 18px 0; font-size:12px; line-height:1.6; color:#64748b;">
+      Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>
+      <span style="word-break:break-all;">{{ action_url }}</span>
+    </p>
+  {% endif %}
+{% endblock %}

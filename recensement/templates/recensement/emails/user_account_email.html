@@ -1,0 +1,15 @@
+{% extends "recensement/emails/base_email.html" %}
+
+{% block content %}
+  {% include "recensement/emails/includes/email_badge.html" with badge_label="Compte utilisateur" %}
+
+  <h1 style="margin:18px 0 10px 0; font-size:24px; line-height:1.25; color:#0f172a;">
+    {{ email_title|default:"Information de compte" }}
+  </h1>
+
+  <p style="margin:0 0 18px 0; font-size:15px; line-height:1.7; color:#334155;">
+    {{ message_principal|default:"Une information liée à votre compte utilisateur est disponible." }}
+  </p>
+
+  {% include "recensement/emails/includes/email_button.html" %}
+{% endblock %}

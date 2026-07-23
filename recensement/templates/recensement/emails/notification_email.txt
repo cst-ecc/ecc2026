@@ -1,0 +1,9 @@
+{{ email_title|default:"Notification" }}
+
+{% if destinataire_nom %}Bonjour {{ destinataire_nom }},{% endif %}
+
+{{ message_principal|default:"Vous avez reçu une notification de la plateforme." }}
+
+{% if action_url %}Lien : {{ action_url }}{% endif %}
+
+Cet e-mail a été généré automatiquement par la Plateforme ECC.

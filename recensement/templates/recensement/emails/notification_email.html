@@ -1,0 +1,27 @@
+{% extends "recensement/emails/base_email.html" %}
+
+{% block content %}
+  {% include "recensement/emails/includes/email_badge.html" with badge_label="Notification" %}
+
+  <h1 style="margin:18px 0 10px 0; font-size:24px; line-height:1.25; color:#0f172a;">
+    {{ email_title|default:"Notification" }}
+  </h1>
+
+  {% if destinataire_nom %}
+    <p style="margin:0 0 16px 0; font-size:15px; line-height:1.7; color:#334155;">
+      Bonjour {{ destinataire_nom }},
+    </p>
+  {% endif %}
+
+  <p style="margin:0 0 18px 0; font-size:15px; line-height:1.7; color:#334155;">
+    {{ message_principal|default:"Vous avez reçu une notification de la plateforme." }}
+  </p>
+
+  {% include "recensement/emails/includes/email_button.html" %}
+
+  {% if action_url %}
+    <p style="margin:0 0 18px 0; font-size:12px; line-height:1.6; color:#64748b;">
+      Lien direct : <span style="word-break:break-all;">{{ action_url }}</span>
+    </p>
+  {% endif %}
+{% endblock %}
