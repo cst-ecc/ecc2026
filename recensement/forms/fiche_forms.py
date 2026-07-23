@@ -43,17 +43,17 @@ class FicheParoisseForm(forms.ModelForm):
         widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_province"}),
     )
     district = forms.ModelChoiceField(
-        queryset=District.objects.all(),
+        queryset=District.objects.filter(est_sites_particuliers=False),
         label="District ecclésial",
         widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_district"}),
     )
     zone = forms.ModelChoiceField(
-        queryset=Zone.objects.all(),
+        queryset=Zone.objects.filter(district__est_sites_particuliers=False),
         label="Zone ecclésiale",
         widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_zone"}),
     )
     village = forms.ModelChoiceField(
-        queryset=Village.objects.all(),
+        queryset=Village.objects.filter(zone__district__est_sites_particuliers=False),
         required=False,
         label="Village / quartier",
         widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_village"}),
@@ -83,7 +83,10 @@ class FicheParoisseForm(forms.ModelForm):
             return
 
         zone_ids = zones_autorisees(user) or set()
-        zones_qs = Zone.objects.filter(pk__in=zone_ids).select_related("district__province__region").order_by("nom")
+        zones_qs = Zone.objects.filter(
+            pk__in=zone_ids,
+            district__est_sites_particuliers=False,
+        ).select_related("district__province__region").order_by("nom")
 
         self.fields["zone"].queryset = zones_qs
         self.fields["district"].queryset = District.objects.filter(zones__in=zones_qs).distinct().order_by("nom")
@@ -93,7 +96,10 @@ class FicheParoisseForm(forms.ModelForm):
         self.fields["region"].queryset = (
             Region.objects.filter(provinces__districts__zones__in=zones_qs).distinct().order_by("ordre", "nom")
         )
-        self.fields["village"].queryset = Village.objects.filter(zone_id__in=zone_ids).order_by("nom")
+        self.fields["village"].queryset = Village.objects.filter(
+            zone_id__in=zone_ids,
+            zone__district__est_sites_particuliers=False,
+        ).order_by("nom")
 
         # Une seule zone effective : préremplissage complet. Le verrouillage
         # visuel est appliqué dans cascade.js, tandis que la validation serveur

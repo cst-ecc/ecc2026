@@ -1,0 +1,88 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}{{ site.nom }} — Site particulier{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-5 flex-wrap gap-2">
+  <div>
+    <h1 class="text-xl font-semibold text-slate-900">{{ site.nom }}</h1>
+    <span class="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 text-xs font-medium">
+      {{ site.get_type_site_display }}
+    </span>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="{% url 'recensement:site_particulier_update' site.pk %}"
+       class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg px-4 py-2.5">
+      Modifier
+    </a>
+    <a href="{% url 'recensement:site_particulier_list' %}"
+       class="border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg px-4 py-2.5">
+      ← Retour à la liste
+    </a>
+  </div>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6">
+  <div class="app-card p-5 space-y-4">
+    <h2 class="text-sm font-semibold text-slate-800 border-b border-slate-100 pb-2">Informations générales</h2>
+    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+      <dt class="text-slate-500">Pays</dt>
+      <dd class="text-slate-900">{{ site.pays|default:"—" }}</dd>
+      <dt class="text-slate-500">Localité</dt>
+      <dd class="text-slate-900">{{ site.localite|default:"—" }}</dd>
+      <dt class="text-slate-500">Statut</dt>
+      <dd class="text-slate-900">{{ site.statut|default:"—" }}</dd>
+      <dt class="text-slate-500">Responsable</dt>
+      <dd class="text-slate-900">{{ site.responsable|default:"—" }}</dd>
+      <dt class="text-slate-500">Contact</dt>
+      <dd class="text-slate-900">{{ site.contact_responsable|default:"—" }}</dd>
+    </dl>
+  </div>
+
+  <div class="app-card p-5 space-y-4">
+    <h2 class="text-sm font-semibold text-slate-800 border-b border-slate-100 pb-2">Géolocalisation</h2>
+    {% if site.latitude and site.longitude %}
+    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+      <dt class="text-slate-500">Latitude</dt>
+      <dd class="text-slate-900">{{ site.latitude }}</dd>
+      <dt class="text-slate-500">Longitude</dt>
+      <dd class="text-slate-900">{{ site.longitude }}</dd>
+      {% if site.precision_gps %}
+      <dt class="text-slate-500">Précision</dt>
+      <dd class="text-slate-900">{{ site.precision_gps }} m</dd>
+      {% endif %}
+    </dl>
+    {% else %}
+    <p class="text-sm text-slate-400">Coordonnées GPS non renseignées.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if site.description or site.informations_historiques or site.observations %}
+<div class="app-card p-5 mt-6 space-y-4">
+  {% if site.description %}
+  <div>
+    <h2 class="text-sm font-semibold text-slate-800 mb-1">Description</h2>
+    <p class="text-sm text-slate-700 whitespace-pre-line">{{ site.description }}</p>
+  </div>
+  {% endif %}
+  {% if site.informations_historiques %}
+  <div>
+    <h2 class="text-sm font-semibold text-slate-800 mb-1">Informations historiques ou liturgiques</h2>
+    <p class="text-sm text-slate-700 whitespace-pre-line">{{ site.informations_historiques }}</p>
+  </div>
+  {% endif %}
+  {% if site.observations %}
+  <div>
+    <h2 class="text-sm font-semibold text-slate-800 mb-1">Observations</h2>
+    <p class="text-sm text-slate-700 whitespace-pre-line">{{ site.observations }}</p>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="mt-6 text-xs text-slate-400">
+  Créé le {{ site.date_creation|date:"d/m/Y à H:i" }}{% if site.cree_par %} par {{ site.cree_par.get_full_name|default:site.cree_par.get_username }}{% endif %}.
+  Dernière modification le {{ site.date_modification|date:"d/m/Y à H:i" }}{% if site.modifie_par %} par {{ site.modifie_par.get_full_name|default:site.modifie_par.get_username }}{% endif %}.
+</div>
+{% endblock %}

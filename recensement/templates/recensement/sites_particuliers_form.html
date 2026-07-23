@@ -1,0 +1,116 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}{% if is_edit %}Modifier {{ site.nom }}{% else %}Nouveau site particulier{% endif %}{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+  <h1 class="text-xl font-semibold text-slate-900">
+    {% if is_edit %}Modifier le site : {{ site.nom }}{% else %}Ajouter un site particulier{% endif %}
+  </h1>
+  <p class="text-sm text-slate-500 mt-0.5">
+    Les sites particuliers sont gérés séparément du recensement des paroisses ordinaires.
+  </p>
+</div>
+
+<form method="post" class="app-card p-5 space-y-6">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+      {% for error in form.non_field_errors %}
+        <p>{{ error }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <fieldset>
+    <legend class="text-sm font-semibold text-slate-800 mb-3">Identification</legend>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label for="id_nom" class="block text-xs font-medium text-slate-600 mb-1">Nom du site *</label>
+        {{ form.nom }}
+        {% if form.nom.errors %}<p class="text-xs text-red-600 mt-1">{{ form.nom.errors.0 }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_type_site" class="block text-xs font-medium text-slate-600 mb-1">Type de site</label>
+        {{ form.type_site }}
+      </div>
+      <div>
+        <label for="id_pays" class="block text-xs font-medium text-slate-600 mb-1">Pays</label>
+        {{ form.pays }}
+      </div>
+      <div>
+        <label for="id_localite" class="block text-xs font-medium text-slate-600 mb-1">Localité</label>
+        {{ form.localite }}
+      </div>
+      <div>
+        <label for="id_statut" class="block text-xs font-medium text-slate-600 mb-1">Statut</label>
+        {{ form.statut }}
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend class="text-sm font-semibold text-slate-800 mb-3">Responsable</legend>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label for="id_responsable" class="block text-xs font-medium text-slate-600 mb-1">Responsable de référence</label>
+        {{ form.responsable }}
+      </div>
+      <div>
+        <label for="id_contact_responsable" class="block text-xs font-medium text-slate-600 mb-1">Contact du responsable</label>
+        {{ form.contact_responsable }}
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend class="text-sm font-semibold text-slate-800 mb-3">Détails</legend>
+    <div class="space-y-4">
+      <div>
+        <label for="id_description" class="block text-xs font-medium text-slate-600 mb-1">Description</label>
+        {{ form.description }}
+      </div>
+      <div>
+        <label for="id_informations_historiques" class="block text-xs font-medium text-slate-600 mb-1">Informations historiques ou liturgiques</label>
+        {{ form.informations_historiques }}
+      </div>
+      <div>
+        <label for="id_observations" class="block text-xs font-medium text-slate-600 mb-1">Observations</label>
+        {{ form.observations }}
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend class="text-sm font-semibold text-slate-800 mb-3">Géolocalisation (facultatif)</legend>
+    <div class="grid md:grid-cols-3 gap-4">
+      <div>
+        <label for="id_latitude" class="block text-xs font-medium text-slate-600 mb-1">Latitude</label>
+        {{ form.latitude }}
+        {% if form.latitude.errors %}<p class="text-xs text-red-600 mt-1">{{ form.latitude.errors.0 }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_longitude" class="block text-xs font-medium text-slate-600 mb-1">Longitude</label>
+        {{ form.longitude }}
+        {% if form.longitude.errors %}<p class="text-xs text-red-600 mt-1">{{ form.longitude.errors.0 }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_precision_gps" class="block text-xs font-medium text-slate-600 mb-1">Précision (m)</label>
+        {{ form.precision_gps }}
+      </div>
+    </div>
+  </fieldset>
+
+  <div class="flex items-center justify-between gap-2 flex-wrap pt-4 border-t border-slate-100">
+    <a href="{% if is_edit %}{% url 'recensement:site_particulier_detail' site.pk %}{% else %}{% url 'recensement:site_particulier_list' %}{% endif %}"
+       class="border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg px-4 py-2.5">
+      Annuler
+    </a>
+    <button type="submit"
+            class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg px-5 py-2.5">
+      {% if is_edit %}Enregistrer les modifications{% else %}Créer le site{% endif %}
+    </button>
+  </div>
+</form>
+{% endblock %}

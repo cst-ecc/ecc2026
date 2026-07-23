@@ -442,3 +442,13 @@ def peut_intervenir_sur_code_paroisse(user):
 
 def peut_voir_historique_codes(user):
     return get_role(user) == Profil.Role.SUPER_ADMIN
+
+
+# ---------------------------------------------------------------------------
+# Sites particuliers
+# ---------------------------------------------------------------------------
+
+
+def peut_gerer_sites_particuliers(user):
+    """Seul le super administrateur peut gérer les sites particuliers."""
+    return get_role(user) == Profil.Role.SUPER_ADMIN

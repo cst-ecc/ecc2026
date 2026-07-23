@@ -66,6 +66,14 @@ from .relances_views import (
     relances_liste,
 )
 
+# --- Sites particuliers -------------------------------------------------------
+from .sites_particuliers_views import (
+    site_particulier_create,
+    site_particulier_detail,
+    site_particulier_list,
+    site_particulier_update,
+)
+
 # --- Vues « utilisateur » héritées (non routées, compat import) ------------
 from .legacy_user_views import (
     utilisateur_create,
@@ -125,6 +133,11 @@ __all__ = [
     "relances_liste",
     "relance_lancer",
     "relance_intervention_super_admin",
+    # Sites particuliers
+    "site_particulier_list",
+    "site_particulier_detail",
+    "site_particulier_create",
+    "site_particulier_update",
     # Vues utilisateur héritées (non routées)
     "utilisateur_list",
     "utilisateur_create",

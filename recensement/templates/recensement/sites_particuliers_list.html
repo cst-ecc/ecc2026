@@ -1,0 +1,61 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}Sites particuliers{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-5 flex-wrap gap-2">
+  <div>
+    <h1 class="text-xl font-semibold text-slate-900">Sites particuliers ({{ total }})</h1>
+    <p class="text-sm text-slate-500 mt-0.5">
+      Sites ecclésiaux sous l'autorité directe du Siège mondial, gérés hors du circuit de recensement ordinaire.
+    </p>
+  </div>
+  <a href="{% url 'recensement:site_particulier_create' %}"
+     class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg px-4 py-2.5">
+    + Nouveau site
+  </a>
+</div>
+
+<div class="overflow-x-auto app-card">
+  <table class="min-w-full text-sm app-table">
+    <thead class="bg-brand-800 text-white text-left">
+      <tr>
+        <th class="px-4 py-3 font-medium">Nom</th>
+        <th class="px-4 py-3 font-medium">Type</th>
+        <th class="px-4 py-3 font-medium">Pays</th>
+        <th class="px-4 py-3 font-medium">Localité</th>
+        <th class="px-4 py-3 font-medium">Statut</th>
+        <th class="px-4 py-3 font-medium">Responsable</th>
+        <th class="px-4 py-3 font-medium">Dernière modification</th>
+        <th class="px-4 py-3 font-medium">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for site in sites %}
+      <tr class="hover:bg-slate-50">
+        <td class="px-4 py-3 font-medium text-slate-900">
+          <a href="{% url 'recensement:site_particulier_detail' site.pk %}" class="text-brand-600 hover:underline">{{ site.nom }}</a>
+        </td>
+        <td class="px-4 py-3">{{ site.get_type_site_display }}</td>
+        <td class="px-4 py-3">{{ site.pays|default:"—" }}</td>
+        <td class="px-4 py-3">{{ site.localite|default:"—" }}</td>
+        <td class="px-4 py-3">{{ site.statut|default:"—" }}</td>
+        <td class="px-4 py-3">{{ site.responsable|default:"—" }}</td>
+        <td class="px-4 py-3 whitespace-nowrap text-slate-500">{{ site.date_modification|date:"d/m/Y H:i" }}</td>
+        <td class="px-4 py-3 whitespace-nowrap">
+          <a href="{% url 'recensement:site_particulier_detail' site.pk %}" class="text-brand-600 hover:underline text-xs">Consulter</a>
+          <span class="text-slate-300 mx-1">|</span>
+          <a href="{% url 'recensement:site_particulier_update' site.pk %}" class="text-brand-600 hover:underline text-xs">Modifier</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8" class="text-center text-slate-400 py-8">
+          Aucun site particulier enregistré.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

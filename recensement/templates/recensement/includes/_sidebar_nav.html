@@ -34,5 +34,13 @@
   <div class="sidebar-submenu"><a href="{% url 'recensement:utilisateur_list' %}" class="sidebar-link {% if 'utilisateur' in url_name or 'affectation' in url_name %}is-active{% endif %}">Utilisateurs subordonnés</a></div>
 </details>
 {% endif %}
+{% if peut_gerer_sites_particuliers %}
+<details class="sidebar-group" {% if 'site_particulier' in url_name %}open{% endif %}>
+  <summary class="sidebar-summary"><span>Sites particuliers</span><span aria-hidden="true">›</span></summary>
+  <div class="sidebar-submenu">
+    <a href="{% url 'recensement:site_particulier_list' %}" class="sidebar-link {% if 'site_particulier' in url_name %}is-active{% endif %}">Gestion des sites</a>
+  </div>
+</details>
+{% endif %}
 {% if is_super_admin %}<a href="/admin/" target="_blank" rel="noopener" class="sidebar-link mt-2">Référentiel géographique</a>{% endif %}
 {% endwith %}

@@ -61,4 +61,10 @@ urlpatterns = [
         views.relance_intervention_super_admin,
         name="relance_intervention_super_admin",
     ),
+
+    # Sites particuliers (gestion séparée du recensement ordinaire)
+    path("sites-particuliers/", views.site_particulier_list, name="site_particulier_list"),
+    path("sites-particuliers/ajouter/", views.site_particulier_create, name="site_particulier_create"),
+    path("sites-particuliers/<int:pk>/", views.site_particulier_detail, name="site_particulier_detail"),
+    path("sites-particuliers/<int:pk>/modifier/", views.site_particulier_update, name="site_particulier_update"),
 ]

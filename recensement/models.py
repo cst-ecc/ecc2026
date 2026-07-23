@@ -126,6 +126,11 @@ class District(models.Model):
         blank=True,
         help_text="Code court stable pour les identifiants (ex : D01, D02…). Généré automatiquement si laissé vide.",
     )
+    est_sites_particuliers = models.BooleanField(
+        default=False,
+        help_text="Marque ce district comme réservé aux sites particuliers "
+        "(exclu des cascades et du recensement ordinaire).",
+    )
 
     class Meta:
         unique_together = ("province", "nom")
@@ -972,18 +977,9 @@ class HistoriqueAffectationTerritoriale(models.Model):
 # Relances de validation (système à 3 niveaux avant intervention super admin)
 # ---------------------------------------------------------------------------
 
+
 class RelanceValidation(models.Model):
-    """État des relances pour une fiche en attente de validation.
-
-    Une ligne est créée au moment de la première relance sur une fiche
-    (via ``relances.lancer_relance``). Tant qu'aucune relance n'a été
-    lancée, l'absence de ligne équivaut à « 0 relance, action immédiatement
-    disponible » (voir ``relances.etat_relance``).
-
-    Règle des délais (imposée par ``recensement.relances``, pas par ce
-    modèle) : 7 jours après la 1ère relance, 3 jours après la 2e, puis
-    1 jour après la 3e avant que le super administrateur puisse intervenir.
-    """
+    """État des relances pour une fiche en attente de validation."""
 
     fiche = models.OneToOneField(
         FicheParoisse,
@@ -1040,3 +1036,85 @@ class HistoriqueRelance(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} — {self.fiche.nom_paroisse} — {self.date_action:%d/%m/%Y %H:%M}"
+
+
+# ---------------------------------------------------------------------------
+# Sites particuliers (gestion séparée du circuit de recensement ordinaire)
+# ---------------------------------------------------------------------------
+
+
+class TypeSiteParticulier(models.TextChoices):
+    CATHEDRALE = "cathedrale", "Cathédrale"
+    BASILIQUE = "basilique", "Basilique"
+    SITE_NATIVITE = "site_nativite", "Site de la Nativité"
+    PAROISSE_MERE = "paroisse_mere", "Paroisse Mère"
+    AUTRE = "autre", "Autre"
+
+
+class SiteParticulier(models.Model):
+    """Site ecclésial particulier, géré en dehors du circuit de recensement
+    ordinaire. Ces sites (cathédrales, basiliques, sites de pèlerinage…) sont
+    sous l'autorité directe du Siège mondial et ne dépendent pas de la
+    hiérarchie Région→Province→District→Zone utilisée pour les paroisses.
+    """
+
+    nom = models.CharField(max_length=200)
+    type_site = models.CharField(
+        max_length=30,
+        choices=TypeSiteParticulier.choices,
+        default=TypeSiteParticulier.AUTRE,
+        verbose_name="Type de site",
+    )
+    pays = models.CharField(max_length=100, blank=True, verbose_name="Pays")
+    localite = models.CharField(
+        max_length=200, blank=True, verbose_name="Localité"
+    )
+    description = models.TextField(blank=True)
+    responsable = models.CharField(
+        max_length=200, blank=True, verbose_name="Responsable de référence"
+    )
+    contact_responsable = models.CharField(
+        max_length=50, blank=True, verbose_name="Contact du responsable"
+    )
+    statut = models.CharField(
+        max_length=50, blank=True,
+        help_text="État actuel du site (ouvert, en travaux, fermé…).",
+    )
+    observations = models.TextField(blank=True)
+    informations_historiques = models.TextField(
+        blank=True, verbose_name="Informations historiques ou liturgiques"
+    )
+
+    # --- Géolocalisation (facultative) ---
+    latitude = models.DecimalField(
+        max_digits=10, decimal_places=7, null=True, blank=True,
+        validators=[MinValueValidator(-90), MaxValueValidator(90)],
+    )
+    longitude = models.DecimalField(
+        max_digits=10, decimal_places=7, null=True, blank=True,
+        validators=[MinValueValidator(-180), MaxValueValidator(180)],
+    )
+    precision_gps = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+    )
+
+    # --- Traçabilité ---
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="sites_particuliers_crees",
+    )
+    modifie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="sites_particuliers_modifies",
+    )
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nom"]
+        verbose_name = "Site particulier"
+        verbose_name_plural = "Sites particuliers"
+
+    def __str__(self):
+        return self.nom
