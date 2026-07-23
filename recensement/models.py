@@ -961,6 +961,7 @@ class HistoriqueAffectationTerritoriale(models.Model):
         related_name="actions_affectations_territoriales",
     )
     role_effecteur = models.CharField(max_length=20, blank=True)
+
     date_action = models.DateTimeField(auto_now_add=True)
     motif = models.TextField(blank=True)
 
@@ -972,6 +973,61 @@ class HistoriqueAffectationTerritoriale(models.Model):
     def __str__(self):
         return f"{self.get_action_display()} — {self.utilisateur.get_username()} — {self.date_action:%d/%m/%Y %H:%M}"
 
+
+
+
+class NotificationInterne(models.Model):
+    """Notification interne affichée dans l'application."""
+
+    TYPE_RELANCE_VALIDATION = "relance_validation"
+
+    destinataire = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications_internes",
+    )
+    titre = models.CharField(max_length=200)
+    message = models.TextField()
+    type_notification = models.CharField(max_length=50, default=TYPE_RELANCE_VALIDATION)
+    niveau = models.CharField(max_length=30, blank=True)
+    fiche = models.ForeignKey(
+        FicheParoisse,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notifications_relance",
+    )
+    url_cible = models.CharField(max_length=300, blank=True)
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications_creees",
+    )
+    est_lue = models.BooleanField(default=False)
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_lecture = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-date_creation", "-id"]
+        verbose_name = "Notification interne"
+        verbose_name_plural = "Notifications internes"
+        indexes = [
+            models.Index(fields=["destinataire", "est_lue"], name="notif_dest_lue_idx"),
+            models.Index(fields=["type_notification", "date_creation"], name="notif_type_date_idx"),
+        ]
+
+    def marquer_comme_lue(self):
+        from django.utils import timezone
+
+        if not self.est_lue:
+            self.est_lue = True
+            self.date_lecture = timezone.now()
+            self.save(update_fields=["est_lue", "date_lecture"])
+
+    def __str__(self):
+        return f"{self.destinataire.get_username()} — {self.titre}"
 
 # ---------------------------------------------------------------------------
 # Relances de validation (système à 3 niveaux avant intervention super admin)
@@ -1027,6 +1083,33 @@ class HistoriqueRelance(models.Model):
         related_name="relances_effectuees",
     )
     role_effecteur = models.CharField(max_length=20, blank=True)
+
+    utilisateur_relance = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="relances_recues",
+    )
+    role_utilisateur_relance = models.CharField(max_length=20, blank=True)
+    perimetre_relance = models.CharField(max_length=255, blank=True)
+    niveau_relance = models.PositiveSmallIntegerField(default=0)
+    nb_fiches_concernees = models.PositiveIntegerField(default=1)
+    canal_notification = models.CharField(max_length=30, default="interne")
+    statut_email = models.CharField(
+        max_length=20,
+        choices=[
+            ("non_applicable", "Non applicable"),
+            ("envoye", "Envoyé"),
+            ("non_envoye", "Non envoyé"),
+            ("echec", "Échec"),
+        ],
+        default="non_applicable",
+    )
+    motif_email = models.TextField(blank=True)
+    prochaine_relance_possible = models.DateTimeField(null=True, blank=True)
+    intervention_super_admin_possible = models.DateTimeField(null=True, blank=True)
+
     date_action = models.DateTimeField(auto_now_add=True)
 
     class Meta:

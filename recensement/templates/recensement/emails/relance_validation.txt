@@ -1,0 +1,19 @@
+Bonjour,
+
+Vous avez actuellement des fiches en attente de validation dans le système de recensement des paroisses.
+
+Niveau de relance : {{ niveau_relance }}
+Nombre de fiches concernées : {{ nb_fiches }}
+Validation attendue : {{ type_validation }}
+Périmètre concerné : {{ perimetre }}
+Date de relance : {{ date_relance|date:"d/m/Y" }}
+Relance envoyée par : {{ auteur.get_full_name|default:auteur.username }}
+
+Merci de vous connecter à la plateforme afin de procéder au traitement des fiches en attente.
+
+{% if lien_plateforme %}
+Lien : {{ lien_plateforme }}
+{% endif %}
+
+Cordialement,
+Plateforme de recensement des paroisses

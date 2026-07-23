@@ -9,6 +9,7 @@
   </div>
 </details>
 {% endif %}
+
 <details class="sidebar-group" {% if url_name == 'fiche_list' or url_name == 'fiche_create' or url_name == 'fiche_detail' or url_name == 'fiche_update' or url_name == 'fiche_a_valider' or url_name == 'carte' %}open{% endif %}>
   <summary class="sidebar-summary"><span>Recensement</span><span aria-hidden="true">›</span></summary>
   <div class="sidebar-submenu">
@@ -18,6 +19,7 @@
     {% if peut_voir_carte %}<a href="{% url 'recensement:carte' %}" class="sidebar-link {% if url_name == 'carte' %}is-active{% endif %}">Carte des paroisses</a>{% endif %}
   </div>
 </details>
+
 {% if peut_voir_menu_relances %}
 <details class="sidebar-group" {% if url_name == 'relances_liste' %}open{% endif %}>
   <summary class="sidebar-summary"><span>Relances</span><span aria-hidden="true">›</span></summary>
@@ -28,12 +30,14 @@
   </div>
 </details>
 {% endif %}
+
 {% if peut_gerer_utilisateurs %}
 <details class="sidebar-group" {% if 'utilisateur' in url_name or 'affectation' in url_name %}open{% endif %}>
   <summary class="sidebar-summary"><span>Comptes & accès</span><span aria-hidden="true">›</span></summary>
   <div class="sidebar-submenu"><a href="{% url 'recensement:utilisateur_list' %}" class="sidebar-link {% if 'utilisateur' in url_name or 'affectation' in url_name %}is-active{% endif %}">Utilisateurs subordonnés</a></div>
 </details>
 {% endif %}
+
 {% if peut_gerer_sites_particuliers %}
 <details class="sidebar-group" {% if 'site_particulier' in url_name %}open{% endif %}>
   <summary class="sidebar-summary"><span>Sites particuliers</span><span aria-hidden="true">›</span></summary>
@@ -42,5 +46,6 @@
   </div>
 </details>
 {% endif %}
+
 {% if is_super_admin %}<a href="/admin/" target="_blank" rel="noopener" class="sidebar-link mt-2">Référentiel géographique</a>{% endif %}
 {% endwith %}

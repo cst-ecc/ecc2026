@@ -1,54 +1,208 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="fr">
-<head>{% include "recensement/includes/_head.html" %}</head>
-<body class="app-body min-h-screen overflow-x-hidden bg-slate-50 text-slate-800">
-  {% include "recensement/includes/_loader.html" %}
-  <aside id="sidebar" class="app-sidebar fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] -translate-x-full flex-col transition-transform duration-200 md:w-64 md:max-w-none md:translate-x-0" aria-label="Navigation principale">
-    <div class="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4">
-      <a href="{% url 'recensement:fiche_list' %}" class="flex min-w-0 items-center gap-3 text-white">
-        <img src="{% static 'recensement/img/logo-cst.png' %}" alt="CST" class="h-10 w-10 rounded-full bg-white/95 object-contain p-1">
-        <span class="min-w-0"><strong class="block truncate text-sm">Recensement ECC</strong><small class="block truncate text-[11px] text-brand-100">Administration des paroisses</small></span>
+<head>
+  {% include "recensement/includes/_head.html" %}
+</head>
+
+<body class="min-h-screen overflow-x-hidden bg-slate-50 text-slate-800">
+
+  <!-- Sidebar -->
+  <aside
+    id="sidebar"
+    class="
+      fixed inset-y-0 left-0 z-50
+      flex w-72 max-w-[85vw] flex-col
+      bg-brand-900
+      -translate-x-full transition-transform duration-200 ease-in-out
+      md:w-64 md:max-w-none md:translate-x-0
+    "
+    aria-label="Navigation principale"
+  >
+    <div class="h-14 shrink-0 flex items-center justify-between gap-2 px-4 border-b border-brand-700">
+      <a href="{% url 'recensement:fiche_list' %}" class="min-w-0 truncate font-semibold text-white">
+        Recensement
       </a>
-      <button id="sidebar-close" type="button" class="rounded-lg p-2 text-brand-100 hover:bg-white/10 md:hidden" aria-label="Fermer le menu">×</button>
+
+      <button
+        id="sidebar-close"
+        type="button"
+        class="md:hidden shrink-0 rounded-md p-2 text-brand-100 hover:bg-brand-800 hover:text-white"
+        aria-label="Fermer le menu"
+      >
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
     </div>
-    <nav class="min-h-0 flex-1 overflow-y-auto px-3 py-4">{% include "recensement/includes/_sidebar_nav.html" %}</nav>
-    <div class="shrink-0 border-t border-white/10 p-3">
-      <div class="mb-0.5 truncate text-sm text-brand-100">{{ user.get_full_name|default:user.get_username }}</div>
-      {% if user_scope %}<div class="mb-2 truncate text-[11px] text-brand-200/70">{{ user_scope.role_label }}</div>{% else %}<div class="mb-2"></div>{% endif %}
-      <form method="post" action="{% url 'logout' %}" data-loader-message="Déconnexion en cours…">{% csrf_token %}<button type="submit" class="w-full rounded-lg px-3 py-2 text-left text-sm text-brand-100 hover:bg-white/10 hover:text-white">Se déconnecter</button></form>
+
+    <nav class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
+      {% include "recensement/includes/_sidebar_nav.html" %}
+    </nav>
+
+    <div class="shrink-0 border-t border-brand-700 bg-brand-900 p-3">
+      <div class="mb-2 truncate text-sm text-brand-100">
+        {{ user.get_full_name|default:user.get_username }}
+      </div>
+
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button
+          type="submit"
+          class="w-full rounded-md px-2 py-2 text-left text-sm text-brand-200 hover:bg-brand-800 hover:text-white"
+        >
+          Se déconnecter
+        </button>
+      </form>
     </div>
   </aside>
-  <div id="sidebar-overlay" class="fixed inset-0 z-40 hidden bg-slate-950/60 md:hidden" aria-hidden="true"></div>
-  <div class="flex min-h-screen min-w-0 flex-col md:pl-64">
-    <header class="app-mobile-header sticky top-0 z-30 flex h-14 items-center gap-3 px-4 text-white md:hidden"><button id="sidebar-toggle" type="button" class="-ml-2 rounded-lg p-2 hover:bg-white/10" aria-controls="sidebar" aria-expanded="false">☰</button><span class="truncate font-semibold">Recensement ECC</span></header>
-    <main class="min-w-0 flex-1"><div class="mx-auto w-full max-w-6xl min-w-0 px-3 py-5 sm:px-6 sm:py-6">{% include "recensement/includes/_messages.html" %}{% block content %}{% endblock %}</div></main>
-    <footer class="mt-6 border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
-      <p>
-        &copy; {% now "Y" %} Église du Christianisme Céleste — Recensement des paroisses
-      </p>
 
-      <p class="mt-2">
-        Projet initié et supervisé par le
-        <span class="font-semibold text-slate-700">
-          Conseil Supérieur de Transition (CST)
-        </span>
-        — Développé par
-        <a
-          href="https://chablis-mahutin.onrender.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="font-semibold text-brand-600 hover:text-brand-700 hover:underline"
-        >
-          CHABLIS MAHUTIN
+  <div id="sidebar-overlay" class="fixed inset-0 z-40 hidden bg-black/50 md:hidden" aria-hidden="true"></div>
+
+  <div class="flex min-h-screen min-w-0 flex-col md:pl-64">
+
+    <!-- Navbar moderne : menu mobile + cloche notifications -->
+    <header class="sticky top-0 z-30 h-14 shrink-0 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+      <div class="mx-auto flex h-full w-full max-w-5xl items-center justify-between gap-3 px-3 sm:px-6">
+        <div class="flex min-w-0 items-center gap-3">
+          <button
+            id="sidebar-toggle"
+            type="button"
+            class="-ml-2 rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:hidden"
+            aria-controls="sidebar"
+            aria-expanded="false"
+          >
+            <span class="sr-only">Ouvrir le menu</span>
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
+          <div class="min-w-0">
+            <div class="truncate text-sm font-semibold text-slate-900 sm:text-base">
+              Recensement des paroisses
+            </div>
+            {% if user_scope %}
+              <div class="hidden truncate text-xs text-slate-500 sm:block">
+                {{ user_scope.role_label }}{% if user_scope.couverture_label %} · {{ user_scope.couverture_label }}{% endif %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="flex shrink-0 items-center gap-2">
+          {% include "recensement/includes/_notification_bell.html" %}
+        </div>
+      </div>
+    </header>
+
+    <main class="min-w-0 flex-1">
+      <div class="mx-auto w-full max-w-5xl min-w-0 px-3 py-5 sm:px-6 sm:py-6">
+        {% if messages %}
+          <div class="mb-4 space-y-2">
+            {% for message in messages %}
+              <div class="break-words rounded-lg border px-4 py-3 text-sm
+                {% if 'error' in message.tags %}
+                  border-red-200 bg-red-50 text-red-800
+                {% elif 'success' in message.tags %}
+                  border-green-200 bg-green-50 text-green-800
+                {% elif 'warning' in message.tags %}
+                  border-amber-200 bg-amber-50 text-amber-800
+                {% else %}
+                  border-blue-200 bg-blue-50 text-blue-800
+                {% endif %}
+              ">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    <footer class="shrink-0 border-t border-slate-200 px-4 py-4 text-center text-xs text-slate-400">
+      <p class="flex flex-wrap items-center justify-center gap-1">
+        Développé avec
+        <svg class="h-3 w-3 text-red-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path d="M10 17.5l-1.45-1.32C4.4 12.36 2 10.2 2 7.5 2 5.42 3.42 4 5.5 4c1.16 0 2.28.54 3 1.39A3.99 3.99 0 0 1 11.5 4C13.58 4 15 5.42 15 7.5c0 2.7-2.4 4.86-6.55 8.68L10 17.5z" />
+        </svg>
+        par
+        <a href="https://VOTRE-PORTFOLIO-ICI.example.com" target="_blank" rel="noopener" class="text-brand-600 hover:underline">
+          Chablis Mahutin
         </a>
       </p>
     </footer>
   </div>
-  <script src="{% static 'recensement/js/app_loader.js' %}" defer></script>
-  <script src="{% static 'recensement/js/sidebar.js' %}" defer></script>
-  <script src="{% static 'recensement/js/manager_change_guard.js' %}" defer></script>
-  <script src="{% static 'recensement/js/export_preview.js' %}" defer></script>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var sidebar = document.getElementById("sidebar");
+      var overlay = document.getElementById("sidebar-overlay");
+      var toggleButton = document.getElementById("sidebar-toggle");
+      var closeButton = document.getElementById("sidebar-close");
+
+      if (!sidebar || !overlay || !toggleButton) {
+        return;
+      }
+
+      function openSidebar() {
+        sidebar.classList.remove("-translate-x-full");
+        sidebar.classList.add("translate-x-0");
+        overlay.classList.remove("hidden");
+        toggleButton.setAttribute("aria-expanded", "true");
+        document.body.classList.add("overflow-hidden");
+      }
+
+      function closeSidebar() {
+        sidebar.classList.add("-translate-x-full");
+        sidebar.classList.remove("translate-x-0");
+        overlay.classList.add("hidden");
+        toggleButton.setAttribute("aria-expanded", "false");
+        document.body.classList.remove("overflow-hidden");
+      }
+
+      toggleButton.addEventListener("click", function () {
+        var isOpen = toggleButton.getAttribute("aria-expanded") === "true";
+        if (isOpen) { closeSidebar(); } else { openSidebar(); }
+      });
+
+      overlay.addEventListener("click", closeSidebar);
+      if (closeButton) { closeButton.addEventListener("click", closeSidebar); }
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") { closeSidebar(); }
+      });
+
+      sidebar.addEventListener("click", function (event) {
+        var link = event.target.closest("a");
+        if (link && window.innerWidth < 768) { closeSidebar(); }
+      });
+
+      window.addEventListener("resize", function () {
+        if (window.innerWidth >= 768) {
+          overlay.classList.add("hidden");
+          document.body.classList.remove("overflow-hidden");
+          toggleButton.setAttribute("aria-expanded", "false");
+        }
+      });
+    })();
+
+    document.addEventListener("submit", function (event) {
+      var form = event.target;
+      if (form.matches && form.matches("[data-confirm-valider]")) {
+        var message = form.getAttribute("data-confirm-valider");
+        if (!window.confirm(message)) { event.preventDefault(); }
+      }
+    });
+  </script>
+
+  <script src="{% static 'recensement/js/manager_change_guard.js' %}"></script>
+  <script src="{% static 'recensement/js/export_preview.js' %}"></script>
+
   {% block extra_js %}{% endblock %}
 </body>
 </html>

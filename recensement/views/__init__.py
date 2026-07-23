@@ -61,9 +61,11 @@ from .ajax_views import (
 
 # --- Relances de validation --------------------------------------------------
 from .relances_views import (
-    relance_intervention_super_admin,
-    relance_lancer,
     relances_liste,
+    relance_lancer,
+    relance_intervention_super_admin,
+    notifications_liste,
+    notification_marquer_lue,
 )
 
 # --- Sites particuliers -------------------------------------------------------
@@ -133,6 +135,8 @@ __all__ = [
     "relances_liste",
     "relance_lancer",
     "relance_intervention_super_admin",
+    "notifications_liste",
+    "notification_marquer_lue",
     # Sites particuliers
     "site_particulier_list",
     "site_particulier_detail",

@@ -61,6 +61,8 @@ urlpatterns = [
         views.relance_intervention_super_admin,
         name="relance_intervention_super_admin",
     ),
+    path("notifications/", views.notifications_liste, name="notifications_liste"),
+    path("notifications/<int:pk>/lue/", views.notification_marquer_lue, name="notification_marquer_lue"),
 
     # Sites particuliers (gestion séparée du recensement ordinaire)
     path("sites-particuliers/", views.site_particulier_list, name="site_particulier_list"),
