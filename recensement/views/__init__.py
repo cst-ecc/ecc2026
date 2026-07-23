@@ -77,12 +77,14 @@ from .legacy_user_views import (
     utilisateur_toggle_actif,
     utilisateur_update,
 )
+from .notifications_views import (
+    notification_marquer_lue,
+    notifications_liste,
+)
 from .public_views import landing, post_login_redirect
 
 # --- Relances de validation --------------------------------------------------
 from .relances_views import (
-    notification_marquer_lue,
-    notifications_liste,
     relance_intervention_super_admin,
     relance_lancer,
     relances_liste,

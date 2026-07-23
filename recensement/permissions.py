@@ -333,6 +333,9 @@ def peut_modifier_fiche(user, fiche):
     role = get_role(user)
     if not fiche_dans_perimetre(user, fiche):
         return False
+
+    if role == Profil.Role.OP_ZONE:
+        return fiche.statut_validation == FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
     if role == Profil.Role.OP_DISTRICT:
         return fiche.statut_validation == FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR
     if role == Profil.Role.OP_PROVINCE:

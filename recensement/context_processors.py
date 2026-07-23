@@ -21,7 +21,7 @@ def role_context(request):
 
     nb_a_valider = 0
 
-    if role == Profil.Role.OP_DISTRICT:
+    if role in (Profil.Role.OP_ZONE, Profil.Role.OP_DISTRICT):
         zone_ids = zones_autorisees(user) or set()
         if zone_ids:
             nb_a_valider = FicheParoisse.objects.filter(
@@ -51,7 +51,12 @@ def role_context(request):
         "is_superviseur": role == Profil.Role.OP_DISTRICT,
         # Droits dérivés pour l'interface.
         "peut_creer_fiche": role in (Profil.Role.AGENT, Profil.Role.SUPER_ADMIN),
-        "peut_valider_fiches": role in (Profil.Role.OP_DISTRICT, Profil.Role.OP_PROVINCE),
+        "peut_valider_fiches": role
+        in (
+            Profil.Role.OP_ZONE,
+            Profil.Role.OP_DISTRICT,
+            Profil.Role.OP_PROVINCE,
+        ),
         "peut_voir_carte": role
         in (
             Profil.Role.SUPER_ADMIN,

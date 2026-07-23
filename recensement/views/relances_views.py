@@ -1,4 +1,4 @@
-"""Vues du système de relances et des notifications internes."""
+"""Vues du système de relances."""
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -7,8 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
 from .. import relances
-from ..models import FicheParoisse, HistoriqueRelance, NotificationInterne
-from ..notifications import marquer_notification_lue
+from ..models import FicheParoisse, HistoriqueRelance
 
 
 @login_required
@@ -45,7 +44,14 @@ def relance_lancer(request, pk):
         label = {1: "Première relance", 2: "Deuxième relance", 3: "Troisième et dernière relance"}.get(
             etat.nb_relances, "Relance"
         )
-        dernieres = HistoriqueRelance.objects.filter(fiche=fiche).order_by("-date_action")[:10]
+        action = {
+            1: HistoriqueRelance.Action.RELANCE_1,
+            2: HistoriqueRelance.Action.RELANCE_2,
+            3: HistoriqueRelance.Action.RELANCE_3,
+        }.get(etat.nb_relances)
+        dernieres = HistoriqueRelance.objects.filter(
+            fiche=fiche, action=action, niveau_relance=etat.nb_relances
+        ).order_by("-date_action")[:20]
         emails_envoyes = sum(1 for h in dernieres if h.statut_email == "envoye")
         emails_absents = sum(1 for h in dernieres if h.statut_email == "non_envoye")
         emails_echec = sum(1 for h in dernieres if h.statut_email == "echec")
@@ -71,28 +77,14 @@ def relance_intervention_super_admin(request, pk):
     fiche = get_object_or_404(FicheParoisse, pk=pk)
     try:
         fiche, code = relances.intervenir_super_admin(fiche=fiche, super_admin=request.user)
-        if code:
-            messages.success(request, f"Intervention effectuée. Fiche validée et code généré : {code}.")
-        else:
-            messages.success(request, "Intervention effectuée. La fiche est transmise au palier suivant.")
+        messages.success(
+            request,
+            f"Intervention effectuée. Fiche validée et code généré : {code}."
+            if code
+            else "Intervention effectuée. La fiche est transmise au palier suivant.",
+        )
     except PermissionDenied:
         raise
     except ValidationError as exc:
         messages.error(request, "; ".join(exc.messages) if hasattr(exc, "messages") else str(exc))
     return redirect("recensement:relances_liste")
-
-
-@login_required
-@require_GET
-def notifications_liste(request):
-    notifications = NotificationInterne.objects.filter(destinataire=request.user).select_related("fiche", "cree_par")
-    return render(request, "recensement/notifications_liste.html", {"notifications": notifications})
-
-
-@login_required
-@require_POST
-def notification_marquer_lue(request, pk):
-    notification = get_object_or_404(NotificationInterne, pk=pk)
-    marquer_notification_lue(user=request.user, notification=notification)
-    messages.success(request, "Notification marquée comme lue.")
-    return redirect("recensement:notifications_liste")
