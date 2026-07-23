@@ -28,29 +28,6 @@ Refactor purement structurel pour la partie historique ; les vues de
 """
 
 # --- Pages publiques / aiguillage -----------------------------------------
-from .public_views import landing, post_login_redirect
-
-# --- Tableau de bord -------------------------------------------------------
-from .dashboard_views import dashboard, suivi_modifications
-
-# --- Fiches de recensement -------------------------------------------------
-from .fiche_views import (
-    fiche_create,
-    fiche_delete,
-    fiche_detail,
-    fiche_list,
-    fiche_update,
-)
-
-# --- Workflow de validation ------------------------------------------------
-from .validation_views import fiche_a_valider, fiche_valider
-
-# --- Carte -----------------------------------------------------------------
-from .carte_views import carte_paroisses, fiches_geojson
-
-# --- Export ----------------------------------------------------------------
-from .export_views import fiche_export_excel, fiche_export_preview
-
 # --- AJAX cascade ----------------------------------------------------------
 from .ajax_views import (
     ajax_districts,
@@ -59,13 +36,56 @@ from .ajax_views import (
     ajax_zones,
 )
 
+# --- Carte -----------------------------------------------------------------
+from .carte_views import carte_paroisses, fiches_geojson
+
+# --- Tableau de bord -------------------------------------------------------
+from .dashboard_views import dashboard, suivi_modifications
+
+# --- Export ----------------------------------------------------------------
+from .export_views import _fiches_export_filtrees, fiche_export_excel, fiche_export_preview  # noqa: F401
+
+# --- Fiches de recensement -------------------------------------------------
+from .fiche_views import (  # noqa: F401
+    fiche_create,
+    fiche_delete,
+    fiche_detail,
+    fiche_list,
+    fiche_update,
+)
+
+# --- Helpers internes (réexportés pour compat des imports existants) -------
+from .helpers import (  # noqa: F401
+    _CHAMP_VERS_ETAPE,
+    _CSV_FORMULA_PREFIXES,
+    _csv_safe,
+    _fiches_visibles_pour,
+    _premiere_etape_en_erreur,
+    _snapshot_fiche,
+)
+
+# --- Vues « utilisateur » héritées (non routées, compat import) ------------
+from .legacy_user_views import (
+    _provinces_disponibles,  # noqa: F401
+    _regions_disponibles,  # noqa: F401
+    _utilisateurs_visibles_pour,  # noqa: F401
+    utilisateur_create,
+    utilisateur_created,
+    utilisateur_delete,
+    utilisateur_list,
+    utilisateur_reset_password,
+    utilisateur_toggle_actif,
+    utilisateur_update,
+)
+from .public_views import landing, post_login_redirect
+
 # --- Relances de validation --------------------------------------------------
 from .relances_views import (
-    relances_liste,
-    relance_lancer,
-    relance_intervention_super_admin,
-    notifications_liste,
     notification_marquer_lue,
+    notifications_liste,
+    relance_intervention_super_admin,
+    relance_lancer,
+    relances_liste,
 )
 
 # --- Sites particuliers -------------------------------------------------------
@@ -76,33 +96,8 @@ from .sites_particuliers_views import (
     site_particulier_update,
 )
 
-# --- Vues « utilisateur » héritées (non routées, compat import) ------------
-from .legacy_user_views import (
-    utilisateur_create,
-    utilisateur_created,
-    utilisateur_delete,
-    utilisateur_list,
-    utilisateur_reset_password,
-    utilisateur_toggle_actif,
-    utilisateur_update,
-)
-
-# --- Helpers internes (réexportés pour compat des imports existants) -------
-from .helpers import (
-    _CHAMP_VERS_ETAPE,
-    _CSV_FORMULA_PREFIXES,
-    _csv_safe,
-    _fiches_visibles_pour,
-    _premiere_etape_en_erreur,
-    _snapshot_fiche,
-)
-from .export_views import _fiches_export_filtrees
-from .legacy_user_views import (
-    _provinces_disponibles,
-    _regions_disponibles,
-    _utilisateurs_visibles_pour,
-)
-
+# --- Workflow de validation ------------------------------------------------
+from .validation_views import fiche_a_valider, fiche_valider
 
 __all__ = [
     # Pages publiques

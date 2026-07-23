@@ -3,8 +3,7 @@ from django.urls import path
 from recensement.healthcheck import healthcheck
 
 from . import access_views, views
-from .views import doublon_views
-from .views import notifications_views
+from .views import doublon_views, notifications_views
 
 app_name = "recensement"
 
@@ -55,7 +54,6 @@ urlpatterns = [
         name="utilisateur_toggle_actif",
     ),
     path("utilisateurs/<int:pk>/supprimer/", access_views.utilisateur_delete, name="utilisateur_delete"),
-
     # Système de relances de validation (3 niveaux + intervention super admin)
     path("relances/", views.relances_liste, name="relances_liste"),
     path("relances/<int:pk>/relancer/", views.relance_lancer, name="relance_lancer"),
@@ -64,7 +62,6 @@ urlpatterns = [
         views.relance_intervention_super_admin,
         name="relance_intervention_super_admin",
     ),
-
     # Sites particuliers (gestion séparée du recensement ordinaire)
     path("sites-particuliers/", views.site_particulier_list, name="site_particulier_list"),
     path("sites-particuliers/ajouter/", views.site_particulier_create, name="site_particulier_create"),

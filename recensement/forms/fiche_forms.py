@@ -18,7 +18,6 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from ..doublons import (
     analyser_risque_doublon,
     appliquer_infos_doublon_sur_instance,
-    journaliser_alerte_doublon,
     normaliser_nom_paroisse,
 )
 from ..models import District, FicheParoisse, Profil, Province, Region, Village, Zone
@@ -115,10 +114,14 @@ class FicheParoisseForm(forms.ModelForm):
             return
 
         zone_ids = zones_autorisees(user) or set()
-        zones_qs = Zone.objects.filter(
-            pk__in=zone_ids,
-            district__est_sites_particuliers=False,
-        ).select_related("district__province__region").order_by("nom")
+        zones_qs = (
+            Zone.objects.filter(
+                pk__in=zone_ids,
+                district__est_sites_particuliers=False,
+            )
+            .select_related("district__province__region")
+            .order_by("nom")
+        )
 
         self.fields["zone"].queryset = zones_qs
         self.fields["district"].queryset = District.objects.filter(zones__in=zones_qs).distinct().order_by("nom")
@@ -442,7 +445,6 @@ class FicheParoisseForm(forms.ModelForm):
             )
 
         return cleaned_data
-
 
     def save(self, commit=True):
         instance = super().save(commit=False)

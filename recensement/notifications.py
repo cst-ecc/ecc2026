@@ -1,6 +1,7 @@
 """Services de notifications internes."""
 
 from django.core.exceptions import PermissionDenied
+
 from .models import NotificationInterne
 
 

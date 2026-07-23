@@ -20,14 +20,20 @@ def relances_liste(request):
     lignes = []
     for fiche in fiches:
         etat = relances.etat_relance(fiche, getattr(fiche, "relance_validation", None))
-        lignes.append({
-            "fiche": fiche,
-            "etat": etat,
-            "peut_relancer": relances.peut_relancer_fiche(request.user, fiche) and etat["peut_relancer_maintenant"],
-            "peut_intervenir": relances.peut_intervenir_super_admin(request.user) and etat["intervention_possible"],
-            "historiques": list(fiche.historique_relances.select_related("effectue_par", "utilisateur_relance")[:5]),
-        })
-    return render(request, "recensement/relances_liste.html", {"lignes": lignes, "resume": relances.resume_relances(fiches)})
+        lignes.append(
+            {
+                "fiche": fiche,
+                "etat": etat,
+                "peut_relancer": relances.peut_relancer_fiche(request.user, fiche) and etat["peut_relancer_maintenant"],
+                "peut_intervenir": relances.peut_intervenir_super_admin(request.user) and etat["intervention_possible"],
+                "historiques": list(
+                    fiche.historique_relances.select_related("effectue_par", "utilisateur_relance")[:5]
+                ),
+            }
+        )
+    return render(
+        request, "recensement/relances_liste.html", {"lignes": lignes, "resume": relances.resume_relances(fiches)}
+    )
 
 
 @login_required
@@ -36,7 +42,9 @@ def relance_lancer(request, pk):
     fiche = get_object_or_404(FicheParoisse, pk=pk)
     try:
         etat = relances.lancer_relance(fiche=fiche, utilisateur=request.user)
-        label = {1: "Première relance", 2: "Deuxième relance", 3: "Troisième et dernière relance"}.get(etat.nb_relances, "Relance")
+        label = {1: "Première relance", 2: "Deuxième relance", 3: "Troisième et dernière relance"}.get(
+            etat.nb_relances, "Relance"
+        )
         dernieres = HistoriqueRelance.objects.filter(fiche=fiche).order_by("-date_action")[:10]
         emails_envoyes = sum(1 for h in dernieres if h.statut_email == "envoye")
         emails_absents = sum(1 for h in dernieres if h.statut_email == "non_envoye")

@@ -147,7 +147,9 @@ def fiches_en_attente_pour(user):
         ids = districts_autorises(user) or set()
         if not ids:
             return qs.none()
-        return qs.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR, district_id__in=ids).order_by("date_recensement")
+        return qs.filter(
+            statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR, district_id__in=ids
+        ).order_by("date_recensement")
     return qs.none()
 
 
@@ -177,7 +179,9 @@ def peut_intervenir_super_admin(user):
 
 def utilisateurs_relances_pour_fiche(*, lanceur, fiche):
     if fiche.statut_validation == FicheParoisse.StatutValidation.ATTENTE_MANAGER:
-        qs = User.objects.filter(is_active=True, profil__role=Profil.Role.OP_PROVINCE, profil__province_id=fiche.province_id)
+        qs = User.objects.filter(
+            is_active=True, profil__role=Profil.Role.OP_PROVINCE, profil__province_id=fiche.province_id
+        )
     else:
         qs = User.objects.filter(is_active=True).filter(
             Q(profil__role=Profil.Role.OP_DISTRICT, profil__district_id=fiche.district_id)
@@ -205,15 +209,35 @@ def etat_relance(fiche, relance_obj=None):
     if relance_obj is None:
         relance_obj = getattr(fiche, "relance_validation", None)
     if relance_obj is None:
-        return {"nb_relances": 0, "peut_relancer_maintenant": True, "prochaine_relance_le": None, "intervention_possible": False, "intervention_le": None, "derniere_relance_effectuee": False}
-    peut_relancer = relance_obj.nb_relances < 3 and (relance_obj.date_prochaine_relance_autorisee is None or now >= relance_obj.date_prochaine_relance_autorisee)
-    intervention_possible = relance_obj.nb_relances >= 3 and not relance_obj.intervention_super_admin_effectuee and relance_obj.date_intervention_super_admin_autorisee is not None and now >= relance_obj.date_intervention_super_admin_autorisee
+        return {
+            "nb_relances": 0,
+            "peut_relancer_maintenant": True,
+            "prochaine_relance_le": None,
+            "intervention_possible": False,
+            "intervention_le": None,
+            "derniere_relance_effectuee": False,
+        }
+    peut_relancer = relance_obj.nb_relances < 3 and (
+        relance_obj.date_prochaine_relance_autorisee is None or now >= relance_obj.date_prochaine_relance_autorisee
+    )
+    intervention_possible = (
+        relance_obj.nb_relances >= 3
+        and not relance_obj.intervention_super_admin_effectuee
+        and relance_obj.date_intervention_super_admin_autorisee is not None
+        and now >= relance_obj.date_intervention_super_admin_autorisee
+    )
     return {
         "nb_relances": relance_obj.nb_relances,
         "peut_relancer_maintenant": peut_relancer,
-        "prochaine_relance_le": relance_obj.date_prochaine_relance_autorisee if relance_obj.nb_relances < 3 and not peut_relancer else None,
+        "prochaine_relance_le": relance_obj.date_prochaine_relance_autorisee
+        if relance_obj.nb_relances < 3 and not peut_relancer
+        else None,
         "intervention_possible": intervention_possible,
-        "intervention_le": relance_obj.date_intervention_super_admin_autorisee if relance_obj.nb_relances >= 3 and not intervention_possible and not relance_obj.intervention_super_admin_effectuee else None,
+        "intervention_le": relance_obj.date_intervention_super_admin_autorisee
+        if relance_obj.nb_relances >= 3
+        and not intervention_possible
+        and not relance_obj.intervention_super_admin_effectuee
+        else None,
         "derniere_relance_effectuee": relance_obj.nb_relances >= 3,
     }
 
@@ -234,7 +258,17 @@ def resume_relances(fiches_qs):
             nb_action_possible += 1
         else:
             nb_en_attente_delai += 1
-    return {"total_en_attente": total, "par_nb_relances": par_nb_relances, "nb_jamais_relancees": par_nb_relances[0], "nb_relance_1_faite": par_nb_relances[1], "nb_relance_2_faite": par_nb_relances[2], "nb_relance_3_faite": par_nb_relances[3], "nb_action_possible": nb_action_possible, "nb_en_attente_delai": nb_en_attente_delai, "nb_intervention_possible": nb_intervention_possible}
+    return {
+        "total_en_attente": total,
+        "par_nb_relances": par_nb_relances,
+        "nb_jamais_relancees": par_nb_relances[0],
+        "nb_relance_1_faite": par_nb_relances[1],
+        "nb_relance_2_faite": par_nb_relances[2],
+        "nb_relance_3_faite": par_nb_relances[3],
+        "nb_action_possible": nb_action_possible,
+        "nb_en_attente_delai": nb_en_attente_delai,
+        "nb_intervention_possible": nb_intervention_possible,
+    }
 
 
 def nb_actions_relance_disponibles(user):
@@ -255,10 +289,14 @@ def lancer_relance(*, fiche, utilisateur):
         raise PermissionDenied("Vous n'êtes pas autorisé à relancer cet opérateur.")
     obj, _ = RelanceValidation.objects.select_for_update().get_or_create(fiche=fiche)
     if obj.nb_relances >= 3:
-        raise ValidationError("Une quatrième relance est impossible. Seule l'intervention du super administrateur peut suivre.")
+        raise ValidationError(
+            "Une quatrième relance est impossible. Seule l'intervention du super administrateur peut suivre."
+        )
     now = timezone.now()
     if obj.date_prochaine_relance_autorisee and now < obj.date_prochaine_relance_autorisee:
-        raise ValidationError(f"La prochaine relance ne sera possible que le {obj.date_prochaine_relance_autorisee:%d/%m/%Y à %H:%M}.")
+        raise ValidationError(
+            f"La prochaine relance ne sera possible que le {obj.date_prochaine_relance_autorisee:%d/%m/%Y à %H:%M}."
+        )
     obj.nb_relances += 1
     niveau = obj.nb_relances
     if niveau == 1:
@@ -276,11 +314,25 @@ def lancer_relance(*, fiche, utilisateur):
 
     destinataires = utilisateurs_relances_pour_fiche(lanceur=utilisateur, fiche=fiche)
     if not destinataires:
-        HistoriqueRelance.objects.create(fiche=fiche, action=_ACTIONS_PAR_NIVEAU[niveau], effectue_par=utilisateur, role_effecteur=get_role(utilisateur) or "", niveau_relance=niveau, perimetre_relance=_perimetre_fiche(fiche), canal_notification="interne", statut_email="non_applicable", motif_email="Aucun utilisateur destinataire trouvé.", prochaine_relance_possible=obj.date_prochaine_relance_autorisee, intervention_super_admin_possible=obj.date_intervention_super_admin_autorisee)
+        HistoriqueRelance.objects.create(
+            fiche=fiche,
+            action=_ACTIONS_PAR_NIVEAU[niveau],
+            effectue_par=utilisateur,
+            role_effecteur=get_role(utilisateur) or "",
+            niveau_relance=niveau,
+            perimetre_relance=_perimetre_fiche(fiche),
+            canal_notification="interne",
+            statut_email="non_applicable",
+            motif_email="Aucun utilisateur destinataire trouvé.",
+            prochaine_relance_possible=obj.date_prochaine_relance_autorisee,
+            intervention_super_admin_possible=obj.date_intervention_super_admin_autorisee,
+        )
         return obj
     for destinataire in destinataires:
         _creer_notification(destinataire=destinataire, fiche=fiche, niveau=niveau, auteur=utilisateur, nb_fiches=1)
-        statut_email, motif_email = _envoyer_email_relance(destinataire=destinataire, fiche=fiche, niveau=niveau, auteur=utilisateur, nb_fiches=1)
+        statut_email, motif_email = _envoyer_email_relance(
+            destinataire=destinataire, fiche=fiche, niveau=niveau, auteur=utilisateur, nb_fiches=1
+        )
         HistoriqueRelance.objects.create(
             fiche=fiche,
             action=_ACTIONS_PAR_NIVEAU[niveau],
@@ -312,7 +364,9 @@ def intervenir_super_admin(*, fiche, super_admin):
         raise ValidationError("La troisième relance doit d'abord être effectuée avant toute intervention.")
     now = timezone.now()
     if not obj.date_intervention_super_admin_autorisee or now < obj.date_intervention_super_admin_autorisee:
-        raise ValidationError(f"L'intervention ne sera possible que le {obj.date_intervention_super_admin_autorisee:%d/%m/%Y à %H:%M}.")
+        raise ValidationError(
+            f"L'intervention ne sera possible que le {obj.date_intervention_super_admin_autorisee:%d/%m/%Y à %H:%M}."
+        )
     if obj.intervention_super_admin_effectuee:
         raise ValidationError("L'intervention du super administrateur a déjà été effectuée pour cette fiche.")
     if fiche.statut_validation == FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR:
@@ -330,5 +384,13 @@ def intervenir_super_admin(*, fiche, super_admin):
     obj.intervention_super_admin_effectuee = True
     obj.date_prochaine_relance_autorisee = None
     obj.save(update_fields=["intervention_super_admin_effectuee", "date_prochaine_relance_autorisee"])
-    HistoriqueRelance.objects.create(fiche=fiche, action=HistoriqueRelance.Action.INTERVENTION_SUPER_ADMIN, effectue_par=super_admin, role_effecteur=Profil.Role.SUPER_ADMIN, perimetre_relance=_perimetre_fiche(fiche), canal_notification="interne", statut_email="non_applicable")
+    HistoriqueRelance.objects.create(
+        fiche=fiche,
+        action=HistoriqueRelance.Action.INTERVENTION_SUPER_ADMIN,
+        effectue_par=super_admin,
+        role_effecteur=Profil.Role.SUPER_ADMIN,
+        perimetre_relance=_perimetre_fiche(fiche),
+        canal_notification="interne",
+        statut_email="non_applicable",
+    )
     return fiche, code

@@ -34,9 +34,7 @@ def normaliser(texte):
     if not texte:
         return ""
     texte = str(texte).strip().lower()
-    texte = "".join(
-        c for c in unicodedata.normalize("NFKD", texte) if not unicodedata.combining(c)
-    )
+    texte = "".join(c for c in unicodedata.normalize("NFKD", texte) if not unicodedata.combining(c))
     for caractere in ("'", "’", ".", ";", ","):
         texte = texte.replace(caractere, " ")
     texte = " ".join(texte.split())

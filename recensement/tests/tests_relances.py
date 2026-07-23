@@ -18,7 +18,6 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .. import relances
 from recensement.models import (
     District,
     FicheParoisse,
@@ -29,6 +28,8 @@ from recensement.models import (
     Village,
     Zone,
 )
+
+from .. import relances
 
 
 def _creer_geo():
@@ -71,23 +72,34 @@ class RelanceDelaisTests(TestCase):
     def setUp(self):
         self.region, self.province, self.district, self.zone, self.village = _creer_geo()
         self.agent = _creer_utilisateur(
-            "t_agent", Profil.Role.AGENT,
-            region=self.region, province=self.province, district=self.district, zone=self.zone,
+            "t_agent",
+            Profil.Role.AGENT,
+            region=self.region,
+            province=self.province,
+            district=self.district,
+            zone=self.zone,
         )
         self.op_district = _creer_utilisateur(
-            "t_op_district", Profil.Role.OP_DISTRICT,
-            region=self.region, province=self.province, district=self.district,
+            "t_op_district",
+            Profil.Role.OP_DISTRICT,
+            region=self.region,
+            province=self.province,
+            district=self.district,
         )
         self.op_province = _creer_utilisateur(
-            "t_op_province", Profil.Role.OP_PROVINCE,
-            region=self.region, province=self.province,
+            "t_op_province",
+            Profil.Role.OP_PROVINCE,
+            region=self.region,
+            province=self.province,
         )
-        self.super_admin = User.objects.create_superuser(
-            username="t_super", password="motdepasse123!", email=""
-        )
+        self.super_admin = User.objects.create_superuser(username="t_super", password="motdepasse123!", email="")
         self.fiche = _creer_fiche(
-            region=self.region, province=self.province, district=self.district,
-            zone=self.zone, village=self.village, cree_par=self.agent,
+            region=self.region,
+            province=self.province,
+            district=self.district,
+            zone=self.zone,
+            village=self.village,
+            cree_par=self.agent,
             statut=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR,
         )
 
@@ -156,41 +168,60 @@ class RelancePerimetreTests(TestCase):
     def setUp(self):
         self.region, self.province, self.district, self.zone, self.village = _creer_geo()
         # Deuxième district, hors du périmètre de op_district / op_province ci-dessous.
-        self.autre_district = District.objects.create(
-            nom="Autre District", province=self.province, code="D02"
-        )
-        self.autre_province = Province.objects.create(
-            nom="Autre Province", region=self.region, code="P02"
-        )
+        self.autre_district = District.objects.create(nom="Autre District", province=self.province, code="D02")
+        self.autre_province = Province.objects.create(nom="Autre Province", region=self.region, code="P02")
         self.agent = _creer_utilisateur(
-            "t_agent2", Profil.Role.AGENT,
-            region=self.region, province=self.province, district=self.district, zone=self.zone,
+            "t_agent2",
+            Profil.Role.AGENT,
+            region=self.region,
+            province=self.province,
+            district=self.district,
+            zone=self.zone,
         )
         self.op_district = _creer_utilisateur(
-            "t_op_district2", Profil.Role.OP_DISTRICT,
-            region=self.region, province=self.province, district=self.district,
+            "t_op_district2",
+            Profil.Role.OP_DISTRICT,
+            region=self.region,
+            province=self.province,
+            district=self.district,
         )
         self.op_province = _creer_utilisateur(
-            "t_op_province2", Profil.Role.OP_PROVINCE,
-            region=self.region, province=self.province,
+            "t_op_province2",
+            Profil.Role.OP_PROVINCE,
+            region=self.region,
+            province=self.province,
         )
         self.fiche_dans_district = _creer_fiche(
-            region=self.region, province=self.province, district=self.district,
-            zone=self.zone, village=self.village, cree_par=self.agent,
+            region=self.region,
+            province=self.province,
+            district=self.district,
+            zone=self.zone,
+            village=self.village,
+            cree_par=self.agent,
             statut=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR,
         )
         zone_autre = Zone.objects.create(nom="Zone Autre", district=self.autre_district, code="Z002")
         village_autre = Village.objects.create(nom="Village Autre", zone=zone_autre)
         self.fiche_hors_district = _creer_fiche(
-            region=self.region, province=self.province, district=self.autre_district,
-            zone=zone_autre, village=village_autre, cree_par=self.agent,
+            region=self.region,
+            province=self.province,
+            district=self.autre_district,
+            zone=zone_autre,
+            village=village_autre,
+            cree_par=self.agent,
             statut=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR,
         )
         fiche_manager = FicheParoisse.objects.create(
-            region=self.region, province=self.autre_province, district=self.autre_district,
-            zone=zone_autre, village=village_autre, nom_paroisse="Paroisse Autre Province",
-            annee_fondation=2000, statut_batiment=StatutBatiment.ACHEVE,
-            cree_par=self.agent, statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER,
+            region=self.region,
+            province=self.autre_province,
+            district=self.autre_district,
+            zone=zone_autre,
+            village=village_autre,
+            nom_paroisse="Paroisse Autre Province",
+            annee_fondation=2000,
+            statut_batiment=StatutBatiment.ACHEVE,
+            cree_par=self.agent,
+            statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER,
         )
         self.fiche_autre_province = fiche_manager
 
@@ -213,12 +244,19 @@ class RelanceInterfaceTests(TestCase):
     def setUp(self):
         self.region, self.province, self.district, self.zone, self.village = _creer_geo()
         self.agent = _creer_utilisateur(
-            "t_agent3", Profil.Role.AGENT,
-            region=self.region, province=self.province, district=self.district, zone=self.zone,
+            "t_agent3",
+            Profil.Role.AGENT,
+            region=self.region,
+            province=self.province,
+            district=self.district,
+            zone=self.zone,
         )
         self.op_district = _creer_utilisateur(
-            "t_op_district3", Profil.Role.OP_DISTRICT,
-            region=self.region, province=self.province, district=self.district,
+            "t_op_district3",
+            Profil.Role.OP_DISTRICT,
+            region=self.region,
+            province=self.province,
+            district=self.district,
         )
         self.op_district.set_password("motdepasse123!")
         self.op_district.save()
@@ -243,8 +281,12 @@ class RelanceInterfaceTests(TestCase):
 
     def test_12_etat_relance_fiche_jamais_relancee(self):
         fiche = _creer_fiche(
-            region=self.region, province=self.province, district=self.district,
-            zone=self.zone, village=self.village, cree_par=self.agent,
+            region=self.region,
+            province=self.province,
+            district=self.district,
+            zone=self.zone,
+            village=self.village,
+            cree_par=self.agent,
             statut=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR,
         )
         etat = relances.etat_relance(fiche)

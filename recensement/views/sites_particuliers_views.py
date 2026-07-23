@@ -13,9 +13,7 @@ from ..permissions import peut_gerer_sites_particuliers
 
 def _exiger_acces_sites_particuliers(user):
     if not peut_gerer_sites_particuliers(user):
-        raise PermissionDenied(
-            "L'accès aux sites particuliers est réservé au super administrateur."
-        )
+        raise PermissionDenied("L'accès aux sites particuliers est réservé au super administrateur.")
 
 
 @login_required

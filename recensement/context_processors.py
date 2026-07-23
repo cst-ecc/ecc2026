@@ -1,6 +1,6 @@
 from . import relances
-from .notifications import nb_notifications_non_lues
 from .models import AffectationTerritoriale, FicheParoisse, Profil
+from .notifications import nb_notifications_non_lues
 from .permissions import (
     districts_autorises,
     get_role,

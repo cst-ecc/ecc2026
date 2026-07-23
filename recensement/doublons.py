@@ -11,18 +11,15 @@ sont rejoués côté formulaire avant tout enregistrement.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
-from difflib import SequenceMatcher
 import math
 import re
 import unicodedata
+from decimal import InvalidOperation
+from difflib import SequenceMatcher
 
 from django.urls import reverse
-from django.utils import timezone
 
 from .models import FicheParoisse, HistoriqueAlerteDoublon, Profil
-
 
 SEUIL_NOM_TRES_PROCHE = 0.88
 SEUIL_NOM_PROCHE = 0.78
@@ -59,9 +56,7 @@ def normaliser_nom_paroisse(valeur: str) -> str:
         return ""
 
     texte = "".join(
-        caractere
-        for caractere in unicodedata.normalize("NFKD", texte)
-        if not unicodedata.combining(caractere)
+        caractere for caractere in unicodedata.normalize("NFKD", texte) if not unicodedata.combining(caractere)
     )
     texte = re.sub(r"[^a-z0-9]+", " ", texte)
     mots = [mot for mot in texte.split() if mot not in MOTS_GENERIQUES]
@@ -102,10 +97,7 @@ def distance_metres(lat1, lon1, lat2, lon2):
     delta_phi = math.radians(lat2 - lat1)
     delta_lambda = math.radians(lon2 - lon1)
 
-    a = (
-        math.sin(delta_phi / 2) ** 2
-        + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
-    )
+    a = math.sin(delta_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return rayon_terre * c
 
@@ -175,12 +167,19 @@ def analyser_risque_doublon(
 
     for fiche in qs[:300]:
         fiche_nom_normalise = fiche.nom_paroisse_normalise or normaliser_nom_paroisse(fiche.nom_paroisse)
-        score_nom = 1.0 if fiche_nom_normalise == nom_normalise else SequenceMatcher(
-            None, nom_normalise, fiche_nom_normalise
-        ).ratio()
+        score_nom = (
+            1.0
+            if fiche_nom_normalise == nom_normalise
+            else SequenceMatcher(None, nom_normalise, fiche_nom_normalise).ratio()
+        )
 
         dist = None
-        if latitude is not None and longitude is not None and fiche.latitude is not None and fiche.longitude is not None:
+        if (
+            latitude is not None
+            and longitude is not None
+            and fiche.latitude is not None
+            and fiche.longitude is not None
+        ):
             dist = distance_metres(latitude, longitude, fiche.latitude, fiche.longitude)
 
         meme_contact = bool(contact_norm and normaliser_contact(fiche.contact_responsable) == contact_norm)

@@ -9,10 +9,14 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from recensement import relances
-from recensement.models import FicheParoisse, NotificationInterne, Profil, Region, Province, District, Zone, Village
+from recensement.models import District, FicheParoisse, NotificationInterne, Profil, Province, Region, Village, Zone
 
 
-@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", DEFAULT_FROM_EMAIL="noreply@example.test", SITE_URL="https://recensement-paroisses.ecc.bj")
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    DEFAULT_FROM_EMAIL="noreply@example.test",
+    SITE_URL="https://recensement-paroisses.ecc.bj",
+)
 class RelancesNotificationsTests(TestCase):
     def setUp(self):
         self.region = Region.objects.create(nom="Porto-Novo", ordre=1, code="R01")

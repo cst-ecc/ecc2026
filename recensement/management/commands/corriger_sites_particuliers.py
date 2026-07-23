@@ -40,13 +40,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
 
-        villages = list(
-            Village.objects.select_related("zone__district").all()
-        )
-        cibles = [
-            v for v in villages
-            if NOM_DISTRICT_SITES_PARTICULIERS in normaliser(v.zone.district.nom)
-        ]
+        villages = list(Village.objects.select_related("zone__district").all())
+        cibles = [v for v in villages if NOM_DISTRICT_SITES_PARTICULIERS in normaliser(v.zone.district.nom)]
 
         if not cibles:
             self.stdout.write(
@@ -90,11 +85,7 @@ class Command(BaseCommand):
             else:
                 transaction.savepoint_commit(sid)
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"\n✓ {nb_corriges} nom(s) corrigé(s)."
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"\n✓ {nb_corriges} nom(s) corrigé(s)."))
         if nb_deja_bons:
             self.stdout.write(f"  {nb_deja_bons} nom(s) déjà correct(s).")
         if noms_non_reconnus:

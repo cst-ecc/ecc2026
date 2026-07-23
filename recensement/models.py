@@ -1059,8 +1059,6 @@ class HistoriqueAffectationTerritoriale(models.Model):
         return f"{self.get_action_display()} — {self.utilisateur.get_username()} — {self.date_action:%d/%m/%Y %H:%M}"
 
 
-
-
 class NotificationInterne(models.Model):
     """Notification interne affichée dans l'application."""
 
@@ -1113,6 +1111,7 @@ class NotificationInterne(models.Model):
 
     def __str__(self):
         return f"{self.destinataire.get_username()} — {self.titre}"
+
 
 # ---------------------------------------------------------------------------
 # Relances de validation (système à 3 niveaux avant intervention super admin)
@@ -1234,47 +1233,55 @@ class SiteParticulier(models.Model):
         verbose_name="Type de site",
     )
     pays = models.CharField(max_length=100, blank=True, verbose_name="Pays")
-    localite = models.CharField(
-        max_length=200, blank=True, verbose_name="Localité"
-    )
+    localite = models.CharField(max_length=200, blank=True, verbose_name="Localité")
     description = models.TextField(blank=True)
-    responsable = models.CharField(
-        max_length=200, blank=True, verbose_name="Responsable de référence"
-    )
-    contact_responsable = models.CharField(
-        max_length=50, blank=True, verbose_name="Contact du responsable"
-    )
+    responsable = models.CharField(max_length=200, blank=True, verbose_name="Responsable de référence")
+    contact_responsable = models.CharField(max_length=50, blank=True, verbose_name="Contact du responsable")
     statut = models.CharField(
-        max_length=50, blank=True,
+        max_length=50,
+        blank=True,
         help_text="État actuel du site (ouvert, en travaux, fermé…).",
     )
     observations = models.TextField(blank=True)
-    informations_historiques = models.TextField(
-        blank=True, verbose_name="Informations historiques ou liturgiques"
-    )
+    informations_historiques = models.TextField(blank=True, verbose_name="Informations historiques ou liturgiques")
 
     # --- Géolocalisation (facultative) ---
     latitude = models.DecimalField(
-        max_digits=10, decimal_places=7, null=True, blank=True,
+        max_digits=10,
+        decimal_places=7,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(-90), MaxValueValidator(90)],
     )
     longitude = models.DecimalField(
-        max_digits=10, decimal_places=7, null=True, blank=True,
+        max_digits=10,
+        decimal_places=7,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(-180), MaxValueValidator(180)],
     )
     precision_gps = models.DecimalField(
-        max_digits=8, decimal_places=2, null=True, blank=True,
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(0)],
     )
 
     # --- Traçabilité ---
     cree_par = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name="sites_particuliers_crees",
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sites_particuliers_crees",
     )
     modifie_par = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name="sites_particuliers_modifies",
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sites_particuliers_modifies",
     )
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)

@@ -9,6 +9,7 @@ conflit avec une éventuelle suite de tests existante. Exécution :
 from django.test import SimpleTestCase, TestCase
 
 from recensement.models import District, Province, Region, Village, Zone
+
 from ..sites_particuliers import (
     CORRECTIONS_SITES_PARTICULIERS,
     corriger_nom_site,
@@ -67,9 +68,7 @@ class CommandeCorrectionTests(TestCase):
     def setUp(self):
         self.region = Region.objects.create(nom="Porto-Novo", ordre=1, code="R01")
         self.province = Province.objects.create(nom="Mère", region=self.region, code="P01")
-        self.district = District.objects.create(
-            nom="des Sites particuliers", province=self.province, code="D01"
-        )
+        self.district = District.objects.create(nom="des Sites particuliers", province=self.province, code="D01")
         self.zone_benin = Zone.objects.create(nom="Bénin", district=self.district, code="Z001")
         self.zone_nigeria = Zone.objects.create(nom="Nigéria", district=self.district, code="Z002")
 
@@ -81,12 +80,8 @@ class CommandeCorrectionTests(TestCase):
 
         call_command("corriger_sites_particuliers")
 
-        self.assertTrue(
-            Village.objects.filter(zone=self.zone_benin, nom="Cathédrale de Tchakou").exists()
-        )
-        self.assertTrue(
-            Village.objects.filter(zone=self.zone_nigeria, nom="Saint SBJ Oshoffa Cathedral").exists()
-        )
+        self.assertTrue(Village.objects.filter(zone=self.zone_benin, nom="Cathédrale de Tchakou").exists())
+        self.assertTrue(Village.objects.filter(zone=self.zone_nigeria, nom="Saint SBJ Oshoffa Cathedral").exists())
 
     def test_commande_idempotente(self):
         from django.core.management import call_command
@@ -95,9 +90,7 @@ class CommandeCorrectionTests(TestCase):
         call_command("corriger_sites_particuliers")
         call_command("corriger_sites_particuliers")  # deuxième exécution : ne doit rien casser
 
-        self.assertEqual(
-            Village.objects.filter(zone=self.zone_benin, nom="Cathédrale de Tchakou").count(), 1
-        )
+        self.assertEqual(Village.objects.filter(zone=self.zone_benin, nom="Cathédrale de Tchakou").count(), 1)
 
     def test_commande_ne_touche_pas_les_villages_hors_district(self):
         from django.core.management import call_command
@@ -108,9 +101,7 @@ class CommandeCorrectionTests(TestCase):
 
         call_command("corriger_sites_particuliers")
 
-        self.assertTrue(
-            Village.objects.filter(zone=autre_zone, nom="Site de Tchakou").exists()
-        )
+        self.assertTrue(Village.objects.filter(zone=autre_zone, nom="Site de Tchakou").exists())
 
     def test_commande_dry_run_n_ecrit_rien(self):
         from django.core.management import call_command
@@ -118,9 +109,5 @@ class CommandeCorrectionTests(TestCase):
         Village.objects.create(zone=self.zone_benin, nom="Site de Tchakou")
         call_command("corriger_sites_particuliers", dry_run=True)
 
-        self.assertTrue(
-            Village.objects.filter(zone=self.zone_benin, nom="Site de Tchakou").exists()
-        )
-        self.assertFalse(
-            Village.objects.filter(zone=self.zone_benin, nom="Cathédrale de Tchakou").exists()
-        )
+        self.assertTrue(Village.objects.filter(zone=self.zone_benin, nom="Site de Tchakou").exists())
+        self.assertFalse(Village.objects.filter(zone=self.zone_benin, nom="Cathédrale de Tchakou").exists())
