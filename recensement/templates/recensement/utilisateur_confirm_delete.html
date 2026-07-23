@@ -15,6 +15,7 @@
       </p>
       <p class="mt-2 font-semibold text-slate-900">{{ utilisateur.username }}</p>
       <p class="text-sm text-slate-500">{{ utilisateur.get_full_name|default:"—" }}</p>
+      <p class="text-sm text-slate-500">E-mail : {{ utilisateur.email|default:"Non renseigné" }} — Tél. : {{ utilisateur.profil.telephone|default:"Non renseigné" }}</p>
 
       <div class="mt-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3">
         Cette action est <strong>irréversible</strong>. Les fiches déjà créées par ce
@@ -23,7 +24,12 @@
         des utilisateurs si vous n'êtes pas certain.
       </div>
 
-      <form method="post" class="mt-5 flex flex-col sm:flex-row gap-2 justify-end">
+      <form method="post" class="mt-5 flex flex-col sm:flex-row gap-2 justify-end"
+            data-confirm-title="Suppression définitive du compte"
+            data-confirm-message="Supprimer définitivement le compte « {{ utilisateur.username }} » ?"
+            data-confirm-details="Cette action est irréversible. Les fiches déjà créées seront conservées mais perdront leur attribution."
+            data-confirm-label="Supprimer le compte"
+            data-confirm-variant="danger">
         {% csrf_token %}
         <a href="{% url 'recensement:utilisateur_list' %}"
            class="text-center border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg">

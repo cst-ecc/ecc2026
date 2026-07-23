@@ -3,6 +3,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
+from .forms.validators import valider_telephone_international
 from .models import (
     AffectationTerritoriale,
     District,
@@ -24,6 +25,49 @@ INPUT_CSS = (
     "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
 )
 SELECT_CSS = INPUT_CSS + " bg-white"
+
+
+class UtilisateurContactForm(forms.Form):
+    """E-mail et téléphone facultatifs d'un utilisateur géré."""
+
+    email = forms.EmailField(
+        required=False,
+        label="Adresse e-mail",
+        widget=forms.EmailInput(attrs={"class": INPUT_CSS, "placeholder": "exemple@ecc.bj", "autocomplete": "email"}),
+        error_messages={"invalid": "Adresse e-mail invalide. Vérifiez le format saisi."},
+    )
+    telephone = forms.CharField(
+        required=False,
+        label="Téléphone",
+        widget=forms.TextInput(
+            attrs={"class": INPUT_CSS, "placeholder": "Ex : 01 96 35 56 21 ou +2290196355621", "autocomplete": "tel"}
+        ),
+    )
+
+    def __init__(self, *args, cible=None, **kwargs):
+        initial = kwargs.pop("initial", {}) or {}
+        if cible is not None:
+            profil = getattr(cible, "profil", None)
+            initial = {
+                **initial,
+                "email": getattr(cible, "email", "") or "",
+                "telephone": getattr(profil, "telephone", "") or "",
+            }
+        kwargs["initial"] = initial
+        super().__init__(*args, **kwargs)
+        self.cible = cible
+
+    def clean_email(self):
+        return (self.cleaned_data.get("email") or "").strip().lower()
+
+    def clean_telephone(self):
+        value = (self.cleaned_data.get("telephone") or "").strip()
+        if not value:
+            return ""
+        valider_telephone_international(value)
+        import re
+
+        return re.sub(r"[\s\-.()]", "", value)
 
 
 class ProfilTerritorialForm(forms.ModelForm):

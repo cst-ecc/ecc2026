@@ -12,12 +12,14 @@ from .access_forms import (
     ActionAffectationForm,
     AffectationTerritorialeForm,
     ProfilTerritorialForm,
+    UtilisateurContactForm,
 )
 from .forms import TailwindSetPasswordForm
 from .identifiants import generer_identifiant, generer_mot_de_passe_provisoire
 from .models import (
     AffectationTerritoriale,
     HistoriqueAffectationTerritoriale,
+    HistoriqueContactUtilisateur,
     Profil,
     Province,
     Region,
@@ -49,7 +51,30 @@ def _cible_gerable(request, pk):
     return cible
 
 
-def _contexte_formulaire(request, *, profil_form, utilisateur=None, is_edit=False, affectation_form=None):
+def _snapshot_contacts(utilisateur):
+    profil = getattr(utilisateur, "profil", None)
+    return {
+        "email": (getattr(utilisateur, "email", "") or "").strip(),
+        "telephone": (getattr(profil, "telephone", "") or "").strip(),
+    }
+
+
+def _journaliser_contacts_si_modifies(*, utilisateur, effectue_par, ancien, nouveau):
+    if ancien == nouveau:
+        return
+    HistoriqueContactUtilisateur.objects.create(
+        utilisateur=utilisateur,
+        effectue_par=effectue_par,
+        ancien_email=ancien.get("email", ""),
+        nouveau_email=nouveau.get("email", ""),
+        ancien_telephone=ancien.get("telephone", ""),
+        nouveau_telephone=nouveau.get("telephone", ""),
+    )
+
+
+def _contexte_formulaire(
+    request, *, profil_form, utilisateur=None, is_edit=False, affectation_form=None, contact_form=None
+):
     affectations = []
     historique = []
     if utilisateur is not None:
@@ -68,8 +93,12 @@ def _contexte_formulaire(request, *, profil_form, utilisateur=None, is_edit=Fals
             )[:100]
         )
 
+    if contact_form is None:
+        contact_form = UtilisateurContactForm(cible=utilisateur)
+
     return {
         "profil_form": profil_form,
+        "contact_form": contact_form,
         "utilisateur": utilisateur,
         "is_edit": is_edit,
         "affectation_form": affectation_form,
@@ -130,7 +159,8 @@ def utilisateur_create(request):
 
     if request.method == "POST":
         profil_form = ProfilTerritorialForm(request.POST, responsable=request.user)
-        if profil_form.is_valid():
+        contact_form = UtilisateurContactForm(request.POST)
+        if profil_form.is_valid() and contact_form.is_valid():
             try:
                 with transaction.atomic():
                     role = profil_form.cleaned_data["role"]
@@ -152,6 +182,7 @@ def utilisateur_create(request):
                         password=mot_de_passe,
                         first_name=(request.POST.get("first_name") or "").strip(),
                         last_name=(request.POST.get("last_name") or "").strip(),
+                        email=contact_form.cleaned_data.get("email", ""),
                     )
                     profil = utilisateur.profil
                     profil.role = role
@@ -160,6 +191,7 @@ def utilisateur_create(request):
                     profil.district = district
                     profil.zone = zone
                     profil.cree_par = request.user
+                    profil.telephone = contact_form.cleaned_data.get("telephone", "") or None
                     profil.full_clean()
                     profil.save()
 
@@ -171,11 +203,12 @@ def utilisateur_create(request):
         messages.error(request, "Veuillez corriger les erreurs indiquées.")
     else:
         profil_form = ProfilTerritorialForm(responsable=request.user)
+        contact_form = UtilisateurContactForm()
 
     return render(
         request,
         "recensement/utilisateur_form.html",
-        _contexte_formulaire(request, profil_form=profil_form, is_edit=False),
+        _contexte_formulaire(request, profil_form=profil_form, is_edit=False, contact_form=contact_form),
     )
 
 
@@ -209,8 +242,10 @@ def utilisateur_update(request, pk):
             responsable=request.user,
             cible=utilisateur,
         )
-        if profil_form.is_valid():
+        contact_form = UtilisateurContactForm(request.POST, cible=utilisateur)
+        if profil_form.is_valid() and contact_form.is_valid():
             ancien = serialiser_profil(profil)
+            ancien_contact = _snapshot_contacts(utilisateur)
             with transaction.atomic():
                 profil_modifie = profil_form.save(commit=False)
                 profil_modifie.full_clean()
@@ -218,8 +253,20 @@ def utilisateur_update(request, pk):
 
                 utilisateur.first_name = (request.POST.get("first_name") or "").strip()
                 utilisateur.last_name = (request.POST.get("last_name") or "").strip()
+                utilisateur.email = contact_form.cleaned_data.get("email", "")
                 utilisateur.is_active = request.POST.get("is_active") == "on"
-                utilisateur.save(update_fields=["first_name", "last_name", "is_active"])
+                utilisateur.save(update_fields=["first_name", "last_name", "email", "is_active"])
+
+                profil_modifie.telephone = contact_form.cleaned_data.get("telephone", "") or None
+                profil_modifie.save(update_fields=["telephone"])
+
+                nouveau_contact = _snapshot_contacts(utilisateur)
+                _journaliser_contacts_si_modifies(
+                    utilisateur=utilisateur,
+                    effectue_par=request.user,
+                    ancien=ancien_contact,
+                    nouveau=nouveau_contact,
+                )
 
                 nouveau = serialiser_profil(profil_modifie)
                 journaliser_modification_principale(
@@ -239,6 +286,7 @@ def utilisateur_update(request, pk):
             responsable=request.user,
             cible=utilisateur,
         )
+        contact_form = UtilisateurContactForm(cible=utilisateur)
 
     affectation_form = AffectationTerritorialeForm(
         responsable=request.user,
@@ -253,6 +301,7 @@ def utilisateur_update(request, pk):
             utilisateur=utilisateur,
             is_edit=True,
             affectation_form=affectation_form,
+            contact_form=contact_form,
         ),
     )
 

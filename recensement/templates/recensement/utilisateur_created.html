@@ -26,6 +26,12 @@
     </div>
 
     <div>
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Coordonnées</p>
+      <p class="text-slate-800">E-mail : {{ utilisateur.email|default:"Non renseigné" }}</p>
+      <p class="text-slate-800">Téléphone : {{ utilisateur.profil.telephone|default:"Non renseigné" }}</p>
+    </div>
+
+    <div>
       <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Rôle</p>
       <p class="text-slate-800">{{ utilisateur.profil.get_role_display }}</p>
     </div>

@@ -7,8 +7,7 @@ Ordre d'exécution :
   2. Génération des codes courts R/P/D/Z.
   3. Création des utilisateurs de test (tous les rôles).
   4. Création des fiches de recensement (tous les statuts).
-  5. Génération des codes officiels pour les fiches validées.
-  6. Création des historiques de modification.
+  5. Création des historiques de modification.
 
 Idempotence : chaque objet est créé via get_or_create / update_or_create ;
 relancer la commande ne crée pas de doublons.
@@ -41,7 +40,6 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from recensement.codification import generer_codes_retroactifs
 from recensement.models import (
     District,
     FicheParoisse,
@@ -462,12 +460,15 @@ def _creer_ou_maj_utilisateur(
     prenom="",
     nom="",
     is_superuser=False,
+    email="",
+    telephone="",
 ):
     """Crée ou met à jour un utilisateur et son profil de démonstration.
     Retourne l'objet User."""
     user, created = User.objects.get_or_create(username=username)
     user.first_name = prenom
     user.last_name = nom
+    user.email = email or ""
     user.is_staff = is_superuser
     user.is_superuser = is_superuser
     user.is_active = True
@@ -480,6 +481,7 @@ def _creer_ou_maj_utilisateur(
     profil.province = province
     profil.district = district
     profil.zone = zone
+    profil.telephone = telephone or None
     if cree_par is not None:
         profil.cree_par = cree_par
     profil.save()
@@ -586,23 +588,16 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"{len(fiches)} fiches créées/mises à jour."))
 
         # ----------------------------------------------------------------
-        # 4. Codification officielle des fiches validées
+        # 4. Historiques de modification
         # ----------------------------------------------------------------
-        self.stdout.write("\n── Étape 4/6 : Codification officielle ──")
-        nb_codes = generer_codes_retroactifs(verbose=False)
-        self.stdout.write(self.style.SUCCESS(f"{nb_codes} code(s) officiel(s) généré(s) pour les fiches validées."))
-
-        # ----------------------------------------------------------------
-        # 5. Historiques de modification
-        # ----------------------------------------------------------------
-        self.stdout.write("\n── Étape 5/6 : Historiques de modification ──")
+        self.stdout.write("\n── Étape 4/5 : Historiques de modification ──")
         nb_histo = self._creer_historiques(fiches, comptes)
         self.stdout.write(self.style.SUCCESS(f"{nb_histo} historiques créés."))
 
         # ----------------------------------------------------------------
-        # 6. Résumé final
+        # 5. Résumé final
         # ----------------------------------------------------------------
-        self.stdout.write("\n── Étape 6/6 : Résumé ──")
+        self.stdout.write("\n── Étape 5/5 : Résumé ──")
         self._afficher_resume(mdp)
 
     # ====================================================================
@@ -707,6 +702,8 @@ class Command(BaseCommand):
             role=Profil.Role.SUPER_ADMIN,
             prenom="Celestin",
             nom="Agbossou",
+            email="support@ecc.bj",
+            telephone="+2290190000000",
             is_superuser=True,
         )
         self.stdout.write("  ✓ SA001 (Super Administrateur)")
@@ -724,6 +721,8 @@ class Command(BaseCommand):
                 cree_par=sa,
                 prenom="Honoré",
                 nom="Degbey",
+                email="omoobaoshoffa@gmail.com",
+                telephone="+2290191111111",
             )
             self.stdout.write(f"  ✓ {username_opp1} (OP PROVINCE — {p1.nom})")
 
@@ -741,6 +740,8 @@ class Command(BaseCommand):
                 cree_par=opp1 or sa,
                 prenom="Théodore",
                 nom="Azonho",
+                email="",
+                telephone="+2290192222222",
             )
             self.stdout.write(f"  ✓ {username_opd1} (OP DISTRICT — {d1.nom})")
 
@@ -759,6 +760,8 @@ class Command(BaseCommand):
                 cree_par=opd1 or sa,
                 prenom="Sylvestre",
                 nom="Koutchika",
+                email="opzone.demo@ecc.bj",
+                telephone="",
             )
             self.stdout.write(f"  ✓ {username_opz1} (OP ZONE — {z1.nom})")
 
@@ -777,6 +780,8 @@ class Command(BaseCommand):
                 cree_par=opd1 or sa,
                 prenom="Jérémie",
                 nom="Houssou",
+                email="",
+                telephone="",
             )
             self.stdout.write(f"  ✓ {username_ag1} (Agent — {z1.nom})")
 
@@ -795,6 +800,8 @@ class Command(BaseCommand):
                 cree_par=opd1 or sa,
                 prenom="Victorine",
                 nom="Gbèdo",
+                email="agent.demo@ecc.bj",
+                telephone="+2290193333333",
             )
             self.stdout.write(f"  ✓ {username_ag2} (Agent — {z1.nom})")
 
@@ -811,6 +818,8 @@ class Command(BaseCommand):
                 cree_par=sa,
                 prenom="Prosper",
                 nom="Biaou",
+                email="province2.demo@ecc.bj",
+                telephone="+2348012345678",
             )
             self.stdout.write(f"  ✓ {username_opp2} (OP PROVINCE — {p2.nom})")
 
@@ -828,6 +837,8 @@ class Command(BaseCommand):
                 cree_par=opp2 or sa,
                 prenom="Euloge",
                 nom="Sossou",
+                email="district2.demo@ecc.bj",
+                telephone="",
             )
             self.stdout.write(f"  ✓ {username_opd2} (OP DISTRICT — {d2.nom})")
 
@@ -846,6 +857,8 @@ class Command(BaseCommand):
                 cree_par=opd2 or sa,
                 prenom="Barnabé",
                 nom="Tamou",
+                email="",
+                telephone="+2290194444444",
             )
             self.stdout.write(f"  ✓ {username_ag3} (Agent — {z2.nom})")
 
@@ -1068,7 +1081,10 @@ Utilisateurs (mot de passe commun : {mdp})
             profil = getattr(u, "profil", None)
             role_label = profil.get_role_display() if profil else "—"
             perimetre = profil.perimetre_display() if profil else "—"
-            self.stdout.write(f"  {u.username:<35} {role_label:<30} {perimetre}")
+            contact = (
+                f"email={u.email or '—'} tel={getattr(profil, 'telephone', '') or '—'}" if profil else "email=— tel=—"
+            )
+            self.stdout.write(f"  {u.username:<35} {role_label:<30} {perimetre} | {contact}")
 
         self.stdout.write(
             self.style.SUCCESS(f"""
@@ -1078,7 +1094,6 @@ Fiches de recensement
   En attente OP PROVINCE  : {FicheParoisse.objects.filter(statut_validation="attente_manager").count()}
   En attente OP DISTRICT  : {FicheParoisse.objects.filter(statut_validation="attente_superviseur").count()}
 
-Codes officiels générés   : {FicheParoisse.objects.exclude(code_officiel__isnull=True).exclude(code_officiel="").count()}
 Historiques de modification : {HistoriqueModification.objects.count()}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

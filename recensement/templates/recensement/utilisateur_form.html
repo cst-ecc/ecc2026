@@ -20,6 +20,11 @@
       {% for error in profil_form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
     </div>
   {% endif %}
+  {% if contact_form.non_field_errors %}
+    <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {% for error in contact_form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+    </div>
+  {% endif %}
 
   <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Identité et statut</div>
@@ -56,6 +61,29 @@
           Compte actif
         </label>
       {% endif %}
+    </div>
+  </div>
+
+
+  <div class="app-card">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Coordonnées facultatives</div>
+    <div class="p-5">
+      <p class="text-sm text-slate-500 mb-4">
+        L’adresse e-mail sera utilisée pour les relances et les notifications système lorsqu’elle est renseignée. Sans e-mail, la notification interne reste créée.
+      </p>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label for="{{ contact_form.email.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ contact_form.email.label }}</label>
+          {{ contact_form.email }}
+          {% for error in contact_form.email.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label for="{{ contact_form.telephone.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ contact_form.telephone.label }}</label>
+          {{ contact_form.telephone }}
+          <p class="text-xs text-slate-400 mt-1">Numéro béninois ou international, avec ou sans indicatif.</p>
+          {% for error in contact_form.telephone.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        </div>
+      </div>
     </div>
   </div>
 
@@ -196,6 +224,23 @@
 Après : {{ entree.nouveau_perimetre }}</pre></details>
       </div>
       {% empty %}<p class="p-5 text-sm text-slate-400">Aucun historique territorial.</p>{% endfor %}
+    </div>
+  </div>
+
+
+  <div class="app-card">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Historique des contacts</div>
+    <div class="divide-y divide-slate-100">
+      {% for entree in utilisateur.historique_contacts.all|slice:":10" %}
+      <div class="p-4 text-sm">
+        <div class="flex justify-between gap-4"><strong>Coordonnées modifiées</strong><span class="text-xs text-slate-400">{{ entree.date_modification|date:'d/m/Y H:i' }}</span></div>
+        <p class="text-slate-600 mt-1">Par {{ entree.effectue_par.get_username|default:'Compte supprimé' }}</p>
+        <div class="grid sm:grid-cols-2 gap-3 mt-3 text-xs">
+          <div class="rounded bg-red-50 border border-red-100 p-3"><span class="font-semibold text-red-700">Avant</span><br>E-mail : {{ entree.ancien_email|default:'Non renseigné' }}<br>Téléphone : {{ entree.ancien_telephone|default:'Non renseigné' }}</div>
+          <div class="rounded bg-green-50 border border-green-100 p-3"><span class="font-semibold text-green-700">Après</span><br>E-mail : {{ entree.nouveau_email|default:'Non renseigné' }}<br>Téléphone : {{ entree.nouveau_telephone|default:'Non renseigné' }}</div>
+        </div>
+      </div>
+      {% empty %}<p class="p-5 text-sm text-slate-400">Aucune modification de contact enregistrée.</p>{% endfor %}
     </div>
   </div>
 </div>

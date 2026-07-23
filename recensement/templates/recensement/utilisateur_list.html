@@ -74,6 +74,7 @@
       <tr>
         <th class="px-4 py-3 font-medium">Identifiant</th>
         <th class="px-4 py-3 font-medium">Nom</th>
+        <th class="px-4 py-3 font-medium">Contact</th>
         <th class="px-4 py-3 font-medium">Rôle</th>
         <th class="px-4 py-3 font-medium">Périmètre</th>
         <th class="px-4 py-3 font-medium">Accès supplémentaires</th>
@@ -95,6 +96,13 @@
 
         {# Nom #}
         <td class="px-4 py-3">{{ u.get_full_name|default:"—" }}</td>
+
+        {# Contact #}
+        <td class="px-4 py-3 text-xs text-slate-600">
+          {% if u.email %}<div><span class="text-slate-400">E-mail :</span> {{ u.email }}</div>{% endif %}
+          {% if u.profil.telephone %}<div><span class="text-slate-400">Tél. :</span> {{ u.profil.telephone }}</div>{% endif %}
+          {% if not u.email and not u.profil.telephone %}<span class="text-slate-400">Non renseigné</span>{% endif %}
+        </td>
 
         {# Rôle #}
         <td class="px-4 py-3">
@@ -195,7 +203,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="9" class="text-center text-slate-400 py-8">Aucun compte pour le moment.</td>
+        <td colspan="10" class="text-center text-slate-400 py-8">Aucun compte pour le moment.</td>
       </tr>
       {% endfor %}
     </tbody>

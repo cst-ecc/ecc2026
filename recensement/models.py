@@ -320,6 +320,13 @@ class Profil(models.Model):
         auto_now_add=True,
         help_text="Date et heure de création du compte.",
     )
+    telephone = models.CharField(
+        max_length=30,
+        null=True,
+        blank=True,
+        verbose_name="Téléphone",
+        help_text="Numéro de téléphone facultatif de l'utilisateur.",
+    )
 
     class Meta:
         verbose_name = "Profil utilisateur"
@@ -1057,6 +1064,36 @@ class HistoriqueAffectationTerritoriale(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} — {self.utilisateur.get_username()} — {self.date_action:%d/%m/%Y %H:%M}"
+
+
+class HistoriqueContactUtilisateur(models.Model):
+    """Trace les changements d'e-mail et de téléphone d'un utilisateur."""
+
+    utilisateur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="historique_contacts",
+    )
+    effectue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="modifications_contacts_utilisateurs",
+    )
+    ancien_email = models.EmailField(blank=True)
+    nouveau_email = models.EmailField(blank=True)
+    ancien_telephone = models.CharField(max_length=30, blank=True)
+    nouveau_telephone = models.CharField(max_length=30, blank=True)
+    date_modification = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_modification", "-id"]
+        verbose_name = "Historique de contact utilisateur"
+        verbose_name_plural = "Historiques de contacts utilisateurs"
+
+    def __str__(self):
+        return f"Contacts de {self.utilisateur.get_username()} modifiés le {self.date_modification:%d/%m/%Y %H:%M}"
 
 
 class NotificationInterne(models.Model):
