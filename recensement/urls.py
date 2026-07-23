@@ -3,6 +3,8 @@ from django.urls import path
 from recensement.healthcheck import healthcheck
 
 from . import access_views, views
+from .views import doublon_views
+from .views import notifications_views
 
 app_name = "recensement"
 
@@ -29,6 +31,7 @@ urlpatterns = [
     path("ajax/districts/<int:province_id>/", views.ajax_districts, name="ajax_districts"),
     path("ajax/zones/<int:district_id>/", views.ajax_zones, name="ajax_zones"),
     path("ajax/villages/<int:zone_id>/", views.ajax_villages, name="ajax_villages"),
+    path("ajax/doublons-fiche/", doublon_views.ajax_verifier_doublon_fiche, name="ajax_verifier_doublon_fiche"),
     # Gestion hiérarchique des comptes et accès territoriaux
     path("utilisateurs/", access_views.utilisateur_list, name="utilisateur_list"),
     path("utilisateurs/nouveau/", access_views.utilisateur_create, name="utilisateur_create"),
@@ -61,12 +64,16 @@ urlpatterns = [
         views.relance_intervention_super_admin,
         name="relance_intervention_super_admin",
     ),
-    path("notifications/", views.notifications_liste, name="notifications_liste"),
-    path("notifications/<int:pk>/lue/", views.notification_marquer_lue, name="notification_marquer_lue"),
 
     # Sites particuliers (gestion séparée du recensement ordinaire)
     path("sites-particuliers/", views.site_particulier_list, name="site_particulier_list"),
     path("sites-particuliers/ajouter/", views.site_particulier_create, name="site_particulier_create"),
     path("sites-particuliers/<int:pk>/", views.site_particulier_detail, name="site_particulier_detail"),
     path("sites-particuliers/<int:pk>/modifier/", views.site_particulier_update, name="site_particulier_update"),
+    path("notifications/", notifications_views.notifications_liste, name="notifications_liste"),
+    path(
+        "notifications/<int:pk>/lue/",
+        notifications_views.notification_marquer_lue,
+        name="notification_marquer_lue",
+    ),
 ]

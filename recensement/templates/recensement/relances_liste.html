@@ -58,9 +58,19 @@
         </td>
         <td class="px-4 py-3 whitespace-nowrap">
           {% if ligne.peut_relancer %}
-            <form method="post" action="{% url 'recensement:relance_lancer' ligne.fiche.pk %}" class="inline">{% csrf_token %}<button type="submit" class="border border-brand-600 text-brand-700 hover:bg-brand-50 text-xs font-semibold rounded-lg px-3 py-1.5">{% if ligne.etat.nb_relances == 0 %}Première relance{% elif ligne.etat.nb_relances == 1 %}Deuxième relance{% else %}Dernière relance{% endif %}</button></form>
+            <form method="post" action="{% url 'recensement:relance_lancer' ligne.fiche.pk %}" class="inline"
+                  data-confirm-title="Confirmer l’envoi de la relance"
+                  data-confirm-message="Envoyer une relance pour « {{ ligne.fiche.nom_paroisse }} » ?"
+                  data-confirm-details="Une notification interne sera créée et un e-mail sera envoyé si l’opérateur concerné possède une adresse e-mail."
+                  data-confirm-label="Envoyer la relance"
+                  data-confirm-variant="warning">{% csrf_token %}<button type="submit" class="border border-brand-600 text-brand-700 hover:bg-brand-50 text-xs font-semibold rounded-lg px-3 py-1.5">{% if ligne.etat.nb_relances == 0 %}Première relance{% elif ligne.etat.nb_relances == 1 %}Deuxième relance{% else %}Dernière relance{% endif %}</button></form>
           {% elif ligne.peut_intervenir %}
-            <form method="post" action="{% url 'recensement:relance_intervention_super_admin' ligne.fiche.pk %}" class="inline" onsubmit="return confirm('Confirmer la validation directe de cette fiche par intervention du super administrateur ?');">{% csrf_token %}<button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg px-3 py-1.5">Intervention super admin</button></form>
+            <form method="post" action="{% url 'recensement:relance_intervention_super_admin' ligne.fiche.pk %}" class="inline"
+                  data-confirm-title="Intervention du super administrateur"
+                  data-confirm-message="Confirmer la validation directe de cette fiche par intervention du super administrateur ?"
+                  data-confirm-details="Cette action est réservée au super administrateur après épuisement du cycle de relances."
+                  data-confirm-label="Confirmer l’intervention"
+                  data-confirm-variant="danger">{% csrf_token %}<button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg px-3 py-1.5">Intervention super admin</button></form>
           {% else %}<span class="text-xs text-slate-400">—</span>{% endif %}
         </td>
       </tr>

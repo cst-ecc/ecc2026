@@ -45,7 +45,11 @@
         <td class="px-4 py-3">
           <div class="flex gap-2">
             <form method="post" action="{% url 'recensement:fiche_valider' fiche.pk %}"
-                  data-confirm-valider="Valider « {{ fiche.nom_paroisse }} » ? Vous ne pourrez plus la modifier vous-même après validation.">
+                  data-confirm-title="Confirmer la validation"
+                  data-confirm-message="Valider « {{ fiche.nom_paroisse }} » ? Cette action transmettra la fiche au palier suivant."
+                  data-confirm-details="Après validation, vous ne pourrez plus modifier cette fiche vous-même."
+                  data-confirm-label="Valider la fiche"
+                  data-confirm-variant="success">
               {% csrf_token %}
               <button type="submit"
                       class="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">

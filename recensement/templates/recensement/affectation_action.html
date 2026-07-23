@@ -21,7 +21,12 @@
         <div class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{{ form.non_field_errors }}</div>
       {% endif %}
 
-      <form method="post" class="space-y-4">
+      <form method="post" class="space-y-4"
+            data-confirm-title="{{ action|capfirst }} l’affectation"
+            data-confirm-message="Confirmer cette action sur l’affectation territoriale de {{ utilisateur.username }} ?"
+            data-confirm-details="Cette action sera tracée dans l’historique des accès territoriaux."
+            data-confirm-label="Confirmer"
+            data-confirm-variant="{% if action == 'retirer' %}danger{% elif action == 'suspendre' %}warning{% else %}success{% endif %}">
         {% csrf_token %}
         <div>
           <label for="{{ form.motif.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.motif.label }}</label>

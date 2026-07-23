@@ -113,6 +113,7 @@
           <label for="{{ form.nom_paroisse.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nom_paroisse.label }}</label>
           {{ form.nom_paroisse }}
           {% for error in form.nom_paroisse.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+          <div id="doublon-live-warning" class="hidden mt-3" aria-live="polite"></div>
         </div>
         <div class="grid sm:grid-cols-2 gap-4">
           <div>
@@ -459,6 +460,50 @@
           fiche ne pourra plus être modifiée que par un superviseur ou un manager, avec
           justification obligatoire.
         </p>
+        {% if form.alerte_doublon and form.alerte_doublon.gravite != "aucun" %}
+          <div class="mb-4 rounded-xl border {% if form.alerte_doublon.gravite == 'bloquant' %}border-red-200 bg-red-50 text-red-800{% else %}border-amber-200 bg-amber-50 text-amber-800{% endif %} px-4 py-3 text-sm">
+            <div class="font-semibold">
+              {% if form.alerte_doublon.gravite == "bloquant" %}
+                Doublon probable détecté
+              {% else %}
+                Une fiche similaire existe déjà
+              {% endif %}
+            </div>
+            <p class="mt-1">{{ form.alerte_doublon.motif_principal }}</p>
+
+            <ul class="mt-3 space-y-2">
+              {% for item in form.alerte_doublon.correspondances %}
+                <li class="rounded-lg bg-white/70 px-3 py-2">
+                  <div class="font-semibold">{{ item.nom }}</div>
+                  <div class="text-xs opacity-80">
+                    {{ item.zone }} · {{ item.statut }}
+                    {% if item.distance_metres %} · GPS : {{ item.distance_metres|floatformat:0 }} m{% endif %}
+                    · Similarité : {{ item.score_nom|floatformat:2 }}
+                  </div>
+                  {% if item.url %}
+                    <a href="{{ item.url }}" class="mt-1 inline-block text-xs font-semibold underline">Ouvrir la fiche existante</a>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+
+            {% if form.alerte_doublon.peut_confirmer %}
+              <div class="mt-4 border-t border-amber-200 pt-3">
+                <label class="flex items-start gap-2 text-sm font-medium">
+                  {{ form.confirmer_doublon_possible }}
+                  <span>{{ form.confirmer_doublon_possible.label }}</span>
+                </label>
+                {% for error in form.confirmer_doublon_possible.errors %}<p class="text-red-600 text-xs mt-1">{{ error }}</p>{% endfor %}
+                <div class="mt-3">
+                  <label for="{{ form.motif_doublon_possible.id_for_label }}" class="block text-xs font-medium mb-1">{{ form.motif_doublon_possible.label }}</label>
+                  {{ form.motif_doublon_possible }}
+                  {% for error in form.motif_doublon_possible.errors %}<p class="text-red-600 text-xs mt-1">{{ error }}</p>{% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+
         <dl id="recap-content" class="text-sm divide-y divide-slate-100">
           <!-- Rempli dynamiquement en JS (wizard.js) au moment d'atteindre cette étape -->
         </dl>
@@ -525,6 +570,7 @@
    * null lorsqu’aucune erreur de validation n’existe.
    */
   window.RECENSEMENT_ETAPE_ERREUR = {{ etape_erreur_json|safe }};
+  window.RECENSEMENT_DOUBLONS_URL = "{% url 'recensement:ajax_verifier_doublon_fiche' %}";
 </script>
 
 <script
@@ -551,6 +597,11 @@
 <!-- Gestion cumulative des trois photos de la paroisse -->
 <script
   src="{% static 'recensement/js/photos.js' %}"
+  defer
+></script>
+
+<script
+  src="{% static 'recensement/js/doublon_check.js' %}"
   defer
 ></script>
 

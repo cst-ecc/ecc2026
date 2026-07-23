@@ -15,6 +15,12 @@ from decimal import Decimal
 from django import forms
 from django.core.validators import MaxValueValidator, MinValueValidator
 
+from ..doublons import (
+    analyser_risque_doublon,
+    appliquer_infos_doublon_sur_instance,
+    journaliser_alerte_doublon,
+    normaliser_nom_paroisse,
+)
 from ..models import District, FicheParoisse, Profil, Province, Region, Village, Zone
 from ..permissions import get_role, peut_creer_dans_zone, zones_autorisees
 from .base import (
@@ -59,6 +65,31 @@ class FicheParoisseForm(forms.ModelForm):
         widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_village"}),
     )
 
+    confirmer_doublon_possible = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={
+                "class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500",
+                "id": "id_confirmer_doublon_possible",
+            }
+        ),
+        label="Je confirme qu’il ne s’agit pas de la même paroisse.",
+    )
+    motif_doublon_possible = forms.CharField(
+        required=False,
+        min_length=10,
+        max_length=1000,
+        widget=forms.Textarea(
+            attrs={
+                "class": INPUT_CSS,
+                "rows": 3,
+                "id": "id_motif_doublon_possible",
+                "placeholder": "Expliquez pourquoi cette fiche est légitime malgré la similarité détectée.",
+            }
+        ),
+        label="Motif de confirmation",
+    )
+
     # Champ "honeypot" anti-robot
     site_web = forms.CharField(
         required=False,
@@ -75,6 +106,7 @@ class FicheParoisseForm(forms.ModelForm):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
+        self.alerte_doublon = None
         if user is None:
             return
 
@@ -367,20 +399,39 @@ class FicheParoisseForm(forms.ModelForm):
 
         nom_paroisse = cleaned_data.get("nom_paroisse")
         parish_shepherd = cleaned_data.get("parish_shepherd")
-        if zone and nom_paroisse and parish_shepherd:
-            doublons = FicheParoisse.objects.filter(
+        contact_responsable = cleaned_data.get("contact_responsable")
+        if zone and nom_paroisse:
+            self.alerte_doublon = analyser_risque_doublon(
                 zone=zone,
-                nom_paroisse__iexact=nom_paroisse,
-                parish_shepherd__iexact=parish_shepherd,
+                nom_paroisse=nom_paroisse,
+                latitude=latitude,
+                longitude=longitude,
+                parish_shepherd=parish_shepherd or "",
+                contact_responsable=contact_responsable or "",
+                instance=self.instance,
+                utilisateur=self.user,
             )
-            if self.instance.pk:
-                doublons = doublons.exclude(pk=self.instance.pk)
-            if doublons.exists():
+
+            if self.alerte_doublon.get("gravite") == "bloquant":
                 self.add_error(
                     "nom_paroisse",
-                    "Cette paroisse existe déjà dans cette zone (même nom, même chargé de paroisse). "
-                    "Vérifiez auprès de votre superviseur avant de continuer.",
+                    "Une fiche identique ou très similaire existe déjà dans cette zone. "
+                    "La création d'une nouvelle fiche est bloquée : il faut vérifier ou corriger la fiche existante.",
                 )
+
+            elif self.alerte_doublon.get("gravite") == "confirmation":
+                confirmation = cleaned_data.get("confirmer_doublon_possible")
+                motif = (cleaned_data.get("motif_doublon_possible") or "").strip()
+                if not confirmation:
+                    self.add_error(
+                        "confirmer_doublon_possible",
+                        "Confirmez explicitement qu'il ne s'agit pas de la même paroisse.",
+                    )
+                if len(motif) < 10:
+                    self.add_error(
+                        "motif_doublon_possible",
+                        "Un motif d'au moins 10 caractères est obligatoire pour poursuivre malgré l'alerte.",
+                    )
 
         # Contrôle serveur commun à tous les rôles. Le HTML et le JavaScript
         # ne sont jamais considérés comme une barrière de sécurité.
@@ -391,6 +442,23 @@ class FicheParoisseForm(forms.ModelForm):
             )
 
         return cleaned_data
+
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.nom_paroisse_normalise = normaliser_nom_paroisse(instance.nom_paroisse)
+
+        if self.alerte_doublon:
+            appliquer_infos_doublon_sur_instance(
+                instance,
+                self.alerte_doublon,
+                motif_confirmation=(self.cleaned_data.get("motif_doublon_possible") or "").strip(),
+            )
+
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 # ---------------------------------------------------------------------------

@@ -12,7 +12,12 @@
   </p>
 </div>
 
-<form method="post" class="app-card p-5 space-y-6">
+<form method="post" class="app-card p-5 space-y-6"
+      data-confirm-title="{% if is_edit %}Enregistrer les modifications{% else %}Créer le site particulier{% endif %}"
+      data-confirm-message="{% if is_edit %}Confirmer la modification de ce site particulier ?{% else %}Confirmer la création de ce nouveau site particulier ?{% endif %}"
+      data-confirm-details="Les sites particuliers restent séparés du circuit ordinaire de recensement des paroisses."
+      data-confirm-label="{% if is_edit %}Enregistrer{% else %}Créer le site{% endif %}"
+      data-confirm-variant="success">
   {% csrf_token %}
 
   {% if form.non_field_errors %}

@@ -458,6 +458,38 @@ class FicheParoisse(models.Model):
 
     # --- Identité de la paroisse ---
     nom_paroisse = models.CharField(max_length=200)
+    nom_paroisse_normalise = models.CharField(
+        max_length=220,
+        blank=True,
+        db_index=True,
+        help_text="Version normalisée du nom utilisée pour la détection anti-doublon.",
+    )
+
+    class StatutDoublon(models.TextChoices):
+        AUCUN = "aucun", "Aucun risque détecté"
+        A_VERIFIER = "a_verifier", "Doublon possible à vérifier"
+        CONFIRME_LEGITIME = "confirme_legitime", "Confirmé comme fiche légitime"
+        BLOQUE = "bloque", "Doublon bloqué"
+
+    doublon_statut = models.CharField(
+        max_length=30,
+        choices=StatutDoublon.choices,
+        default=StatutDoublon.AUCUN,
+        db_index=True,
+        help_text="État de contrôle anti-doublon de cette fiche.",
+    )
+    doublon_reference = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="doublons_signales",
+        help_text="Fiche existante la plus proche lorsque le système détecte un risque de doublon.",
+    )
+    doublon_motif = models.TextField(
+        blank=True,
+        help_text="Motif fourni lorsqu'une fiche proche est confirmée comme légitime.",
+    )
     annee_fondation = models.PositiveIntegerField(null=True, blank=True)
 
     # --- Chargé de paroisse ---
@@ -603,6 +635,10 @@ class FicheParoisse(models.Model):
                 name="unique_paroisse_zone_nom_charge",
             ),
         ]
+        indexes = [
+            models.Index(fields=["zone", "nom_paroisse_normalise"], name="fiche_zone_nomnorm_idx"),
+            models.Index(fields=["zone", "doublon_statut"], name="fiche_zone_doublon_idx"),
+        ]
 
     def __str__(self):
         return f"{self.nom_paroisse} — {self.localite}"
@@ -664,6 +700,55 @@ class HistoriqueModification(models.Model):
 
     def __str__(self):
         return f"Modification de « {self.fiche.nom_paroisse} » le {self.date_modification:%d/%m/%Y %H:%M}"
+
+
+class HistoriqueAlerteDoublon(models.Model):
+    """Journal des alertes ou tentatives de doublon détectées par le système."""
+
+    class Action(models.TextChoices):
+        CREATION = "creation", "Création"
+        MODIFICATION = "modification", "Modification"
+        TENTATIVE_BLOQUEE = "tentative_bloquee", "Tentative bloquée"
+
+    fiche = models.ForeignKey(
+        FicheParoisse,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="alertes_doublon",
+        help_text="Nouvelle fiche concernée si elle a été enregistrée.",
+    )
+    fiche_reference = models.ForeignKey(
+        FicheParoisse,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="alertes_comme_reference",
+        help_text="Fiche existante la plus proche détectée par le système.",
+    )
+    utilisateur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="alertes_doublon_declenchees",
+    )
+    action = models.CharField(max_length=30, choices=Action.choices)
+    niveau_risque = models.CharField(max_length=30, blank=True)
+    nom_normalise = models.CharField(max_length=220, blank=True)
+    details = models.JSONField(default=dict, blank=True)
+    date_detection = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_detection", "-id"]
+        verbose_name = "Alerte de doublon"
+        verbose_name_plural = "Alertes de doublons"
+        indexes = [
+            models.Index(fields=["niveau_risque", "date_detection"], name="alerte_doublon_risque_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_action_display()} — {self.niveau_risque} — {self.date_detection:%d/%m/%Y %H:%M}"
 
 
 class CodeParoisseHistorique(models.Model):

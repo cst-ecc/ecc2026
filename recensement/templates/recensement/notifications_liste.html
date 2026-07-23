@@ -15,14 +15,32 @@
         <div>
           <div class="flex items-center gap-2 flex-wrap">
             <h2 class="font-semibold text-slate-900">{{ notification.titre }}</h2>
-            {% if not notification.est_lue %}<span class="inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">Non lue</span>{% else %}<span class="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold">Lue</span>{% endif %}
+            {% if not notification.est_lue %}
+              <span class="inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">Non lue</span>
+            {% else %}
+              <span class="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold">Lue</span>
+            {% endif %}
           </div>
           <p class="text-sm text-slate-600 mt-2 whitespace-pre-line">{{ notification.message }}</p>
-          <p class="text-xs text-slate-400 mt-2">{{ notification.date_creation|date:"d/m/Y à H:i" }}{% if notification.cree_par %} · par {{ notification.cree_par.get_full_name|default:notification.cree_par.username }}{% endif %}</p>
+          <p class="text-xs text-slate-400 mt-2">
+            {{ notification.date_creation|date:"d/m/Y à H:i" }}
+            {% if notification.cree_par %} · par {{ notification.cree_par.get_full_name|default:notification.cree_par.username }}{% endif %}
+          </p>
         </div>
+
         <div class="flex flex-col gap-2 items-end">
-          {% if notification.url_cible %}<a href="{{ notification.url_cible }}" class="text-xs border border-brand-600 text-brand-700 hover:bg-brand-50 rounded-lg px-3 py-1.5">Ouvrir</a>{% endif %}
-          {% if not notification.est_lue %}<form method="post" action="{% url 'recensement:notification_marquer_lue' notification.pk %}">{% csrf_token %}<button type="submit" class="text-xs border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg px-3 py-1.5">Marquer comme lue</button></form>{% endif %}
+          {% if notification.url_cible %}
+            <a href="{{ notification.url_cible }}" class="text-xs border border-brand-600 text-brand-700 hover:bg-brand-50 rounded-lg px-3 py-1.5">Ouvrir</a>
+          {% endif %}
+
+          {% if not notification.est_lue %}
+            <form method="post" action="{% url 'recensement:notification_marquer_lue' notification.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="text-xs border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg px-3 py-1.5">
+                Marquer comme lue
+              </button>
+            </form>
+          {% endif %}
         </div>
       </div>
     </div>

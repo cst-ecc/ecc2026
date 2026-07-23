@@ -9,7 +9,11 @@
   <div class="flex gap-2 flex-wrap">
     {% if peut_valider %}
       <form method="post" action="{% url 'recensement:fiche_valider' fiche.pk %}"
-            data-confirm-valider="Valider cette fiche ? Vous ne pourrez plus la modifier vous-même après validation.">
+            data-confirm-title="Confirmer la validation"
+            data-confirm-message="Valider cette fiche ? Elle sera transmise au palier suivant."
+            data-confirm-details="Après validation, vous ne pourrez plus la modifier vous-même."
+            data-confirm-label="Valider la fiche"
+            data-confirm-variant="success">
         {% csrf_token %}
         <button type="submit"
                 class="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-3.5 py-2 rounded-lg">

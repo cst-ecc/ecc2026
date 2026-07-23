@@ -191,15 +191,11 @@
       });
     })();
 
-    document.addEventListener("submit", function (event) {
-      var form = event.target;
-      if (form.matches && form.matches("[data-confirm-valider]")) {
-        var message = form.getAttribute("data-confirm-valider");
-        if (!window.confirm(message)) { event.preventDefault(); }
-      }
-    });
   </script>
 
+  {% include "recensement/includes/_confirm_modal.html" %}
+
+  <script src="{% static 'recensement/js/confirm_modal.js' %}" defer></script>
   <script src="{% static 'recensement/js/manager_change_guard.js' %}"></script>
   <script src="{% static 'recensement/js/export_preview.js' %}"></script>
 

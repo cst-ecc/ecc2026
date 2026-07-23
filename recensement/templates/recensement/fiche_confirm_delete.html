@@ -23,7 +23,12 @@
         fiche (localisation, chargé de paroisse, GPS, observations) seront perdues.
       </div>
 
-      <form method="post" class="mt-5 flex flex-col sm:flex-row gap-2 justify-end">
+      <form method="post" class="mt-5 flex flex-col sm:flex-row gap-2 justify-end"
+            data-confirm-title="Suppression définitive"
+            data-confirm-message="Supprimer définitivement « {{ fiche.nom_paroisse }} » ?"
+            data-confirm-details="Cette action est irréversible. Toutes les données liées à cette fiche seront perdues."
+            data-confirm-label="Supprimer définitivement"
+            data-confirm-variant="danger">
         {% csrf_token %}
         <a href="{% url 'recensement:fiche_detail' fiche.pk %}"
            class="text-center border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg">

@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_http_methods
 
+from ..doublons import journaliser_alerte_doublon
 from ..forms import FicheParoisseForm, MotifModificationForm, PhotosParoisseForm
 from ..models import (
     District,
@@ -42,6 +43,12 @@ def fiche_create(request):
             fiche = form.save(commit=False)
             fiche.cree_par = request.user
             fiche.save()
+            journaliser_alerte_doublon(
+                fiche=fiche,
+                utilisateur=request.user,
+                alerte=getattr(form, "alerte_doublon", None),
+                action="creation",
+            )
             for photo in photos_form.cleaned_data["photos"]:
                 PhotoParoisse.objects.create(fiche=fiche, image=photo)
             messages.success(
@@ -50,6 +57,19 @@ def fiche_create(request):
                 "Vous pouvez recenser une autre paroisse.",
             )
             return redirect("recensement:fiche_create")
+        if getattr(form, "alerte_doublon", None) and form.alerte_doublon.get("gravite") == "bloquant":
+            journaliser_alerte_doublon(
+                fiche=None,
+                utilisateur=request.user,
+                alerte=form.alerte_doublon,
+                action="tentative_bloquee",
+                valeurs_saisies={
+                    "nom_paroisse": request.POST.get("nom_paroisse", ""),
+                    "zone": request.POST.get("zone", ""),
+                    "latitude": request.POST.get("latitude", ""),
+                    "longitude": request.POST.get("longitude", ""),
+                },
+            )
         etape_erreur = _premiere_etape_en_erreur(form, photos_form)
         messages.error(
             request,
@@ -109,6 +129,12 @@ def fiche_update(request, pk):
         if form.is_valid() and motif_form.is_valid():
             avant = _snapshot_fiche(fiche)
             fiche_modifiee = form.save()
+            journaliser_alerte_doublon(
+                fiche=fiche_modifiee,
+                utilisateur=request.user,
+                alerte=getattr(form, "alerte_doublon", None),
+                action="modification",
+            )
             apres = _snapshot_fiche(fiche_modifiee)
             HistoriqueModification.objects.create(
                 fiche=fiche_modifiee,
