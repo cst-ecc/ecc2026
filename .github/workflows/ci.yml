@@ -86,6 +86,15 @@ jobs:
       SESSION_COOKIE_SECURE: "False"
       SECURE_SSL_REDIRECT: "False"
       CSRF_TRUSTED_ORIGINS: "http://localhost"
+      EMAIL_BACKEND: "django.core.mail.backends.console.EmailBackend"
+      EMAIL_HOST: "localhost"
+      EMAIL_PORT: "1025"
+      EMAIL_USE_TLS: "False"
+      EMAIL_USE_SSL: "False"
+      EMAIL_HOST_USER: ""
+      EMAIL_HOST_PASSWORD: ""
+      DEFAULT_FROM_EMAIL: ""
+      SITE_URL: "http://localhost"
 
     steps:
       - uses: actions/checkout@v4
