@@ -966,3 +966,77 @@ class HistoriqueAffectationTerritoriale(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} — {self.utilisateur.get_username()} — {self.date_action:%d/%m/%Y %H:%M}"
+
+
+# ---------------------------------------------------------------------------
+# Relances de validation (système à 3 niveaux avant intervention super admin)
+# ---------------------------------------------------------------------------
+
+class RelanceValidation(models.Model):
+    """État des relances pour une fiche en attente de validation.
+
+    Une ligne est créée au moment de la première relance sur une fiche
+    (via ``relances.lancer_relance``). Tant qu'aucune relance n'a été
+    lancée, l'absence de ligne équivaut à « 0 relance, action immédiatement
+    disponible » (voir ``relances.etat_relance``).
+
+    Règle des délais (imposée par ``recensement.relances``, pas par ce
+    modèle) : 7 jours après la 1ère relance, 3 jours après la 2e, puis
+    1 jour après la 3e avant que le super administrateur puisse intervenir.
+    """
+
+    fiche = models.OneToOneField(
+        FicheParoisse,
+        on_delete=models.CASCADE,
+        related_name="relance_validation",
+    )
+    nb_relances = models.PositiveSmallIntegerField(default=0)
+
+    date_relance_1 = models.DateTimeField(null=True, blank=True)
+    date_relance_2 = models.DateTimeField(null=True, blank=True)
+    date_relance_3 = models.DateTimeField(null=True, blank=True)
+
+    date_prochaine_relance_autorisee = models.DateTimeField(null=True, blank=True)
+    date_intervention_super_admin_autorisee = models.DateTimeField(null=True, blank=True)
+    intervention_super_admin_effectuee = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "Relance de validation"
+        verbose_name_plural = "Relances de validation"
+
+    def __str__(self):
+        return f"Relances pour « {self.fiche.nom_paroisse} » ({self.nb_relances}/3)"
+
+
+class HistoriqueRelance(models.Model):
+    """Journal immuable de chaque relance et intervention super admin."""
+
+    class Action(models.TextChoices):
+        RELANCE_1 = "relance_1", "Première relance"
+        RELANCE_2 = "relance_2", "Deuxième relance"
+        RELANCE_3 = "relance_3", "Troisième relance (dernière)"
+        INTERVENTION_SUPER_ADMIN = "intervention_super_admin", "Intervention du super administrateur"
+
+    fiche = models.ForeignKey(
+        FicheParoisse,
+        on_delete=models.CASCADE,
+        related_name="historique_relances",
+    )
+    action = models.CharField(max_length=30, choices=Action.choices)
+    effectue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="relances_effectuees",
+    )
+    role_effecteur = models.CharField(max_length=20, blank=True)
+    date_action = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_action", "-id"]
+        verbose_name = "Historique de relance"
+        verbose_name_plural = "Historiques de relances"
+
+    def __str__(self):
+        return f"{self.get_action_display()} — {self.fiche.nom_paroisse} — {self.date_action:%d/%m/%Y %H:%M}"

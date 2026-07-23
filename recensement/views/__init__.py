@@ -10,6 +10,7 @@ réparti par responsabilité :
 - ``carte_views.py``      : carte + flux GeoJSON ;
 - ``export_views.py``     : prévisualisation + export Excel ;
 - ``ajax_views.py``       : listes déroulantes en cascade ;
+- ``relances_views.py``   : système de relances de validation (3 niveaux) ;
 - ``legacy_user_views.py``: anciennes vues « utilisateur » (non routées,
                             conservées pour compatibilité d'import) ;
 - ``helpers.py``          : helpers internes partagés (non exposés en URL).
@@ -22,31 +23,15 @@ modification :
     from recensement.views import fiche_create, dashboard   # OK
     from recensement import views ; views.fiches_geojson     # OK
 
-Refactor purement structurel : aucune règle métier, de permission ou de
-validation n'a été modifiée.
+Refactor purement structurel pour la partie historique ; les vues de
+``relances_views.py`` sont un ajout fonctionnel neuf (système de relances).
 """
 
 # --- Pages publiques / aiguillage -----------------------------------------
-# --- AJAX cascade ----------------------------------------------------------
-from .ajax_views import (
-    ajax_districts,
-    ajax_provinces,
-    ajax_villages,
-    ajax_zones,
-)
-
-# --- Carte -----------------------------------------------------------------
-from .carte_views import carte_paroisses, fiches_geojson
+from .public_views import landing, post_login_redirect
 
 # --- Tableau de bord -------------------------------------------------------
 from .dashboard_views import dashboard, suivi_modifications
-
-# --- Export ----------------------------------------------------------------
-from .export_views import (  # noqa: F401
-    _fiches_export_filtrees,
-    fiche_export_excel,
-    fiche_export_preview,
-)
 
 # --- Fiches de recensement -------------------------------------------------
 from .fiche_views import (
@@ -57,21 +42,32 @@ from .fiche_views import (
     fiche_update,
 )
 
-# --- Helpers internes (réexportés pour compat des imports existants) -------
-from .helpers import (  # noqa: F401
-    _CHAMP_VERS_ETAPE,
-    _CSV_FORMULA_PREFIXES,
-    _csv_safe,
-    _fiches_visibles_pour,
-    _premiere_etape_en_erreur,
-    _snapshot_fiche,
+# --- Workflow de validation ------------------------------------------------
+from .validation_views import fiche_a_valider, fiche_valider
+
+# --- Carte -----------------------------------------------------------------
+from .carte_views import carte_paroisses, fiches_geojson
+
+# --- Export ----------------------------------------------------------------
+from .export_views import fiche_export_excel, fiche_export_preview
+
+# --- AJAX cascade ----------------------------------------------------------
+from .ajax_views import (
+    ajax_districts,
+    ajax_provinces,
+    ajax_villages,
+    ajax_zones,
+)
+
+# --- Relances de validation --------------------------------------------------
+from .relances_views import (
+    relance_intervention_super_admin,
+    relance_lancer,
+    relances_liste,
 )
 
 # --- Vues « utilisateur » héritées (non routées, compat import) ------------
-from .legacy_user_views import (  # noqa: F401
-    _provinces_disponibles,
-    _regions_disponibles,
-    _utilisateurs_visibles_pour,
+from .legacy_user_views import (
     utilisateur_create,
     utilisateur_created,
     utilisateur_delete,
@@ -80,10 +76,23 @@ from .legacy_user_views import (  # noqa: F401
     utilisateur_toggle_actif,
     utilisateur_update,
 )
-from .public_views import landing, post_login_redirect
 
-# --- Workflow de validation ------------------------------------------------
-from .validation_views import fiche_a_valider, fiche_valider
+# --- Helpers internes (réexportés pour compat des imports existants) -------
+from .helpers import (
+    _CHAMP_VERS_ETAPE,
+    _CSV_FORMULA_PREFIXES,
+    _csv_safe,
+    _fiches_visibles_pour,
+    _premiere_etape_en_erreur,
+    _snapshot_fiche,
+)
+from .export_views import _fiches_export_filtrees
+from .legacy_user_views import (
+    _provinces_disponibles,
+    _regions_disponibles,
+    _utilisateurs_visibles_pour,
+)
+
 
 __all__ = [
     # Pages publiques
@@ -112,6 +121,10 @@ __all__ = [
     "ajax_districts",
     "ajax_zones",
     "ajax_villages",
+    # Relances
+    "relances_liste",
+    "relance_lancer",
+    "relance_intervention_super_admin",
     # Vues utilisateur héritées (non routées)
     "utilisateur_list",
     "utilisateur_create",

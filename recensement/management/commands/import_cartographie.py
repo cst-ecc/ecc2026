@@ -34,6 +34,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from recensement.models import District, Province, Region, Village, Zone
+from recensement.sites_particuliers import corriger_nom_site
 
 DEFAULT_SHEET = "Cartographie avec villes "
 DEFAULT_FILE = settings.BASE_DIR / "recensement" / "data" / "cartographie_benin.xlsx"
@@ -309,6 +310,7 @@ class Command(BaseCommand):
                             stats["zones"] += 1
 
                         for village_nom in split_villages(e):
+                            village_nom = corriger_nom_site(village_nom, current_district.nom)
                             village_nom = village_nom[:200]
                             _, v_created = Village.objects.get_or_create(zone=zone_obj, nom=village_nom)
                             if v_created:

@@ -1,3 +1,4 @@
+from . import relances
 from .models import AffectationTerritoriale, FicheParoisse, Profil
 from .permissions import (
     districts_autorises,
@@ -59,6 +60,9 @@ def role_context(request):
         "peut_gerer_utilisateurs": peut_gerer_utilisateurs,
         "peut_voir_historique_affectations": role == Profil.Role.SUPER_ADMIN,
         "nb_a_valider": nb_a_valider,
+        # Système de relances de validation.
+        "peut_voir_menu_relances": relances.peut_voir_menu_relances(user),
+        "nb_relances_disponibles": relances.nb_actions_relance_disponibles(user),
         # Périmètre utilisateur pour l'affichage dans les templates.
         "user_scope": _build_user_scope(user, role),
     }

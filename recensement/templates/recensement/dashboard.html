@@ -108,4 +108,38 @@
     </div>
   </div>
 </div>
+
+<div class="flex justify-between items-center flex-wrap gap-2 mb-3 mt-8">
+  <h2 class="text-base font-semibold text-slate-900">Relances de validation</h2>
+  <a href="{% url 'recensement:relances_liste' %}"
+     class="inline-flex items-center gap-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium px-3.5 py-2 rounded-lg">
+    Voir le détail
+  </a>
+</div>
+<div class="grid sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8 text-sm">
+  <div class="app-card p-4">
+    <div class="text-2xl font-bold text-slate-900">{{ resume_relances.total_en_attente }}</div>
+    <div class="text-slate-500 mt-0.5">En attente au total</div>
+  </div>
+  <div class="app-card p-4">
+    <div class="text-2xl font-bold text-slate-700">{{ resume_relances.nb_jamais_relancees }}</div>
+    <div class="text-slate-500 mt-0.5">Jamais relancées</div>
+  </div>
+  <div class="app-card p-4">
+    <div class="text-2xl font-bold text-slate-700">{{ resume_relances.nb_relance_1_faite }}</div>
+    <div class="text-slate-500 mt-0.5">1ère relance faite</div>
+  </div>
+  <div class="app-card p-4">
+    <div class="text-2xl font-bold text-slate-700">{{ resume_relances.nb_relance_2_faite }}</div>
+    <div class="text-slate-500 mt-0.5">2ᵉ relance faite</div>
+  </div>
+  <div class="app-card p-4 border-amber-200">
+    <div class="text-2xl font-bold text-amber-700">{{ resume_relances.nb_relance_3_faite }}</div>
+    <div class="text-slate-500 mt-0.5">3ᵉ relance faite</div>
+  </div>
+  <div class="app-card p-4 border-red-200">
+    <div class="text-2xl font-bold text-red-700">{{ resume_relances.nb_intervention_possible }}</div>
+    <div class="text-slate-500 mt-0.5">Intervention possible</div>
+  </div>
+</div>
 {% endblock %}

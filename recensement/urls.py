@@ -52,4 +52,13 @@ urlpatterns = [
         name="utilisateur_toggle_actif",
     ),
     path("utilisateurs/<int:pk>/supprimer/", access_views.utilisateur_delete, name="utilisateur_delete"),
+
+    # Système de relances de validation (3 niveaux + intervention super admin)
+    path("relances/", views.relances_liste, name="relances_liste"),
+    path("relances/<int:pk>/relancer/", views.relance_lancer, name="relance_lancer"),
+    path(
+        "relances/<int:pk>/intervention/",
+        views.relance_intervention_super_admin,
+        name="relance_intervention_super_admin",
+    ),
 ]
