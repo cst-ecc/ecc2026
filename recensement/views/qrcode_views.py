@@ -1,4 +1,4 @@
-from django.http import Http404, HttpResponse
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET
@@ -54,9 +54,6 @@ def paroisse_qrcode(request, code_court):
     )
 
     response["Cache-Control"] = "public, max-age=86400"
-    response["Content-Disposition"] = (
-        f'inline; filename="qrcode-{fiche.code_court}.png"'
-    )
+    response["Content-Disposition"] = f'inline; filename="qrcode-{fiche.code_court}.png"'
 
     return response
-

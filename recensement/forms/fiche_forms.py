@@ -388,23 +388,23 @@ class FicheParoisseForm(forms.ModelForm):
         if statut_batiment != "autre":
             cleaned_data["statut_batiment_autre"] = ""
 
-        village = cleaned_data.get("village") 
-        nouvelle_localite = (cleaned_data.get("nouvelle_localite_nom") or "").strip() 
-        # En modification, ne jamais vider silencieusement une localité existante. 
-        # # Si le navigateur renvoie village="" et nouvelle_localite_nom="", 
-        # # on conserve la valeur déjà enregistrée en base. 
-        if self.instance and self.instance.pk and not village and not nouvelle_localite: 
-            if self.instance.village_id: 
-                cleaned_data["village"] = self.instance.village 
-                village = self.instance.village 
-            elif self.instance.nouvelle_localite_nom: 
-                cleaned_data["nouvelle_localite_nom"] = self.instance.nouvelle_localite_nom 
-                nouvelle_localite = self.instance.nouvelle_localite_nom 
+        village = cleaned_data.get("village")
+        nouvelle_localite = (cleaned_data.get("nouvelle_localite_nom") or "").strip()
+        # En modification, ne jamais vider silencieusement une localité existante.
+        # # Si le navigateur renvoie village="" et nouvelle_localite_nom="",
+        # # on conserve la valeur déjà enregistrée en base.
+        if self.instance and self.instance.pk and not village and not nouvelle_localite:
+            if self.instance.village_id:
+                cleaned_data["village"] = self.instance.village
+                village = self.instance.village
+            elif self.instance.nouvelle_localite_nom:
+                cleaned_data["nouvelle_localite_nom"] = self.instance.nouvelle_localite_nom
+                nouvelle_localite = self.instance.nouvelle_localite_nom
 
-        if not village and not nouvelle_localite: 
-            self.add_error( 
-                "nouvelle_localite_nom", 
-                "Sélectionnez un village dans la liste, ou précisez le nom de la localité si elle n'y figure pas.", 
+        if not village and not nouvelle_localite:
+            self.add_error(
+                "nouvelle_localite_nom",
+                "Sélectionnez un village dans la liste, ou précisez le nom de la localité si elle n'y figure pas.",
             )
 
         region = cleaned_data.get("region")

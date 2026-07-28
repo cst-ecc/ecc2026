@@ -366,14 +366,8 @@ class AffectationTerritorialeForm(forms.Form):
             if role_responsable == Profil.Role.SUPER_ADMIN:
                 districts_qs = District.objects.all()
 
-            elif (
-                role_responsable == Profil.Role.OP_PROVINCE
-                and profil_responsable
-                and profil_responsable.province_id
-            ):
-                districts_qs = District.objects.filter(
-                    province_id=profil_responsable.province_id
-                )
+            elif role_responsable == Profil.Role.OP_PROVINCE and profil_responsable and profil_responsable.province_id:
+                districts_qs = District.objects.filter(province_id=profil_responsable.province_id)
 
             actifs = AffectationTerritoriale.objects.filter(
                 utilisateur=cible,
@@ -388,13 +382,9 @@ class AffectationTerritorialeForm(forms.Form):
 
             districts_qs = districts_qs.exclude(pk__in=exclusions)
 
-            provinces_qs = Province.objects.filter(
-                districts__in=districts_qs
-            ).distinct()
+            provinces_qs = Province.objects.filter(districts__in=districts_qs).distinct()
 
-            regions_qs = Region.objects.filter(
-                provinces__in=provinces_qs
-            ).distinct()
+            regions_qs = Region.objects.filter(provinces__in=provinces_qs).distinct()
 
             del self.fields["zone"]
 
@@ -404,26 +394,14 @@ class AffectationTerritorialeForm(forms.Form):
             if role_responsable == Profil.Role.SUPER_ADMIN:
                 zones_qs = Zone.objects.all()
 
-            elif (
-                role_responsable == Profil.Role.OP_PROVINCE
-                and profil_responsable
-                and profil_responsable.province_id
-            ):
-                zones_qs = Zone.objects.filter(
-                    district__province_id=profil_responsable.province_id
-                )
+            elif role_responsable == Profil.Role.OP_PROVINCE and profil_responsable and profil_responsable.province_id:
+                zones_qs = Zone.objects.filter(district__province_id=profil_responsable.province_id)
 
             elif role_responsable == Profil.Role.OP_DISTRICT:
-                zones_qs = Zone.objects.filter(
-                    district_id__in=(
-                        districts_autorises(responsable) or set()
-                    )
-                )
+                zones_qs = Zone.objects.filter(district_id__in=(districts_autorises(responsable) or set()))
 
             elif role_responsable == Profil.Role.OP_ZONE:
-                zones_qs = Zone.objects.filter(
-                    pk__in=(zones_autorisees(responsable) or set())
-                )
+                zones_qs = Zone.objects.filter(pk__in=(zones_autorisees(responsable) or set()))
 
             actifs = AffectationTerritoriale.objects.filter(
                 utilisateur=cible,
@@ -438,17 +416,11 @@ class AffectationTerritorialeForm(forms.Form):
 
             zones_qs = zones_qs.exclude(pk__in=exclusions)
 
-            districts_qs = District.objects.filter(
-                zones__in=zones_qs
-            ).distinct()
+            districts_qs = District.objects.filter(zones__in=zones_qs).distinct()
 
-            provinces_qs = Province.objects.filter(
-                districts__in=districts_qs
-            ).distinct()
+            provinces_qs = Province.objects.filter(districts__in=districts_qs).distinct()
 
-            regions_qs = Region.objects.filter(
-                provinces__in=provinces_qs
-            ).distinct()
+            regions_qs = Region.objects.filter(provinces__in=provinces_qs).distinct()
 
         self.fields["region"].queryset = regions_qs.order_by(
             "ordre",
@@ -471,9 +443,7 @@ class AffectationTerritorialeForm(forms.Form):
         zone = cleaned.get("zone")
 
         if self.niveau is None:
-            raise ValidationError(
-                "Ce rôle ne peut pas recevoir d'affectation supplémentaire."
-            )
+            raise ValidationError("Ce rôle ne peut pas recevoir d'affectation supplémentaire.")
 
         if not region:
             self.add_error(
@@ -493,21 +463,13 @@ class AffectationTerritorialeForm(forms.Form):
                 "Sélectionnez un district.",
             )
 
-        if (
-            province
-            and region
-            and province.region_id != region.pk
-        ):
+        if province and region and province.region_id != region.pk:
             self.add_error(
                 "province",
                 "Cette province n'appartient pas à la région choisie.",
             )
 
-        if (
-            district
-            and province
-            and district.province_id != province.pk
-        ):
+        if district and province and district.province_id != province.pk:
             self.add_error(
                 "district",
                 "Ce district n'appartient pas à la province choisie.",
@@ -520,11 +482,7 @@ class AffectationTerritorialeForm(forms.Form):
                     "Sélectionnez une zone.",
                 )
 
-            if (
-                zone
-                and district
-                and zone.district_id != district.pk
-            ):
+            if zone and district and zone.district_id != district.pk:
                 self.add_error(
                     "zone",
                     "Cette zone n'appartient pas au district choisi.",

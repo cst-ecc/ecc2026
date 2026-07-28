@@ -335,8 +335,7 @@ class Command(BaseCommand):
         self.stdout.write("\n── Étape 1b : Nettoyage « Sites particuliers » de la hiérarchie géo ──")
 
         districts_a_supprimer = [
-            d for d in District.objects.all()
-            if NOM_DISTRICT_SITES_PARTICULIERS in normaliser(d.nom)
+            d for d in District.objects.all() if NOM_DISTRICT_SITES_PARTICULIERS in normaliser(d.nom)
         ]
 
         if not districts_a_supprimer:
@@ -384,9 +383,7 @@ class Command(BaseCommand):
                 nb_existants += 1
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f"Sites particuliers : {nb_crees} créé(s), {nb_existants} déjà existant(s)."
-            )
+            self.style.SUCCESS(f"Sites particuliers : {nb_crees} créé(s), {nb_existants} déjà existant(s).")
         )
 
     # ----------------------------------------------------------- super-admin
@@ -467,10 +464,7 @@ class Command(BaseCommand):
     # --------------------------------------------------------------- résumé
     def _resume(self):
         # Vérification : aucun district "Sites particuliers" dans la hiérarchie géo
-        districts_sp = [
-            d for d in District.objects.all()
-            if NOM_DISTRICT_SITES_PARTICULIERS in normaliser(d.nom)
-        ]
+        districts_sp = [d for d in District.objects.all() if NOM_DISTRICT_SITES_PARTICULIERS in normaliser(d.nom)]
         if districts_sp:
             self.stdout.write(
                 self.style.WARNING(
@@ -496,4 +490,3 @@ class Command(BaseCommand):
                 f"Comptes au total      : {User.objects.count()}\n"
             )
         )
-

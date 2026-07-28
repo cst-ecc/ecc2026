@@ -27,7 +27,6 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-
 # ---------------------------------------------------------------------------
 # Constantes
 # ---------------------------------------------------------------------------
@@ -56,22 +55,13 @@ def _segment_numerique(code, longueur):
     - P3   -> 03
     - Z014 -> 014
     """
-    chiffres = "".join(
-        caractere
-        for caractere in str(code or "")
-        if caractere.isdigit()
-    )
+    chiffres = "".join(caractere for caractere in str(code or "") if caractere.isdigit())
 
     if not chiffres:
-        raise ValueError(
-            f"Le code géographique « {code} » ne contient aucun numéro."
-        )
+        raise ValueError(f"Le code géographique « {code} » ne contient aucun numéro.")
 
     if len(chiffres) > longueur:
-        raise ValueError(
-            f"Le code géographique « {code} » dépasse la longueur "
-            f"attendue de {longueur} chiffre(s)."
-        )
+        raise ValueError(f"Le code géographique « {code} » dépasse la longueur attendue de {longueur} chiffre(s).")
 
     return chiffres.zfill(longueur)
 
@@ -92,19 +82,13 @@ def _verifier_referentiel_geographique(fiche):
         raise ValueError("Zone manquante ou sans code.")
 
     if fiche.province.region_id != fiche.region_id:
-        raise ValueError(
-            "La province n'appartient pas à la région de la paroisse."
-        )
+        raise ValueError("La province n'appartient pas à la région de la paroisse.")
 
     if fiche.district.province_id != fiche.province_id:
-        raise ValueError(
-            "Le district n'appartient pas à la province de la paroisse."
-        )
+        raise ValueError("Le district n'appartient pas à la province de la paroisse.")
 
     if fiche.zone.district_id != fiche.district_id:
-        raise ValueError(
-            "La zone n'appartient pas au district de la paroisse."
-        )
+        raise ValueError("La zone n'appartient pas au district de la paroisse.")
 
 
 def _generer_identifiant_alphanumerique():
@@ -120,22 +104,14 @@ def _generer_identifiant_alphanumerique():
     from .models import FicheParoisse
 
     for _ in range(NOMBRE_MAX_TENTATIVES):
-        identifiant = "".join(
-            secrets.choice(ALPHABET_CODE_PAROISSE)
-            for _ in range(LONGUEUR_CODE_ALEATOIRE)
-        )
+        identifiant = "".join(secrets.choice(ALPHABET_CODE_PAROISSE) for _ in range(LONGUEUR_CODE_ALEATOIRE))
 
         code_court = f"{CODE_PAYS_BENIN}-{identifiant}"
 
-        if not FicheParoisse.objects.filter(
-            code_court=code_court
-        ).exists():
+        if not FicheParoisse.objects.filter(code_court=code_court).exists():
             return identifiant, code_court
 
-    raise ValueError(
-        "Impossible de produire un matricule paroissial unique "
-        "après plusieurs tentatives."
-    )
+    raise ValueError("Impossible de produire un matricule paroissial unique après plusieurs tentatives.")
 
 
 def composer_codes_paroisse(fiche):
@@ -167,14 +143,7 @@ def composer_codes_paroisse(fiche):
         3,
     )
 
-    code_long = (
-        f"{CODE_PAYS_BENIN}"
-        f"{region}"
-        f"{province}"
-        f"{district}"
-        f"{zone}"
-        f"{identifiant}"
-    )
+    code_long = f"{CODE_PAYS_BENIN}{region}{province}{district}{zone}{identifiant}"
 
     donnees_composition = {
         "version_codification": 2,
@@ -214,8 +183,7 @@ def generer_code_paroisse(fiche, genere_par=None):
     from .models import CodeParoisseHistorique, FicheParoisse
 
     fiche = (
-        FicheParoisse.objects
-        .select_for_update()
+        FicheParoisse.objects.select_for_update()
         .select_related(
             "region",
             "province",
@@ -225,14 +193,9 @@ def generer_code_paroisse(fiche, genere_par=None):
         .get(pk=fiche.pk)
     )
 
-    if (
-        fiche.statut_validation
-        != FicheParoisse.StatutValidation.VALIDEE
-    ):
+    if fiche.statut_validation != FicheParoisse.StatutValidation.VALIDEE:
         raise ValueError(
-            "La fiche n'est pas complètement validée. "
-            f"Statut actuel : "
-            f"{fiche.get_statut_validation_display()}."
+            f"La fiche n'est pas complètement validée. Statut actuel : {fiche.get_statut_validation_display()}."
         )
 
     # Les deux codes existent : aucune nouvelle génération.
@@ -254,28 +217,15 @@ def generer_code_paroisse(fiche, genere_par=None):
         )
 
     try:
-        code_court, code_long, donnees_composition = (
-            composer_codes_paroisse(fiche)
-        )
+        code_court, code_long, donnees_composition = composer_codes_paroisse(fiche)
     except ValueError as exc:
-        raise ValueError(
-            f"Impossible de générer le code pour "
-            f"« {fiche.nom_paroisse} » : {exc}"
-        ) from exc
+        raise ValueError(f"Impossible de générer le code pour « {fiche.nom_paroisse} » : {exc}") from exc
 
-    if FicheParoisse.objects.filter(
-        code_court=code_court
-    ).exclude(pk=fiche.pk).exists():
-        raise ValueError(
-            f"Le code court {code_court} est déjà attribué."
-        )
+    if FicheParoisse.objects.filter(code_court=code_court).exclude(pk=fiche.pk).exists():
+        raise ValueError(f"Le code court {code_court} est déjà attribué.")
 
-    if FicheParoisse.objects.filter(
-        code_officiel=code_long
-    ).exclude(pk=fiche.pk).exists():
-        raise ValueError(
-            f"Le code long {code_long} est déjà attribué."
-        )
+    if FicheParoisse.objects.filter(code_officiel=code_long).exclude(pk=fiche.pk).exists():
+        raise ValueError(f"Le code long {code_long} est déjà attribué.")
 
     fiche.code_court = code_court
     fiche.code_officiel = code_long
@@ -292,10 +242,7 @@ def generer_code_paroisse(fiche, genere_par=None):
             ]
         )
     except IntegrityError as exc:
-        raise ValueError(
-            "Une collision de matricule a été détectée. "
-            "Veuillez relancer la génération."
-        ) from exc
+        raise ValueError("Une collision de matricule a été détectée. Veuillez relancer la génération.") from exc
 
     CodeParoisseHistorique.objects.create(
         fiche=fiche,
@@ -319,18 +266,11 @@ def generer_codes_retroactifs(verbose=False):
     from .models import FicheParoisse
 
     fiches_a_codifier = (
-        FicheParoisse.objects
-        .filter(
+        FicheParoisse.objects.filter(
             statut_validation=FicheParoisse.StatutValidation.VALIDEE,
         )
-        .filter(
-            Q(code_officiel__isnull=True)
-            | Q(code_officiel="")
-        )
-        .filter(
-            Q(code_court__isnull=True)
-            | Q(code_court="")
-        )
+        .filter(Q(code_officiel__isnull=True) | Q(code_officiel=""))
+        .filter(Q(code_court__isnull=True) | Q(code_court=""))
         .order_by(
             "date_validation_manager",
             "date_recensement",
@@ -348,19 +288,12 @@ def generer_codes_retroactifs(verbose=False):
             )
 
             if verbose:
-                print(
-                    f"  OK {fiche.nom_paroisse:<50} "
-                    f"→ {code}"
-                )
+                print(f"  OK {fiche.nom_paroisse:<50} → {code}")
 
             nb_generees += 1
 
         except ValueError as exc:
             if verbose:
-                print(
-                    f"  ERREUR {fiche.nom_paroisse:<50} "
-                    f"→ {exc}"
-                )
+                print(f"  ERREUR {fiche.nom_paroisse:<50} → {exc}")
 
     return nb_generees
-

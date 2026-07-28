@@ -12,9 +12,7 @@ def generer_qrcode_png(contenu):
     contenu = (contenu or "").strip()
 
     if not contenu:
-        raise ValueError(
-            "Le contenu du QR code ne peut pas être vide."
-        )
+        raise ValueError("Le contenu du QR code ne peut pas être vide.")
 
     qr = qrcode.QRCode(
         version=None,
@@ -35,4 +33,3 @@ def generer_qrcode_png(contenu):
     image.save(buffer, format="PNG")
 
     return buffer.getvalue()
-

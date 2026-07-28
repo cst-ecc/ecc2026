@@ -18,13 +18,13 @@ from .forms import TailwindSetPasswordForm
 from .identifiants import generer_identifiant, generer_mot_de_passe_provisoire
 from .models import (
     AffectationTerritoriale,
+    District,
     HistoriqueAffectationTerritoriale,
     HistoriqueContactUtilisateur,
     Profil,
     Province,
     Region,
     Zone,
-    District,
 )
 from .permissions import (
     get_role,
@@ -335,9 +335,7 @@ def affectation_ajouter(request, pk):
             continue
 
         if not valeur.isdigit():
-            raise PermissionDenied(
-                "La valeur territoriale transmise est invalide."
-            )
+            raise PermissionDenied("La valeur territoriale transmise est invalide.")
 
         valeur_id = int(valeur)
         queryset = form.fields[champ].queryset
@@ -351,35 +349,25 @@ def affectation_ajouter(request, pk):
         if role_connecte == Profil.Role.SUPER_ADMIN:
             if champ == "region":
                 if not Region.objects.filter(pk=valeur_id).exists():
-                    raise PermissionDenied(
-                        "La région demandée n'existe pas."
-                    )
+                    raise PermissionDenied("La région demandée n'existe pas.")
                 continue
 
             if champ == "province":
                 if not Province.objects.filter(pk=valeur_id).exists():
-                    raise PermissionDenied(
-                        "La province demandée n'existe pas."
-                    )
+                    raise PermissionDenied("La province demandée n'existe pas.")
                 continue
 
             if champ == "district":
                 if not District.objects.filter(pk=valeur_id).exists():
-                    raise PermissionDenied(
-                        "Le district demandé n'existe pas."
-                    )
+                    raise PermissionDenied("Le district demandé n'existe pas.")
                 continue
 
             if champ == "zone":
                 if not Zone.objects.filter(pk=valeur_id).exists():
-                    raise PermissionDenied(
-                        "La zone demandée n'existe pas."
-                    )
+                    raise PermissionDenied("La zone demandée n'existe pas.")
                 continue
 
-        raise PermissionDenied(
-            "Le territoire demandé est hors de votre périmètre."
-        )
+        raise PermissionDenied("Le territoire demandé est hors de votre périmètre.")
 
     if get_role(request.user) == Profil.Role.SUPER_ADMIN:
         zone_id = (request.POST.get("zone") or "").strip()
@@ -421,7 +409,6 @@ def affectation_ajouter(request, pk):
                     "Ce district est déjà une affectation supplémentaire active.",
                 )
 
-
     if form.is_valid():
         try:
             niveau = form.niveau
@@ -462,14 +449,11 @@ def affectation_ajouter(request, pk):
         cible=utilisateur,
     )
 
-    contact_form = UtilisateurContactForm(
-        cible=utilisateur
-    )
+    contact_form = UtilisateurContactForm(cible=utilisateur)
 
     messages.error(
         request,
-        "L'affectation supplémentaire n'a pas été ajoutée. "
-        "Veuillez corriger les erreurs indiquées.",
+        "L'affectation supplémentaire n'a pas été ajoutée. Veuillez corriger les erreurs indiquées.",
     )
 
     return render(

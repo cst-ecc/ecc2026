@@ -8,21 +8,17 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import Q
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
 from .codification import generer_code_paroisse
 from .models import FicheParoisse, HistoriqueRelance, NotificationInterne, Profil, RelanceValidation
 from .permissions import districts_autorises, get_profil, get_role
-
-from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string
-from django.utils.html import strip_tags
 
 DELAI_AVANT_RELANCE_2 = timedelta(days=7)
 DELAI_AVANT_RELANCE_3 = timedelta(days=3)
@@ -203,9 +199,7 @@ def _envoyer_email_relance(*, destinataire, fiche, niveau_relance):
     )
 
     if fiche_url:
-        message_texte += (
-            f"\n\nLien vers la fiche : {fiche_url}"
-        )
+        message_texte += f"\n\nLien vers la fiche : {fiche_url}"
 
     expediteur = getattr(
         settings,
@@ -240,6 +234,7 @@ def _envoyer_email_relance(*, destinataire, fiche, niveau_relance):
 
     except Exception as exc:
         return "echec", str(exc)
+
 
 def _creer_notification_et_historique(*, fiche, action, effectue_par, destinataire, niveau_relance, relance_obj):
     message = _message_relance(fiche, niveau_relance)

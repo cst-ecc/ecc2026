@@ -619,10 +619,7 @@ class FicheParoisse(models.Model):
         null=True,
         blank=True,
         db_index=True,
-        help_text=(
-            "Matricule court permanent de la paroisse. "
-            "Exemple : BJ-P7K4M2."
-        ),
+        help_text=("Matricule court permanent de la paroisse. Exemple : BJ-P7K4M2."),
     )
     code_officiel = models.CharField(
         max_length=50,
@@ -630,10 +627,7 @@ class FicheParoisse(models.Model):
         null=True,
         blank=True,
         db_index=True,
-        help_text=(
-            "Code territorial long généré après validation complète. "
-            "Exemple : BJ020307014P7K4M2."
-        ),
+        help_text=("Code territorial long généré après validation complète. Exemple : BJ020307014P7K4M2."),
     )
 
     date_generation_code = models.DateTimeField(

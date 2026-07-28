@@ -87,7 +87,6 @@ def ajouter_affectation(*, attributeur, utilisateur, district=None, zone=None, m
             raise ValidationError("Ce district est déjà l'affectation principale de cet OP DISTRICT.")
         niveau = AffectationTerritoriale.Niveau.DISTRICT
         valeurs = {"district": district, "zone": None}
-    
 
     elif zone is not None:
         if not peut_attribuer_zone(attributeur, utilisateur, zone):
