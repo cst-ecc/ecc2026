@@ -4,12 +4,12 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from .models import (
+from ..models import (
     AffectationTerritoriale,
     HistoriqueAffectationTerritoriale,
     Profil,
 )
-from .permissions import (
+from ..permissions import (
     get_role,
     peut_attribuer_district,
     peut_attribuer_zone,
@@ -74,6 +74,12 @@ def ajouter_affectation(*, attributeur, utilisateur, district=None, zone=None, m
     if not profil:
         raise ValidationError("Le compte cible ne possède pas de profil applicatif.")
 
+    if district is not None and zone is not None:
+        raise ValidationError(
+            "Une affectation supplémentaire doit cibler soit un district, "
+            "soit une zone, mais jamais les deux simultanément."
+        )
+
     if district is not None:
         if not peut_attribuer_district(attributeur, utilisateur, district):
             raise PermissionDenied("Vous ne pouvez pas attribuer ce district.")
@@ -81,6 +87,7 @@ def ajouter_affectation(*, attributeur, utilisateur, district=None, zone=None, m
             raise ValidationError("Ce district est déjà l'affectation principale de cet OP DISTRICT.")
         niveau = AffectationTerritoriale.Niveau.DISTRICT
         valeurs = {"district": district, "zone": None}
+    
 
     elif zone is not None:
         if not peut_attribuer_zone(attributeur, utilisateur, zone):

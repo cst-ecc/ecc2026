@@ -1,5 +1,89 @@
 <section class="app-card mb-4 p-4">
-  <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-sm font-semibold text-brand-900">Codification officielle</h2><p class="mt-0.5 text-xs text-slate-500">Code unique attribué après validation complète de la paroisse.</p></div>
-  {% if fiche.code_officiel %}<span class="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">Code généré</span>{% else %}<span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">En attente</span>{% endif %}</div>
-  <div class="mt-4">{% if fiche.code_officiel %}<code class="inline-block rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-lg font-semibold text-brand-950">{{ fiche.code_officiel }}</code><p class="mt-3 text-xs text-slate-500">Généré le {{ fiche.date_generation_code|date:"d/m/Y à H:i" }}{% if fiche.genere_par %} par {{ fiche.genere_par.get_full_name|default:fiche.genere_par.get_username }}{% endif %}</p>{% else %}<p class="text-sm text-slate-600">Le code sera généré après la validation complète.</p>{% endif %}</div>
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 class="text-sm font-semibold text-brand-900">
+        Codification officielle
+      </h2>
+
+      <p class="mt-0.5 text-xs text-slate-500">
+        Matricules uniques attribués après validation complète de la paroisse.
+      </p>
+    </div>
+
+    {% if fiche.code_officiel and fiche.code_court %}
+      <span class="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+        Codes générés
+      </span>
+    {% else %}
+      <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+        En attente
+      </span>
+    {% endif %}
+  </div>
+
+  {% if fiche.code_officiel and fiche.code_court %}
+    <div class="mt-4 grid gap-5 md:grid-cols-[1fr_auto] md:items-center">
+      <div>
+        <div>
+          <p class="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Code court
+          </p>
+
+          <code class="mt-1 inline-block rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-lg font-semibold text-brand-950">
+            {{ fiche.code_court }}
+          </code>
+        </div>
+
+        <div class="mt-4">
+          <p class="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Code territorial long
+          </p>
+
+          <code class="mt-1 inline-block break-all rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-base font-semibold text-slate-800">
+            {{ fiche.code_officiel }}
+          </code>
+        </div>
+
+        <p class="mt-3 text-xs text-slate-500">
+          Générés le
+          {{ fiche.date_generation_code|date:"d/m/Y à H:i" }}
+
+          {% if fiche.genere_par %}
+            par
+            {{ fiche.genere_par.get_full_name|default:fiche.genere_par.get_username }}
+          {% endif %}
+        </p>
+      </div>
+
+      <div class="flex flex-col items-center rounded-xl border border-slate-200 bg-white p-3">
+        <img
+          src="{% url 'recensement:paroisse_qrcode' fiche.code_court %}"
+          alt="QR code officiel de la paroisse {{ fiche.nom_paroisse }}"
+          width="176"
+          height="176"
+          loading="lazy"
+          class="h-44 w-44 rounded-md"
+        >
+
+        <p class="mt-2 max-w-44 text-center text-xs text-slate-500">
+          Scanner pour vérifier les informations officielles de la paroisse.
+        </p>
+
+        <a
+          href="{% url 'recensement:paroisse_verifier' fiche.code_court %}"
+          target="_blank"
+          rel="noopener"
+          class="mt-2 text-xs font-semibold text-brand-700 hover:underline"
+        >
+          Ouvrir la page de vérification
+        </a>
+      </div>
+    </div>
+  {% else %}
+    <div class="mt-4">
+      <p class="text-sm text-slate-600">
+        Les codes et le QR code seront générés après la validation complète.
+      </p>
+    </div>
+  {% endif %}
 </section>

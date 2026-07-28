@@ -5,9 +5,12 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
 
+from ..codification import generer_code_paroisse
 from ..doublons import journaliser_alerte_doublon
 from ..forms import FicheParoisseForm, MotifModificationForm, PhotosParoisseForm
 from ..models import (
@@ -40,23 +43,70 @@ def fiche_create(request):
         form = FicheParoisseForm(request.POST, request.FILES, user=request.user)
         photos_form = PhotosParoisseForm(request.POST, request.FILES)
         if form.is_valid() and photos_form.is_valid():
-            fiche = form.save(commit=False)
-            fiche.cree_par = request.user
-            fiche.save()
-            journaliser_alerte_doublon(
-                fiche=fiche,
-                utilisateur=request.user,
-                alerte=getattr(form, "alerte_doublon", None),
-                action="creation",
-            )
-            for photo in photos_form.cleaned_data["photos"]:
-                PhotoParoisse.objects.create(fiche=fiche, image=photo)
-            messages.success(
+            role_createur = get_role(request.user)
+
+        try:
+            with transaction.atomic():
+                fiche = form.save(commit=False)
+                fiche.cree_par = request.user
+
+                if role_createur == Profil.Role.SUPER_ADMIN:
+                    maintenant = timezone.now()
+
+                    fiche.statut_validation = FicheParoisse.StatutValidation.VALIDEE
+
+                    # Traçabilité des deux paliers existants :
+                    # le Super administrateur valide directement la fiche.
+                    fiche.valide_par_superviseur = request.user
+                    fiche.date_validation_superviseur = maintenant
+                    fiche.valide_par_manager = request.user
+                    fiche.date_validation_manager = maintenant
+
+                fiche.save()
+
+                journaliser_alerte_doublon(
+                    fiche=fiche,
+                    utilisateur=request.user,
+                    alerte=getattr(form, "alerte_doublon", None),
+                    action="creation",
+                )
+
+                for photo in photos_form.cleaned_data["photos"]:
+                    PhotoParoisse.objects.create(
+                        fiche=fiche,
+                        image=photo,
+                    )
+
+                code_officiel = None
+
+                if role_createur == Profil.Role.SUPER_ADMIN:
+                    code_officiel = generer_code_paroisse(
+                        fiche,
+                        genere_par=request.user,
+                    )
+
+        except ValueError as exc:
+            messages.error(
                 request,
-                "Fiche enregistrée avec succès, en attente de validation par l'OP DISTRICT. "
-                "Vous pouvez recenser une autre paroisse.",
+                "La fiche du Super administrateur n'a pas été enregistrée, "
+                f"car sa codification officielle a échoué : {exc}",
             )
+        else:
+            if role_createur == Profil.Role.SUPER_ADMIN:
+                messages.success(
+                    request,
+                    "Fiche enregistrée et validée directement par le Super administrateur. "
+                    f"Code officiel généré : {code_officiel}.",
+                )
+            else:
+                messages.success(
+                    request,
+                    "Fiche enregistrée avec succès, en attente de validation par l'OP DISTRICT. "
+                    "Vous pouvez recenser une autre paroisse.",
+                )
+
             return redirect("recensement:fiche_create")
+
         if getattr(form, "alerte_doublon", None) and form.alerte_doublon.get("gravite") == "bloquant":
             journaliser_alerte_doublon(
                 fiche=None,
@@ -103,7 +153,7 @@ def fiche_create(request):
 
 
 @login_required
-@role_required(Profil.Role.OP_DISTRICT, Profil.Role.OP_PROVINCE)
+@role_required(Profil.Role.OP_DISTRICT, Profil.Role.OP_PROVINCE, Profil.Role.OP_ZONE, Profil.Role.SUPER_ADMIN)
 @require_http_methods(["GET", "POST"])
 def fiche_update(request, pk):
     """Modification d'une fiche — réservée à l'OP DISTRICT (son district) et

@@ -23,6 +23,8 @@ from .models import (
     Profil,
     Province,
     Region,
+    Zone,
+    District,
 )
 from .permissions import (
     get_role,
@@ -31,7 +33,7 @@ from .permissions import (
     peut_modifier_affectation,
     utilisateurs_visibles_pour,
 )
-from .services_affectations import (
+from .services.services_affectations import (
     ajouter_affectation,
     changer_statut_affectation,
     journaliser_modification_principale,
@@ -310,38 +312,179 @@ def utilisateur_update(request, pk):
 @require_POST
 def affectation_ajouter(request, pk):
     _exiger_gestionnaire(request.user)
+
     utilisateur = _cible_gerable(request, pk)
+
     form = AffectationTerritorialeForm(
         request.POST,
         responsable=request.user,
         cible=utilisateur,
     )
 
-    # Une valeur existante en base mais absente du queryset autorisé indique
-    # une requête falsifiée ou un accès direct hors périmètre : réponse 403.
-    for champ in ("district", "zone"):
+    role_connecte = get_role(request.user)
+
+    for champ in (
+        "region",
+        "province",
+        "district",
+        "zone",
+    ):
         valeur = (request.POST.get(champ) or "").strip()
-        if valeur and champ in form.fields:
-            if not valeur.isdigit() or not form.fields[champ].queryset.filter(pk=int(valeur)).exists():
-                raise PermissionDenied("Le territoire demandé est hors de votre périmètre.")
+
+        if not valeur or champ not in form.fields:
+            continue
+
+        if not valeur.isdigit():
+            raise PermissionDenied(
+                "La valeur territoriale transmise est invalide."
+            )
+
+        valeur_id = int(valeur)
+        queryset = form.fields[champ].queryset
+
+        if queryset.filter(pk=valeur_id).exists():
+            continue
+
+        # Le Super administrateur n'est soumis à aucune restriction
+        # géographique. La destination finale peut toutefois être absente
+        # du queryset lorsqu'elle est déjà principale ou déjà active.
+        if role_connecte == Profil.Role.SUPER_ADMIN:
+            if champ == "region":
+                if not Region.objects.filter(pk=valeur_id).exists():
+                    raise PermissionDenied(
+                        "La région demandée n'existe pas."
+                    )
+                continue
+
+            if champ == "province":
+                if not Province.objects.filter(pk=valeur_id).exists():
+                    raise PermissionDenied(
+                        "La province demandée n'existe pas."
+                    )
+                continue
+
+            if champ == "district":
+                if not District.objects.filter(pk=valeur_id).exists():
+                    raise PermissionDenied(
+                        "Le district demandé n'existe pas."
+                    )
+                continue
+
+            if champ == "zone":
+                if not Zone.objects.filter(pk=valeur_id).exists():
+                    raise PermissionDenied(
+                        "La zone demandée n'existe pas."
+                    )
+                continue
+
+        raise PermissionDenied(
+            "Le territoire demandé est hors de votre périmètre."
+        )
+
+    if get_role(request.user) == Profil.Role.SUPER_ADMIN:
+        zone_id = (request.POST.get("zone") or "").strip()
+        district_id = (request.POST.get("district") or "").strip()
+
+        if form.niveau == AffectationTerritoriale.Niveau.ZONE and zone_id.isdigit():
+            if utilisateur.profil.zone_id == int(zone_id):
+                form.add_error(
+                    "zone",
+                    "Cette zone est déjà l'affectation principale de cet utilisateur.",
+                )
+
+            elif AffectationTerritoriale.objects.filter(
+                utilisateur=utilisateur,
+                niveau=AffectationTerritoriale.Niveau.ZONE,
+                zone_id=int(zone_id),
+                statut=AffectationTerritoriale.Statut.ACTIVE,
+            ).exists():
+                form.add_error(
+                    "zone",
+                    "Cette zone est déjà une affectation supplémentaire active.",
+                )
+
+        elif form.niveau == AffectationTerritoriale.Niveau.DISTRICT and district_id.isdigit():
+            if utilisateur.profil.district_id == int(district_id):
+                form.add_error(
+                    "district",
+                    "Ce district est déjà l'affectation principale de cet utilisateur.",
+                )
+
+            elif AffectationTerritoriale.objects.filter(
+                utilisateur=utilisateur,
+                niveau=AffectationTerritoriale.Niveau.DISTRICT,
+                district_id=int(district_id),
+                statut=AffectationTerritoriale.Statut.ACTIVE,
+            ).exists():
+                form.add_error(
+                    "district",
+                    "Ce district est déjà une affectation supplémentaire active.",
+                )
+
 
     if form.is_valid():
         try:
+            niveau = form.niveau
+
+            district_a_attribuer = None
+            zone_a_attribuer = None
+
+            if niveau == AffectationTerritoriale.Niveau.DISTRICT:
+                district_a_attribuer = form.cleaned_data.get("district")
+
+            elif niveau == AffectationTerritoriale.Niveau.ZONE:
+                zone_a_attribuer = form.cleaned_data.get("zone")
+
             ajouter_affectation(
                 attributeur=request.user,
                 utilisateur=utilisateur,
-                district=form.cleaned_data.get("district"),
-                zone=form.cleaned_data.get("zone"),
+                district=district_a_attribuer,
+                zone=zone_a_attribuer,
                 motif=form.cleaned_data["motif"],
             )
-            messages.success(request, "L'affectation supplémentaire a été ajoutée.")
+
+            messages.success(
+                request,
+                "L'affectation supplémentaire a été ajoutée.",
+            )
+
+            return redirect(
+                "recensement:utilisateur_update",
+                pk=utilisateur.pk,
+            )
+
         except ValidationError as exc:
-            messages.error(request, "; ".join(exc.messages) if hasattr(exc, "messages") else str(exc))
-    else:
-        for erreurs in form.errors.values():
-            for erreur in erreurs:
-                messages.error(request, erreur)
-    return redirect("recensement:utilisateur_update", pk=utilisateur.pk)
+            form.add_error(None, exc)
+
+    profil_form = ProfilTerritorialForm(
+        instance=utilisateur.profil,
+        responsable=request.user,
+        cible=utilisateur,
+    )
+
+    contact_form = UtilisateurContactForm(
+        cible=utilisateur
+    )
+
+    messages.error(
+        request,
+        "L'affectation supplémentaire n'a pas été ajoutée. "
+        "Veuillez corriger les erreurs indiquées.",
+    )
+
+    return render(
+        request,
+        "recensement/utilisateur_form.html",
+        _contexte_formulaire(
+            request,
+            profil_form=profil_form,
+            utilisateur=utilisateur,
+            is_edit=True,
+            affectation_form=form,
+            contact_form=contact_form,
+        ),
+        status=400,
+    )
 
 
 @login_required

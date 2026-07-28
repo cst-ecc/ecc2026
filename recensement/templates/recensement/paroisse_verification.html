@@ -1,0 +1,70 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}
+Vérification de {{ fiche.nom_paroisse }}
+{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl">
+  <section class="app-card overflow-hidden">
+    <div class="border-b border-slate-100 bg-brand-50 px-5 py-4">
+      <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">
+        Registre officiel des paroisses
+      </p>
+
+      <h1 class="mt-1 text-xl font-semibold text-brand-950">
+        {{ fiche.nom_paroisse }}
+      </h1>
+    </div>
+
+    <div class="p-5">
+      <div class="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+        <p class="font-semibold text-green-800">
+          Paroisse officiellement validée
+        </p>
+
+        <p class="mt-1 text-sm text-green-700">
+          Les informations présentées sont issues du registre officiel.
+        </p>
+      </div>
+
+      <dl class="grid grid-cols-3 gap-y-3 text-sm">
+        <dt class="text-slate-500">Code court</dt>
+        <dd class="col-span-2 font-semibold">
+          {{ fiche.code_court }}
+        </dd>
+
+        <dt class="text-slate-500">Code long</dt>
+        <dd class="col-span-2 font-mono font-semibold">
+          {{ fiche.code_officiel }}
+        </dd>
+
+        <dt class="text-slate-500">Région</dt>
+        <dd class="col-span-2">{{ fiche.region.nom }}</dd>
+
+        <dt class="text-slate-500">Province</dt>
+        <dd class="col-span-2">{{ fiche.province.nom }}</dd>
+
+        <dt class="text-slate-500">District</dt>
+        <dd class="col-span-2">{{ fiche.district.nom }}</dd>
+
+        <dt class="text-slate-500">Zone</dt>
+        <dd class="col-span-2">{{ fiche.zone.nom }}</dd>
+
+        <dt class="text-slate-500">Localité</dt>
+        <dd class="col-span-2">{{ fiche.localite }}</dd>
+
+        <dt class="text-slate-500">Fondation</dt>
+        <dd class="col-span-2">
+          {{ fiche.annee_fondation|default:"Année inconnue" }}
+        </dd>
+
+        <dt class="text-slate-500">Immatriculation</dt>
+        <dd class="col-span-2">
+          {{ fiche.date_generation_code|date:"d/m/Y" }}
+        </dd>
+      </dl>
+    </div>
+  </section>
+</div>
+{% endblock %}

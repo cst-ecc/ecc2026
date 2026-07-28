@@ -1,11 +1,12 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-session-timeout-seconds="3600" data-session-warning-seconds="300" data-login-url="{% url 'login' %}">
 <head>
   {% include "recensement/includes/_head.html" %}
 </head>
 
 <body class="min-h-screen overflow-x-hidden bg-slate-50 text-slate-800">
+  {% include "recensement/includes/_loader.html" %}
 
   <!-- Sidebar -->
   <aside
@@ -42,7 +43,7 @@
 
     <div class="shrink-0 border-t border-brand-700 bg-brand-900 p-3">
       <div class="mb-2 truncate text-sm text-brand-100">
-        {{ user.get_full_name|default:user.get_username }}
+        {{ user.get_full_name|default:user.get_username }} {% if user_scope.couverture_label %} <br /> {{ user_scope.role_label }}{% endif %}
       </div>
 
       <form method="post" action="{% url 'logout' %}">
@@ -122,15 +123,24 @@
       </div>
     </main>
 
-    <footer class="shrink-0 border-t border-slate-200 px-4 py-4 text-center text-xs text-slate-400">
-      <p class="flex flex-wrap items-center justify-center gap-1">
-        Développé avec
-        <svg class="h-3 w-3 text-red-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-          <path d="M10 17.5l-1.45-1.32C4.4 12.36 2 10.2 2 7.5 2 5.42 3.42 4 5.5 4c1.16 0 2.28.54 3 1.39A3.99 3.99 0 0 1 11.5 4C13.58 4 15 5.42 15 7.5c0 2.7-2.4 4.86-6.55 8.68L10 17.5z" />
-        </svg>
-        par
-        <a href="https://VOTRE-PORTFOLIO-ICI.example.com" target="_blank" rel="noopener" class="text-brand-600 hover:underline">
-          Chablis Mahutin
+    <footer class="mt-6 border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
+      <p>
+        &copy; {% now "Y" %} Église du Christianisme Céleste — Recensement des paroisses
+      </p>
+
+      <p class="mt-2">
+        Projet initié et supervisé par le
+        <span class="font-semibold text-slate-700">
+          Conseil Supérieur de Transition (CST)
+        </span>
+        — Développé par
+        <a
+          href="https://chablis-mahutin.onrender.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="font-semibold text-brand-600 hover:text-brand-700 hover:underline"
+        >
+          CHABLIS MAHUTIN
         </a>
       </p>
     </footer>
@@ -195,6 +205,7 @@
 
   {% include "recensement/includes/_confirm_modal.html" %}
 
+  <script src="{% static 'recensement/js/session_security.js' %}" defer></script>
   <script src="{% static 'recensement/js/confirm_modal.js' %}" defer></script>
   <script src="{% static 'recensement/js/manager_change_guard.js' %}"></script>
   <script src="{% static 'recensement/js/export_preview.js' %}"></script>

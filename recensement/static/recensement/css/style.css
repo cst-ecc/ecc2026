@@ -535,9 +535,17 @@ input[type="submit"]:disabled {
     background: #fff;
 }
 
-.map-status-dot--validated { border-color: #16a34a; }
-.map-status-dot--province { border-color: #f59e0b; }
-.map-status-dot--district { border-color: #64748b; }
+.map-status-dot--validated {
+    border-color: #16a34a;
+}
+
+.map-status-dot--province {
+    border-color: #f59e0b;
+}
+
+.map-status-dot--district {
+    border-color: #64748b;
+}
 
 @media (min-width: 768px) {
     .map-legend-card {
@@ -551,4 +559,62 @@ input[type="submit"]:disabled {
         padding-top: 0;
         padding-left: 1rem;
     }
+}
+
+/*
+   * Champ géographique actuellement attendu.
+   */
+.geo-field-current {
+    background-color: #ffffff !important;
+    border-color: #2563eb !important;
+    color: #0f172a !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16) !important;
+    opacity: 1 !important;
+    cursor: pointer !important;
+}
+
+/*
+   * Champ géographique déjà renseigné.
+   */
+.geo-field-completed {
+    background-color: #eff6ff !important;
+    border-color: #93c5fd !important;
+    color: #1e3a8a !important;
+    opacity: 1 !important;
+}
+
+/*
+   * Champ géographique pas encore accessible.
+   */
+.geo-field-locked {
+    background-color: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
+    color: #94a3b8 !important;
+    opacity: 0.72 !important;
+    cursor: not-allowed !important;
+}
+
+/*
+   * Différenciation du libellé associé au champ actif.
+   */
+.geo-label-current {
+    color: #1d4ed8 !important;
+    font-weight: 700 !important;
+}
+
+.geo-label-locked {
+    color: #94a3b8 !important;
+}
+
+.geo-label-completed {
+    color: #334155 !important;
+    font-weight: 600 !important;
+}
+
+.geo-field-transition {
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        opacity 0.2s ease;
 }

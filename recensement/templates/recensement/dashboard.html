@@ -12,6 +12,8 @@
 </div>
 
 <p class="text-xs text-slate-400 mb-2">Cliquez sur un compteur pour voir la liste correspondante.</p>
+
+
 <div class="grid sm:grid-cols-4 gap-4 mb-8">
   <a href="{% url 'recensement:fiche_list' %}?statut=tous"
      class="app-card p-5 hover:border-brand-300 hover:shadow transition">
@@ -34,11 +36,13 @@
     <div class="text-sm text-slate-500 mt-1">En attente du chef de province</div>
   </a>
 </div>
-
+<div class="flex justify-between items-center flex-wrap gap-2 mb-3 mt-8">
+  <h2 class="text-base font-semibold text-slate-900">Validation en attente</h2>
+</div>
 <div class="grid lg:grid-cols-2 gap-6">
   <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">
-      En attente — chefs de district à relancer
+      Chefs de district
     </div>
     <div class="overflow-x-auto">
       <table class="min-w-full text-sm app-table">
@@ -71,10 +75,11 @@
       </table>
     </div>
   </div>
+  
 
   <div class="app-card">
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">
-      En attente — chefs de province à relancer
+      Chefs de province
     </div>
     <div class="overflow-x-auto">
       <table class="min-w-full text-sm app-table">

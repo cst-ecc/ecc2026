@@ -1,4 +1,5 @@
 {% extends "recensement/base.html" %}
+{% load static %}
 
 {% block title %}{% if is_edit %}Modifier un compte{% else %}Nouveau compte{% endif %} — Utilisateurs{% endblock %}
 
@@ -149,28 +150,120 @@
       </div>
 
       {% if peut_ajouter_affectation %}
-      <form method="post" action="{% url 'recensement:affectation_ajouter' utilisateur.pk %}" class="rounded-xl border border-slate-200 p-4 mb-5 space-y-3">
-        {% csrf_token %}
-        <h2 class="font-semibold text-slate-800">Ajouter une affectation supplémentaire</h2>
-        {% if affectation_form.district %}
+        <form
+          method="post"
+          id="affectation-supplementaire-form"
+          action="{% url 'recensement:affectation_ajouter' utilisateur.pk %}"
+          class="rounded-xl border border-slate-200 p-4 mb-5 space-y-4"
+        >
+          {% csrf_token %}
+
           <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">{{ affectation_form.district.label }}</label>
+            <h2 class="font-semibold text-slate-800">
+              Ajouter une affectation supplémentaire
+            </h2>
+
+            <p class="text-sm text-slate-500 mt-1">
+              Sélectionnez successivement la région, la province puis le territoire
+              à attribuer.
+            </p>
+          </div>
+
+          {% if affectation_form.non_field_errors %}
+            <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {% for error in affectation_form.non_field_errors %}
+                <p>{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <div id="champ-affectation-region">
+            <label
+              for="{{ affectation_form.region.id_for_label }}"
+              class="block text-sm font-medium text-slate-700 mb-1"
+            >
+              {{ affectation_form.region.label }}
+            </label>
+
+            {{ affectation_form.region }}
+
+            {% for error in affectation_form.region.errors %}
+              <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+            {% endfor %}
+          </div>
+
+          <div id="champ-affectation-province">
+            <label
+              for="{{ affectation_form.province.id_for_label }}"
+              class="block text-sm font-medium text-slate-700 mb-1"
+            >
+              {{ affectation_form.province.label }}
+            </label>
+
+            {{ affectation_form.province }}
+
+            {% for error in affectation_form.province.errors %}
+              <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+            {% endfor %}
+          </div>
+
+          <div id="champ-affectation-district">
+            <label
+              for="{{ affectation_form.district.id_for_label }}"
+              class="block text-sm font-medium text-slate-700 mb-1"
+            >
+              {{ affectation_form.district.label }}
+            </label>
+
             {{ affectation_form.district }}
+
+            {% for error in affectation_form.district.errors %}
+              <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+            {% endfor %}
           </div>
-        {% endif %}
-        {% if affectation_form.zone %}
+
+          {% if affectation_form.zone %}
+            <div id="champ-affectation-zone">
+              <label
+                for="{{ affectation_form.zone.id_for_label }}"
+                class="block text-sm font-medium text-slate-700 mb-1"
+              >
+                {{ affectation_form.zone.label }}
+              </label>
+
+              {{ affectation_form.zone }}
+
+              {% for error in affectation_form.zone.errors %}
+                <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+
           <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">{{ affectation_form.zone.label }}</label>
-            {{ affectation_form.zone }}
+            <label
+              for="{{ affectation_form.motif.id_for_label }}"
+              class="block text-sm font-medium text-slate-700 mb-1"
+            >
+              {{ affectation_form.motif.label }}
+            </label>
+
+            {{ affectation_form.motif }}
+
+            {% for error in affectation_form.motif.errors %}
+              <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+            {% endfor %}
           </div>
-        {% endif %}
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">{{ affectation_form.motif.label }}</label>
-          {{ affectation_form.motif }}
-        </div>
-        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg">Ajouter l’affectation</button>
-      </form>
+
+          <button
+            type="submit"
+            id="btn-ajouter-affectation"
+            class="bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2.5 rounded-lg"
+          >
+            Ajouter l’affectation
+          </button>
+        </form>
       {% endif %}
+
 
       <div class="overflow-x-auto">
         <table class="min-w-full text-sm app-table">
@@ -249,25 +342,34 @@ Après : {{ entree.nouveau_perimetre }}</pre></details>
 
 {% block extra_js %}
 <script>
-(function () {
-  "use strict";
-  var role = document.getElementById("id_role");
-  if (!role) return;
-  var region = document.getElementById("champ-region");
-  var province = document.getElementById("champ-province");
-  var district = document.getElementById("champ-district");
-  var zone = document.getElementById("champ-zone");
+  window.UTILISATEUR_AJAX_URLS = {
+    provinces: "{% url 'recensement:ajax_provinces' 0 %}",
+    districts: "{% url 'recensement:ajax_districts' 0 %}",
+    zones: "{% url 'recensement:ajax_zones' 0 %}"
+  };
 
-  function afficher() {
-    var valeur = role.value;
-    var avecTerritoire = ["op_province", "op_district", "op_zone", "agent"].includes(valeur);
-    region.classList.toggle("hidden", !avecTerritoire);
-    province.classList.toggle("hidden", !avecTerritoire);
-    district.classList.toggle("hidden", !["op_district", "op_zone", "agent"].includes(valeur));
-    zone.classList.toggle("hidden", !["op_zone", "agent"].includes(valeur));
-  }
-  role.addEventListener("change", afficher);
-  afficher();
-})();
+  window.UTILISATEUR_INITIAL = {
+    role: "{{ profil_form.role.value|default:''|escapejs }}",
+    region: "{{ profil_form.region.value|default:''|escapejs }}",
+    province: "{{ profil_form.province.value|default:''|escapejs }}",
+    district: "{{ profil_form.district.value|default:''|escapejs }}",
+    zone: "{{ profil_form.zone.value|default:''|escapejs }}"
+  };
+  window.AFFECTATION_SUPPLEMENTAIRE = {
+    niveau: "{{ affectation_form.niveau|default:''|escapejs }}",
+    region: "{{ affectation_form.region.value|default:''|escapejs }}",
+    province: "{{ affectation_form.province.value|default:''|escapejs }}",
+    district: "{{ affectation_form.district.value|default:''|escapejs }}",
+    zone: "{% if affectation_form.zone %}{{ affectation_form.zone.value|default:''|escapejs }}{% endif %}"
+  };
 </script>
+
+<script
+  src="{% static 'recensement/js/utilisateur_cascade.js' %}"
+  defer
+></script>
+<script
+  src="{% static 'recensement/js/affectation_cascade.js' %}"
+  defer
+></script>
 {% endblock %}

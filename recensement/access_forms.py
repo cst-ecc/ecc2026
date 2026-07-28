@@ -280,27 +280,70 @@ class ProfilTerritorialForm(forms.ModelForm):
 
 
 class AffectationTerritorialeForm(forms.Form):
+    region = forms.ModelChoiceField(
+        queryset=Region.objects.none(),
+        required=False,
+        label="Région ecclésiale",
+        widget=forms.Select(
+            attrs={
+                "class": SELECT_CSS,
+                "id": "id_affectation_region",
+            }
+        ),
+    )
+
+    province = forms.ModelChoiceField(
+        queryset=Province.objects.none(),
+        required=False,
+        label="Province ecclésiale",
+        widget=forms.Select(
+            attrs={
+                "class": SELECT_CSS,
+                "id": "id_affectation_province",
+            }
+        ),
+    )
+
     district = forms.ModelChoiceField(
         queryset=District.objects.none(),
         required=False,
         label="District supplémentaire",
-        widget=forms.Select(attrs={"class": SELECT_CSS}),
+        widget=forms.Select(
+            attrs={
+                "class": SELECT_CSS,
+                "id": "id_affectation_district",
+            }
+        ),
     )
+
     zone = forms.ModelChoiceField(
         queryset=Zone.objects.none(),
         required=False,
         label="Zone supplémentaire",
-        widget=forms.Select(attrs={"class": SELECT_CSS}),
+        widget=forms.Select(
+            attrs={
+                "class": SELECT_CSS,
+                "id": "id_affectation_zone",
+            }
+        ),
     )
+
     motif = forms.CharField(
         min_length=5,
         max_length=1000,
         label="Motif de l'attribution",
-        widget=forms.Textarea(attrs={"class": INPUT_CSS, "rows": 3}),
+        widget=forms.Textarea(
+            attrs={
+                "class": INPUT_CSS,
+                "rows": 3,
+                "id": "id_affectation_motif",
+            }
+        ),
     )
 
     def __init__(self, *args, responsable=None, cible=None, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.responsable = responsable
         self.cible = cible
         self.niveau = None
@@ -312,56 +355,181 @@ class AffectationTerritorialeForm(forms.Form):
         role_responsable = get_role(responsable)
         profil_responsable = getattr(responsable, "profil", None)
 
+        regions_qs = Region.objects.none()
+        provinces_qs = Province.objects.none()
+        districts_qs = District.objects.none()
+        zones_qs = Zone.objects.none()
+
         if role_cible == Profil.Role.OP_DISTRICT:
             self.niveau = AffectationTerritoriale.Niveau.DISTRICT
+
             if role_responsable == Profil.Role.SUPER_ADMIN:
-                qs = District.objects.all()
-            elif role_responsable == Profil.Role.OP_PROVINCE and profil_responsable:
-                qs = District.objects.filter(province_id=profil_responsable.province_id)
-            else:
-                qs = District.objects.none()
+                districts_qs = District.objects.all()
+
+            elif (
+                role_responsable == Profil.Role.OP_PROVINCE
+                and profil_responsable
+                and profil_responsable.province_id
+            ):
+                districts_qs = District.objects.filter(
+                    province_id=profil_responsable.province_id
+                )
 
             actifs = AffectationTerritoriale.objects.filter(
                 utilisateur=cible,
                 niveau=AffectationTerritoriale.Niveau.DISTRICT,
                 statut=AffectationTerritoriale.Statut.ACTIVE,
             ).values_list("district_id", flat=True)
-            self.fields["district"].queryset = qs.exclude(
-                pk__in=list(actifs) + ([cible.profil.district_id] if cible.profil.district_id else [])
-            )
+
+            exclusions = list(actifs)
+
+            if cible.profil.district_id:
+                exclusions.append(cible.profil.district_id)
+
+            districts_qs = districts_qs.exclude(pk__in=exclusions)
+
+            provinces_qs = Province.objects.filter(
+                districts__in=districts_qs
+            ).distinct()
+
+            regions_qs = Region.objects.filter(
+                provinces__in=provinces_qs
+            ).distinct()
+
             del self.fields["zone"]
 
         elif role_cible in (Profil.Role.OP_ZONE, Profil.Role.AGENT):
             self.niveau = AffectationTerritoriale.Niveau.ZONE
+
             if role_responsable == Profil.Role.SUPER_ADMIN:
-                qs = Zone.objects.all()
-            elif role_responsable == Profil.Role.OP_PROVINCE and profil_responsable:
-                qs = Zone.objects.filter(district__province_id=profil_responsable.province_id)
+                zones_qs = Zone.objects.all()
+
+            elif (
+                role_responsable == Profil.Role.OP_PROVINCE
+                and profil_responsable
+                and profil_responsable.province_id
+            ):
+                zones_qs = Zone.objects.filter(
+                    district__province_id=profil_responsable.province_id
+                )
+
             elif role_responsable == Profil.Role.OP_DISTRICT:
-                qs = Zone.objects.filter(district_id__in=(districts_autorises(responsable) or set()))
+                zones_qs = Zone.objects.filter(
+                    district_id__in=(
+                        districts_autorises(responsable) or set()
+                    )
+                )
+
             elif role_responsable == Profil.Role.OP_ZONE:
-                qs = Zone.objects.filter(pk__in=(zones_autorisees(responsable) or set()))
-            else:
-                qs = Zone.objects.none()
+                zones_qs = Zone.objects.filter(
+                    pk__in=(zones_autorisees(responsable) or set())
+                )
 
             actifs = AffectationTerritoriale.objects.filter(
                 utilisateur=cible,
                 niveau=AffectationTerritoriale.Niveau.ZONE,
                 statut=AffectationTerritoriale.Statut.ACTIVE,
             ).values_list("zone_id", flat=True)
-            self.fields["zone"].queryset = qs.exclude(
-                pk__in=list(actifs) + ([cible.profil.zone_id] if cible.profil.zone_id else [])
-            )
-            del self.fields["district"]
+
+            exclusions = list(actifs)
+
+            if cible.profil.zone_id:
+                exclusions.append(cible.profil.zone_id)
+
+            zones_qs = zones_qs.exclude(pk__in=exclusions)
+
+            districts_qs = District.objects.filter(
+                zones__in=zones_qs
+            ).distinct()
+
+            provinces_qs = Province.objects.filter(
+                districts__in=districts_qs
+            ).distinct()
+
+            regions_qs = Region.objects.filter(
+                provinces__in=provinces_qs
+            ).distinct()
+
+        self.fields["region"].queryset = regions_qs.order_by(
+            "ordre",
+            "nom",
+        )
+
+        self.fields["province"].queryset = provinces_qs.order_by("nom")
+
+        self.fields["district"].queryset = districts_qs.order_by("nom")
+
+        if "zone" in self.fields:
+            self.fields["zone"].queryset = zones_qs.order_by("nom")
 
     def clean(self):
         cleaned = super().clean()
-        if self.niveau == AffectationTerritoriale.Niveau.DISTRICT and not cleaned.get("district"):
-            self.add_error("district", "Sélectionnez un district.")
-        elif self.niveau == AffectationTerritoriale.Niveau.ZONE and not cleaned.get("zone"):
-            self.add_error("zone", "Sélectionnez une zone.")
-        elif self.niveau is None:
-            raise ValidationError("Ce rôle ne peut pas recevoir d'affectation supplémentaire.")
+
+        region = cleaned.get("region")
+        province = cleaned.get("province")
+        district = cleaned.get("district")
+        zone = cleaned.get("zone")
+
+        if self.niveau is None:
+            raise ValidationError(
+                "Ce rôle ne peut pas recevoir d'affectation supplémentaire."
+            )
+
+        if not region:
+            self.add_error(
+                "region",
+                "Sélectionnez une région ecclésiale.",
+            )
+
+        if not province:
+            self.add_error(
+                "province",
+                "Sélectionnez une province ecclésiale.",
+            )
+
+        if not district:
+            self.add_error(
+                "district",
+                "Sélectionnez un district.",
+            )
+
+        if (
+            province
+            and region
+            and province.region_id != region.pk
+        ):
+            self.add_error(
+                "province",
+                "Cette province n'appartient pas à la région choisie.",
+            )
+
+        if (
+            district
+            and province
+            and district.province_id != province.pk
+        ):
+            self.add_error(
+                "district",
+                "Ce district n'appartient pas à la province choisie.",
+            )
+
+        if self.niveau == AffectationTerritoriale.Niveau.ZONE:
+            if not zone:
+                self.add_error(
+                    "zone",
+                    "Sélectionnez une zone.",
+                )
+
+            if (
+                zone
+                and district
+                and zone.district_id != district.pk
+            ):
+                self.add_error(
+                    "zone",
+                    "Cette zone n'appartient pas au district choisi.",
+                )
+
         return cleaned
 
 

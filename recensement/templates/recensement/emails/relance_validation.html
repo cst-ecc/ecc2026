@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ sujet }}</title>
+</head>
+
+<body style="margin:0; padding:0; background-color:#f1f5f9; font-family:Arial, Helvetica, sans-serif; color:#0f172a;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f1f5f9; padding:24px 12px;">
+    <tr>
+      <td align="center">
+
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+               style="max-width:620px; background-color:#ffffff; border-radius:14px; overflow:hidden; border:1px solid #e2e8f0;">
+
+          <tr>
+            <td style="background-color:#0f3d66; padding:24px 28px;">
+              <p style="margin:0; color:#bae6fd; font-size:12px; font-weight:bold; text-transform:uppercase; letter-spacing:1px;">
+                Église du Christianisme Céleste
+              </p>
+
+              <h1 style="margin:8px 0 0; color:#ffffff; font-size:22px; line-height:1.35;">
+                Relance de validation
+              </h1>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:28px;">
+
+              <p style="margin:0 0 18px; color:#334155; font-size:15px; line-height:1.7;">
+                Bonjour
+                {% if destinataire.get_full_name %}
+                  {{ destinataire.get_full_name }}
+                {% else %}
+                  {{ destinataire.get_username }}
+                {% endif %},
+              </p>
+
+              <p style="margin:0 0 20px; color:#334155; font-size:15px; line-height:1.7;">
+                Une fiche de recensement est en attente de votre validation dans l’application.
+              </p>
+
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                     style="margin:0 0 24px; background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;">
+                <tr>
+                  <td style="padding:18px;">
+                    <p style="margin:0 0 10px; color:#64748b; font-size:12px; font-weight:bold; text-transform:uppercase;">
+                      Paroisse concernée
+                    </p>
+
+                    <p style="margin:0 0 14px; color:#0f172a; font-size:18px; font-weight:bold;">
+                      {{ fiche.nom_paroisse }}
+                    </p>
+
+                    <p style="margin:0 0 7px; color:#475569; font-size:14px;">
+                      <strong>Région :</strong> {{ fiche.region.nom }}
+                    </p>
+
+                    <p style="margin:0 0 7px; color:#475569; font-size:14px;">
+                      <strong>Province :</strong> {{ fiche.province.nom }}
+                    </p>
+
+                    <p style="margin:0 0 7px; color:#475569; font-size:14px;">
+                      <strong>District :</strong> {{ fiche.district.nom }}
+                    </p>
+
+                    <p style="margin:0; color:#475569; font-size:14px;">
+                      <strong>Zone :</strong> {{ fiche.zone.nom }}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <div style="margin-bottom:24px; padding:16px; background-color:#fff7ed; border-left:4px solid #f59e0b; border-radius:6px;">
+                <p style="margin:0; color:#9a3412; font-size:14px; line-height:1.6;">
+                  <strong>Relance numéro {{ niveau_relance }} :</strong>
+                  merci de consulter cette fiche et d’effectuer la validation attendue.
+                </p>
+              </div>
+
+              {% if fiche_url %}
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto 24px;">
+                  <tr>
+                    <td align="center" bgcolor="#0284c7" style="border-radius:8px;">
+                      <a
+                        href="{{ fiche_url }}"
+                        target="_blank"
+                        rel="noopener"
+                        style="display:inline-block; padding:13px 24px; color:#ffffff; text-decoration:none; font-size:14px; font-weight:bold;"
+                      >
+                        Consulter la fiche
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              {% endif %}
+
+              <p style="margin:0; color:#64748b; font-size:13px; line-height:1.6;">
+                Cette notification a été envoyée automatiquement par la plateforme de recensement des paroisses.
+              </p>
+
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:18px 28px; background-color:#f8fafc; border-top:1px solid #e2e8f0;">
+              <p style="margin:0; color:#94a3b8; font-size:12px; line-height:1.6; text-align:center;">
+                Église du Christianisme Céleste — Recensement des paroisses
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

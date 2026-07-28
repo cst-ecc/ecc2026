@@ -4,6 +4,7 @@ from recensement.healthcheck import healthcheck
 
 from . import access_views, views
 from .views import doublon_views, notifications_views
+from .views import qrcode_views
 
 app_name = "recensement"
 
@@ -72,5 +73,16 @@ urlpatterns = [
         "notifications/<int:pk>/lue/",
         notifications_views.notification_marquer_lue,
         name="notification_marquer_lue",
+    ),
+    path(
+        "paroisses/verifier/<str:code_court>/",
+        qrcode_views.paroisse_verifier,
+        name="paroisse_verifier",
+    ),
+
+    path(
+        "paroisses/verifier/<str:code_court>/qrcode.png",
+        qrcode_views.paroisse_qrcode,
+        name="paroisse_qrcode",
     ),
 ]

@@ -428,6 +428,7 @@ class StatutBatiment(models.TextChoices):
     ACHEVE = "acheve", "Bâtiment achevé / en dur"
     LOUE = "loue", "Salle ou local loué"
     PRETE = "prete", "Salle prêtée / domicile privé"
+    LACUSTRE = "lacustre", "Construction sur l’eau / zone lacustre"
     AUTRE = "autre", "Autre"
 
 
@@ -518,7 +519,12 @@ class FicheParoisse(models.Model):
 
     # --- Bâtiment ---
     statut_batiment = models.CharField(max_length=20, choices=StatutBatiment.choices)
-
+    statut_batiment_autre = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Précision du statut du bâtiment",
+        help_text="À renseigner uniquement lorsque le statut du bâtiment est défini sur Autre.",
+    )
     # --- Géolocalisation (capturée via le téléphone de l'agent) ---
     latitude = models.DecimalField(
         max_digits=10,
@@ -607,13 +613,26 @@ class FicheParoisse(models.Model):
     observations = models.TextField(blank=True)
     date_recensement = models.DateTimeField(auto_now_add=True)
     # --- Codification officielle de la paroisse ---
+    code_court = models.CharField(
+        max_length=20,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "Matricule court permanent de la paroisse. "
+            "Exemple : BJ-P7K4M2."
+        ),
+    )
     code_officiel = models.CharField(
         max_length=50,
         unique=True,
         null=True,
         blank=True,
+        db_index=True,
         help_text=(
-            "Code officiel généré automatiquement après validation complète. Format : BJ-AAAA-RR-PP-DD-ZZ-QQ-XXXX"
+            "Code territorial long généré après validation complète. "
+            "Exemple : BJ020307014P7K4M2."
         ),
     )
 

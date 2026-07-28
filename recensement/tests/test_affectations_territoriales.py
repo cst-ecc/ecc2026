@@ -13,7 +13,7 @@ from recensement.models import (
     Zone,
 )
 from recensement.permissions import districts_autorises, zones_autorisees
-from recensement.services_affectations import (
+from recensement.services.services_affectations import (
     ajouter_affectation,
     changer_statut_affectation,
 )

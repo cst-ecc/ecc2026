@@ -267,6 +267,7 @@ class FicheParoisseForm(forms.ModelForm):
             "photo_charge",
             "nombre_fideles_estime",
             "statut_batiment",
+            "statut_batiment_autre",
             "latitude",
             "longitude",
             "precision_gps",
@@ -301,6 +302,14 @@ class FicheParoisseForm(forms.ModelForm):
                 }
             ),
             "statut_batiment": forms.Select(attrs={"class": SELECT_CSS}),
+            "statut_batiment_autre": forms.TextInput(
+                attrs={
+                    "class": INPUT_CSS,
+                    "id": "id_statut_batiment_autre",
+                    "placeholder": "Précisez le statut du bâtiment",
+                    "maxlength": 150,
+                }
+            ),
             "nom_informateur": forms.TextInput(
                 attrs={
                     "class": INPUT_CSS,
@@ -321,6 +330,7 @@ class FicheParoisseForm(forms.ModelForm):
             "parish_shepherd": "Chargé de paroisse",
             "photo_charge": "Photo du chargé de paroisse (facultative)",
             "statut_batiment": "État du bâtiment / lieu de culte",
+            "statut_batiment_autre": "Précision si autre",
             "nom_informateur": "Nom de l'informateur",
             "contact_informateur": "Contact de l'informateur",
             "observations": "Observations",
@@ -362,15 +372,39 @@ class FicheParoisseForm(forms.ModelForm):
             )
         return value
 
+    def clean_statut_batiment_autre(self):
+        return (self.cleaned_data.get("statut_batiment_autre") or "").strip()
+
     def clean(self):
         cleaned_data = super().clean()
 
-        village = cleaned_data.get("village")
-        nouvelle_localite = (cleaned_data.get("nouvelle_localite_nom") or "").strip()
-        if not village and not nouvelle_localite:
+        statut_batiment = cleaned_data.get("statut_batiment")
+        statut_batiment_autre = (cleaned_data.get("statut_batiment_autre") or "").strip()
+        if statut_batiment == "autre" and not statut_batiment_autre:
             self.add_error(
-                "nouvelle_localite_nom",
-                "Sélectionnez un village dans la liste, ou précisez le nom de la localité si elle n'y figure pas.",
+                "statut_batiment_autre",
+                "Veuillez préciser le statut du bâtiment lorsque vous choisissez Autre.",
+            )
+        if statut_batiment != "autre":
+            cleaned_data["statut_batiment_autre"] = ""
+
+        village = cleaned_data.get("village") 
+        nouvelle_localite = (cleaned_data.get("nouvelle_localite_nom") or "").strip() 
+        # En modification, ne jamais vider silencieusement une localité existante. 
+        # # Si le navigateur renvoie village="" et nouvelle_localite_nom="", 
+        # # on conserve la valeur déjà enregistrée en base. 
+        if self.instance and self.instance.pk and not village and not nouvelle_localite: 
+            if self.instance.village_id: 
+                cleaned_data["village"] = self.instance.village 
+                village = self.instance.village 
+            elif self.instance.nouvelle_localite_nom: 
+                cleaned_data["nouvelle_localite_nom"] = self.instance.nouvelle_localite_nom 
+                nouvelle_localite = self.instance.nouvelle_localite_nom 
+
+        if not village and not nouvelle_localite: 
+            self.add_error( 
+                "nouvelle_localite_nom", 
+                "Sélectionnez un village dans la liste, ou précisez le nom de la localité si elle n'y figure pas.", 
             )
 
         region = cleaned_data.get("region")

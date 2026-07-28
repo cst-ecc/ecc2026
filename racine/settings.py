@@ -146,7 +146,7 @@ if not DEBUG:
     # sur le réseau Docker. Cet en-tête permet à Django de reconnaître que la
     # requête d'origine était sécurisée.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-
+    SECURE_REFERRER_POLICY = "same-origin"
     # Nginx transmet également X-Forwarded-Host.
     USE_X_FORWARDED_HOST = True
 
@@ -198,3 +198,20 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default=EMAIL_HOST_USER)
 SERVER_EMAIL = env("SERVER_EMAIL", default=EMAIL_HOST_USER)
 SITE_URL = env("SITE_URL")
+
+
+# ---------------------------------------------------------------------------
+# Sécurité des sessions — à compléter avec settings_session_security_snippet.py
+# ---------------------------------------------------------------------------
+# À intégrer dans settings.py, idéalement avec valeurs différentes selon DEBUG / production.
+
+SESSION_INACTIVITY_TIMEOUT = 60 * 60  # 1 heure d'inactivité
+SESSION_ABSOLUTE_TIMEOUT = 12 * 60 * 60  # 12 heures maximum, reconnexion le lendemain
+SENSITIVE_ACTION_SESSION_MAX_AGE = 30 * 60  # 30 minutes pour les actions sensibles
+
+SESSION_COOKIE_AGE = SESSION_ABSOLUTE_TIMEOUT
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_SAMESITE = "Lax"
+# CSRF_COOKIE_HTTPONLY = False  # Django recommande souvent accessible aux formulaires JS ; garder selon usage existant.
+CSRF_COOKIE_SAMESITE = "Lax"

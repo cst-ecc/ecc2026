@@ -1,6 +1,9 @@
 {% extends "recensement/base_public.html" %}
+{% load static %}
 
 {% block title %}Connexion — Recensement des paroisses{% endblock %}
+{% block meta_description %}Connexion sécurisée à la plateforme administrative de recensement des paroisses.{% endblock %}
+{% block robots_meta %}<meta name="robots" content="noindex,nofollow,noarchive">{% endblock %}
 
 {% block content %}
 <div class="flex justify-center py-8 sm:py-16">
@@ -9,13 +12,19 @@
       <h1 class="text-xl font-semibold text-slate-900 mb-1">Connexion</h1>
       <p class="text-sm text-slate-500 mb-6">Réservé aux comptes autorisés.</p>
 
+      {% if request.GET.expired %}
+        <div class="mb-4 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 px-4 py-3 text-sm">
+          Votre session a expiré pour des raisons de sécurité. Veuillez vous reconnecter.
+        </div>
+      {% endif %}
+
       {% if form.errors %}
         <div class="mb-4 rounded-lg bg-red-50 text-red-800 border border-red-200 px-4 py-3 text-sm">
           Identifiant ou mot de passe incorrect. Réessayez.
         </div>
       {% endif %}
 
-      <form method="post" class="space-y-4">
+      <form method="post" class="space-y-4" autocomplete="on" novalidate>
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next }}">
 
@@ -24,7 +33,7 @@
             Identifiant
           </label>
           <input type="text" name="{{ form.username.html_name }}" id="{{ form.username.id_for_label }}"
-                 autofocus required
+                 autofocus required autocomplete="username" autocapitalize="none" spellcheck="false"
                  class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
         </div>
 
@@ -32,9 +41,12 @@
           <label for="{{ form.password.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
             Mot de passe
           </label>
-          <input type="password" name="{{ form.password.html_name }}" id="{{ form.password.id_for_label }}"
-                 required
-                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <div class="relative">
+            <input type="password" name="{{ form.password.html_name }}" id="{{ form.password.id_for_label }}"
+                   required autocomplete="current-password" data-secure-password
+                   class="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-12 text-base focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+            {% include "recensement/includes/_password_visibility_button.html" with password_input_id=form.password.id_for_label %}
+          </div>
         </div>
 
         <button type="submit"
@@ -49,4 +61,9 @@
     </p>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script src="{% static 'recensement/js/password_toggle.js' %}" defer></script>
 {% endblock %}

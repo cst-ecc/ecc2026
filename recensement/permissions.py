@@ -331,6 +331,10 @@ def peut_modifier_fiche(user, fiche):
     from .models import FicheParoisse
 
     role = get_role(user)
+
+    if role == Profil.Role.SUPER_ADMIN:
+        return True
+
     if not fiche_dans_perimetre(user, fiche):
         return False
 

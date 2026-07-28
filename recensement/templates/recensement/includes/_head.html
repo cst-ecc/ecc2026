@@ -1,13 +1,37 @@
 {% load static %}
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
 <meta name="theme-color" content="#054771">
+<meta name="author" content="Église du Christianisme Céleste - Conseil Supérieur de Transition (CST)">
+
 <title>{% block title %}Recensement des paroisses{% endblock %}</title>
+<meta name="description" content="{% block meta_description %}Plateforme de recensement des paroisses de l’Église du Christianisme Céleste.{% endblock %}">
+
+{% block robots_meta %}
+  {% if user.is_authenticated %}
+    <meta name="robots" content="noindex,nofollow,noarchive">
+  {% else %}
+    <meta name="robots" content="index,follow">
+  {% endif %}
+{% endblock %}
+
+{% block canonical_url %}{% endblock %}
 
 <link rel="icon" href="{% static 'recensement/img/favicon.ico' %}" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="{% static 'recensement/img/favicon-32x32.png' %}">
 <link rel="icon" type="image/png" sizes="192x192" href="{% static 'recensement/img/favicon-192x192.png' %}">
 <link rel="apple-touch-icon" sizes="180x180" href="{% static 'recensement/img/apple-touch-icon.png' %}">
+
+{% block social_meta %}
+  <meta property="og:title" content="{% block og_title %}Recensement des paroisses{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}Plateforme de recensement des paroisses de l’Église du Christianisme Céleste.{% endblock %}">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:image" content="{% static 'recensement/img/logo-cst.png' %}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{% block twitter_title %}Recensement des paroisses{% endblock %}">
+  <meta name="twitter:description" content="{% block twitter_description %}Plateforme de recensement des paroisses de l’Église du Christianisme Céleste.{% endblock %}">
+{% endblock %}
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
@@ -32,3 +56,4 @@
   };
 </script>
 <link href="{% static 'recensement/css/style.css' %}" rel="stylesheet">
+{% block extra_head %}{% endblock %}

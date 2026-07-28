@@ -71,7 +71,12 @@
     <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Paroisse</div>
     <dl class="p-5 grid grid-cols-3 gap-y-2 text-sm">
       <dt class="col-span-1 text-slate-500">Année de fondation</dt><dd class="col-span-2">{{ fiche.annee_fondation|default:"Non précisée" }}</dd>
-      <dt class="col-span-1 text-slate-500">Statut du bâtiment</dt><dd class="col-span-2">{{ fiche.get_statut_batiment_display }}</dd>
+      <dt class="col-span-1 text-slate-500">Statut du bâtiment</dt> 
+      <dd class="col-span-2"> 
+        {{ fiche.get_statut_batiment_display }} 
+        {% if fiche.statut_batiment == "autre" and fiche.statut_batiment_autre %} — {{ fiche.statut_batiment_autre }} 
+        {% endif %} 
+      </dd>
       <dt class="col-span-1 text-slate-500">Nombre de fidèles estimé</dt><dd class="col-span-2">{{ fiche.nombre_fideles_estime|default:"Non précisé" }}</dd>
     </dl>
   </div>

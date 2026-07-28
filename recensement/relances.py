@@ -19,6 +19,11 @@ from .codification import generer_code_paroisse
 from .models import FicheParoisse, HistoriqueRelance, NotificationInterne, Profil, RelanceValidation
 from .permissions import districts_autorises, get_profil, get_role
 
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+
 DELAI_AVANT_RELANCE_2 = timedelta(days=7)
 DELAI_AVANT_RELANCE_3 = timedelta(days=3)
 DELAI_AVANT_INTERVENTION = timedelta(days=1)
@@ -162,26 +167,79 @@ def _message_relance(fiche, niveau_relance):
 
 def _envoyer_email_relance(*, destinataire, fiche, niveau_relance):
     email = (getattr(destinataire, "email", "") or "").strip()
+
     if not _email_valide(email):
-        return "non_envoye", "Aucune adresse e-mail valide renseignée pour cet utilisateur."
+        return (
+            "non_envoye",
+            "Aucune adresse e-mail valide renseignée pour cet utilisateur.",
+        )
+
     sujet = f"Relance de validation — {fiche.nom_paroisse}"
-    message = _message_relance(fiche, niveau_relance)
+
     site_url = (getattr(settings, "SITE_URL", "") or "").rstrip("/")
-    url = _url_fiche(fiche)
-    if site_url and url:
-        message += f"\n\nLien vers la fiche : {site_url}{url}"
+    url_relative = _url_fiche(fiche)
+
+    fiche_url = ""
+    if site_url and url_relative:
+        fiche_url = f"{site_url}{url_relative}"
+
+    contexte = {
+        "sujet": sujet,
+        "destinataire": destinataire,
+        "fiche": fiche,
+        "niveau_relance": niveau_relance,
+        "fiche_url": fiche_url,
+    }
+
+    message_html = render_to_string(
+        "recensement/emails/relance_validation.html",
+        contexte,
+    )
+
+    # Version texte pour les clients de messagerie qui n'affichent pas le HTML.
+    message_texte = _message_relance(
+        fiche,
+        niveau_relance,
+    )
+
+    if fiche_url:
+        message_texte += (
+            f"\n\nLien vers la fiche : {fiche_url}"
+        )
+
+    expediteur = getattr(
+        settings,
+        "DEFAULT_FROM_EMAIL",
+        None,
+    )
+
     try:
-        result = send_mail(
+        email_message = EmailMultiAlternatives(
             subject=sujet,
-            message=message,
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-            recipient_list=[email],
+            body=message_texte,
+            from_email=expediteur,
+            to=[email],
+        )
+
+        email_message.attach_alternative(
+            message_html,
+            "text/html",
+        )
+
+        resultat = email_message.send(
             fail_silently=False,
         )
-        return ("envoye", "") if result == 1 else ("echec", "Le serveur SMTP n'a pas confirmé l'envoi.")
+
+        if resultat == 1:
+            return "envoye", ""
+
+        return (
+            "echec",
+            "Le serveur SMTP n'a pas confirmé l'envoi.",
+        )
+
     except Exception as exc:
         return "echec", str(exc)
-
 
 def _creer_notification_et_historique(*, fiche, action, effectue_par, destinataire, niveau_relance, relance_obj):
     message = _message_relance(fiche, niveau_relance)

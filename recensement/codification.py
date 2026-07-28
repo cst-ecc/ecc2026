@@ -1,143 +1,198 @@
 """
-Logique de génération des codes officiels des paroisses.
+Génération des matricules officiels des paroisses.
 
-Format : BJ-AAAA-RR-PP-DD-ZZ-QQ-XXXX
+Formats :
 
-Où :
-- BJ : code pays (Bénin)
-- AAAA : année de création ou d'ouverture de la paroisse
-- RR : code de la région ecclésiale
-- PP : code de la province
-- DD : code du district
-- ZZ : code de la zone
-- QQ : code du village/quartier
-- XXXX : numéro d'enregistrement chronologique (basé sur l'année de création)
+- Code court : BJ-P7K4M2
+- Code long  : BJ020307014P7K4M2
 
-La génération est effectuée UNIQUEMENT après validation complète de la paroisse.
-La codification est stable et non modifiée automatiquement après génération.
+Composition du code long :
+
+- BJ      : code pays ;
+- 02      : région ecclésiale ;
+- 03      : province ecclésiale ;
+- 07      : district ecclésial ;
+- 014     : zone ecclésiale ;
+- P7K4M2  : identifiant alphanumérique unique généré par le système.
+
+L'année de fondation et le village ne participent pas à la codification.
+
+La génération est effectuée uniquement après validation complète.
+Une fois attribués, les codes restent stables.
 """
 
-import hashlib
+import secrets
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
+
 
 # ---------------------------------------------------------------------------
 # Constantes
 # ---------------------------------------------------------------------------
 
 CODE_PAYS_BENIN = "BJ"
-ANNEE_PAR_DEFAUT = 2000
+
+# Alphabet sans caractères visuellement ambigus :
+# 0/O et 1/I sont volontairement exclus.
+ALPHABET_CODE_PAROISSE = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+LONGUEUR_CODE_ALEATOIRE = 6
+NOMBRE_MAX_TENTATIVES = 100
 
 
 # ---------------------------------------------------------------------------
-# Composition du code officiel
+# Composition des codes
 # ---------------------------------------------------------------------------
 
 
-def _obtenir_annee_creation(fiche):
-    """Retourne l'année de création de la paroisse."""
-    if fiche.annee_fondation:
-        return fiche.annee_fondation
-    return ANNEE_PAR_DEFAUT
-
-
-def _obtenir_codes_geographiques(fiche):
-    """Extrait les codes géographiques de la fiche.
-
-    Retourne un dict avec les codes region, province, district, zone, village.
-    Lève ValueError si un code manque.
+def _segment_numerique(code, longueur):
     """
-    codes = {}
+    Extrait la partie numérique d'un code géographique.
 
-    if not fiche.region or not fiche.region.code:
+    Exemples :
+    - R02  -> 02
+    - P3   -> 03
+    - Z014 -> 014
+    """
+    chiffres = "".join(
+        caractere
+        for caractere in str(code or "")
+        if caractere.isdigit()
+    )
+
+    if not chiffres:
+        raise ValueError(
+            f"Le code géographique « {code} » ne contient aucun numéro."
+        )
+
+    if len(chiffres) > longueur:
+        raise ValueError(
+            f"Le code géographique « {code} » dépasse la longueur "
+            f"attendue de {longueur} chiffre(s)."
+        )
+
+    return chiffres.zfill(longueur)
+
+
+def _verifier_referentiel_geographique(fiche):
+    """Vérifie la présence et la cohérence du rattachement territorial."""
+
+    if not fiche.region_id or not fiche.region.code:
         raise ValueError("Région manquante ou sans code.")
-    codes["region_code"] = fiche.region.code
 
-    if not fiche.province or not fiche.province.code:
+    if not fiche.province_id or not fiche.province.code:
         raise ValueError("Province manquante ou sans code.")
-    codes["province_code"] = fiche.province.code
 
-    if not fiche.district or not fiche.district.code:
+    if not fiche.district_id or not fiche.district.code:
         raise ValueError("District manquant ou sans code.")
-    codes["district_code"] = fiche.district.code
 
-    if not fiche.zone or not fiche.zone.code:
+    if not fiche.zone_id or not fiche.zone.code:
         raise ValueError("Zone manquante ou sans code.")
-    codes["zone_code"] = fiche.zone.code
 
-    # Village : soit référentiel avec code, soit fallback
-    if fiche.village and fiche.village.code:
-        codes["village_code"] = fiche.village.code
-    elif fiche.village:
-        from .models import FicheParoisse
+    if fiche.province.region_id != fiche.region_id:
+        raise ValueError(
+            "La province n'appartient pas à la région de la paroisse."
+        )
 
-        village_num = FicheParoisse.objects.filter(village=fiche.village, code_officiel__isnull=False).count() + 1
-        codes["village_code"] = f"Q{village_num:03d}"
-    elif fiche.nouvelle_localite_nom:
-        h = int(hashlib.md5(fiche.nouvelle_localite_nom.encode()).hexdigest(), 16) % 999 + 1
-        codes["village_code"] = f"Q{h:03d}"
-    else:
-        raise ValueError("Village ou localité manquant.")
+    if fiche.district.province_id != fiche.province_id:
+        raise ValueError(
+            "Le district n'appartient pas à la province de la paroisse."
+        )
 
-    return codes
+    if fiche.zone.district_id != fiche.district_id:
+        raise ValueError(
+            "La zone n'appartient pas au district de la paroisse."
+        )
 
 
-def _obtenir_numero_enregistrement(fiche_id):
-    """Calcule le prochain numéro d'enregistrement chronologique.
+def _generer_identifiant_alphanumerique():
+    """
+    Génère un identifiant alphanumérique unique.
 
-    Les paroisses sont numérotées selon :
-    1. L'année de création (croissant)
-    2. La date de validation complète (croissant)
-    3. L'ID de la fiche (croissant) comme déterminant stable
+    Retour :
+        tuple[str, str] : identifiant brut et code court.
+
+    Exemple :
+        ("P7K4M2", "BJ-P7K4M2")
     """
     from .models import FicheParoisse
 
-    fiches_codifiees = FicheParoisse.objects.filter(code_officiel__isnull=False).order_by(
-        "annee_fondation", "date_validation_manager", "id"
+    for _ in range(NOMBRE_MAX_TENTATIVES):
+        identifiant = "".join(
+            secrets.choice(ALPHABET_CODE_PAROISSE)
+            for _ in range(LONGUEUR_CODE_ALEATOIRE)
+        )
+
+        code_court = f"{CODE_PAYS_BENIN}-{identifiant}"
+
+        if not FicheParoisse.objects.filter(
+            code_court=code_court
+        ).exists():
+            return identifiant, code_court
+
+    raise ValueError(
+        "Impossible de produire un matricule paroissial unique "
+        "après plusieurs tentatives."
     )
 
-    rank = 1
-    for f in fiches_codifiees:
-        if f.id == fiche_id:
-            return f"{rank:04d}"
-        rank += 1
 
-    return f"{fiches_codifiees.count() + 1:04d}"
-
-
-def composer_code_officiel(fiche):
-    """Compose le code officiel complet pour une fiche.
-
-    Format : BJ-AAAA-RR-PP-DD-ZZ-QQ-XXXX
-
-    Lève ValueError si des données manquent.
+def composer_codes_paroisse(fiche):
     """
-    annee = _obtenir_annee_creation(fiche)
-    codes_geo = _obtenir_codes_geographiques(fiche)
-    numero = _obtenir_numero_enregistrement(fiche.id)
+    Compose le code court et le code territorial long.
 
-    code_officiel = (
-        f"{CODE_PAYS_BENIN}-"
-        f"{annee:04d}-"
-        f"{codes_geo['region_code']}-"
-        f"{codes_geo['province_code']}-"
-        f"{codes_geo['district_code']}-"
-        f"{codes_geo['zone_code']}-"
-        f"{codes_geo['village_code']}-"
-        f"{numero}"
+    Exemple :
+        code court : BJ-P7K4M2
+        code long  : BJ020307014P7K4M2
+    """
+    _verifier_referentiel_geographique(fiche)
+
+    identifiant, code_court = _generer_identifiant_alphanumerique()
+
+    region = _segment_numerique(
+        fiche.region.code,
+        2,
+    )
+    province = _segment_numerique(
+        fiche.province.code,
+        2,
+    )
+    district = _segment_numerique(
+        fiche.district.code,
+        2,
+    )
+    zone = _segment_numerique(
+        fiche.zone.code,
+        3,
     )
 
-    return code_officiel, {
+    code_long = (
+        f"{CODE_PAYS_BENIN}"
+        f"{region}"
+        f"{province}"
+        f"{district}"
+        f"{zone}"
+        f"{identifiant}"
+    )
+
+    donnees_composition = {
+        "version_codification": 2,
         "pays": CODE_PAYS_BENIN,
-        "annee": annee,
-        "region_code": codes_geo["region_code"],
-        "province_code": codes_geo["province_code"],
-        "district_code": codes_geo["district_code"],
-        "zone_code": codes_geo["zone_code"],
-        "village_code": codes_geo["village_code"],
-        "numero_enregistrement": numero,
+        "region_code_source": fiche.region.code,
+        "province_code_source": fiche.province.code,
+        "district_code_source": fiche.district.code,
+        "zone_code_source": fiche.zone.code,
+        "region_segment": region,
+        "province_segment": province,
+        "district_segment": district,
+        "zone_segment": zone,
+        "identifiant_alphanumerique": identifiant,
+        "code_court": code_court,
+        "code_long": code_long,
     }
+
+    return code_court, code_long, donnees_composition
 
 
 # ---------------------------------------------------------------------------
@@ -147,67 +202,165 @@ def composer_code_officiel(fiche):
 
 @transaction.atomic
 def generer_code_paroisse(fiche, genere_par=None):
-    """Génère et attribue le code officiel à une paroisse validée.
+    """
+    Génère et enregistre les codes d'une paroisse validée.
 
-    Idempotente : si le code existe déjà, le retourne sans modification.
-    Lève ValueError si la paroisse n'est pas complètement validée.
+    La fonction reste idempotente :
+    si les deux codes existent, elle retourne le code long sans les modifier.
+
+    Les dossiers possédant seulement un ancien code officiel doivent être
+    traités par une procédure de migration dédiée.
     """
     from .models import CodeParoisseHistorique, FicheParoisse
 
-    if fiche.statut_validation != FicheParoisse.StatutValidation.VALIDEE:
+    fiche = (
+        FicheParoisse.objects
+        .select_for_update()
+        .select_related(
+            "region",
+            "province",
+            "district",
+            "zone",
+        )
+        .get(pk=fiche.pk)
+    )
+
+    if (
+        fiche.statut_validation
+        != FicheParoisse.StatutValidation.VALIDEE
+    ):
         raise ValueError(
-            f"La fiche n'est pas complètement validée. Statut actuel : {fiche.get_statut_validation_display()}."
+            "La fiche n'est pas complètement validée. "
+            f"Statut actuel : "
+            f"{fiche.get_statut_validation_display()}."
         )
 
-    if fiche.code_officiel:
+    # Les deux codes existent : aucune nouvelle génération.
+    if fiche.code_court and fiche.code_officiel:
         return fiche.code_officiel
 
+    # Évite d'écraser silencieusement un ancien code de production.
+    if fiche.code_officiel and not fiche.code_court:
+        raise ValueError(
+            "Cette paroisse possède déjà un ancien code officiel, "
+            "mais aucun code court. Elle doit être traitée par la "
+            "procédure contrôlée de migration des anciens codes."
+        )
+
+    if fiche.code_court and not fiche.code_officiel:
+        raise ValueError(
+            "Cette paroisse possède un code court sans code long. "
+            "La codification est incomplète et doit être régularisée."
+        )
+
     try:
-        code_officiel, donnees_composition = composer_code_officiel(fiche)
-    except ValueError as e:
-        raise ValueError(f"Impossible de générer le code pour « {fiche.nom_paroisse} » : {e}") from e
+        code_court, code_long, donnees_composition = (
+            composer_codes_paroisse(fiche)
+        )
+    except ValueError as exc:
+        raise ValueError(
+            f"Impossible de générer le code pour "
+            f"« {fiche.nom_paroisse} » : {exc}"
+        ) from exc
 
-    if FicheParoisse.objects.filter(code_officiel=code_officiel).exists():
-        raise ValueError(f"Le code {code_officiel} est déjà attribué à une autre paroisse.")
+    if FicheParoisse.objects.filter(
+        code_court=code_court
+    ).exclude(pk=fiche.pk).exists():
+        raise ValueError(
+            f"Le code court {code_court} est déjà attribué."
+        )
 
-    fiche.code_officiel = code_officiel
+    if FicheParoisse.objects.filter(
+        code_officiel=code_long
+    ).exclude(pk=fiche.pk).exists():
+        raise ValueError(
+            f"Le code long {code_long} est déjà attribué."
+        )
+
+    fiche.code_court = code_court
+    fiche.code_officiel = code_long
     fiche.date_generation_code = timezone.now()
     fiche.genere_par = genere_par
-    fiche.save(update_fields=["code_officiel", "date_generation_code", "genere_par"])
+
+    try:
+        fiche.save(
+            update_fields=[
+                "code_court",
+                "code_officiel",
+                "date_generation_code",
+                "genere_par",
+            ]
+        )
+    except IntegrityError as exc:
+        raise ValueError(
+            "Une collision de matricule a été détectée. "
+            "Veuillez relancer la génération."
+        ) from exc
 
     CodeParoisseHistorique.objects.create(
         fiche=fiche,
-        code_attribue=code_officiel,
+        code_attribue=code_long,
         genere_par=genere_par,
         donnees_composition=donnees_composition,
     )
 
-    return code_officiel
+    # Les vues actuelles attendent une chaîne.
+    return code_long
 
 
 @transaction.atomic
 def generer_codes_retroactifs(verbose=False):
-    """Génère les codes pour toutes les fiches validées sans code.
+    """
+    Génère les codes des fiches validées qui ne possèdent encore aucun code.
 
-    Idempotente : peut être lancée plusieurs fois sans danger.
-    Retourne le nombre de fiches codifiées.
+    Les fiches ayant un ancien code officiel sans code court sont volontairement
+    exclues. Elles nécessitent une migration contrôlée séparée.
     """
     from .models import FicheParoisse
 
-    fiches_a_codifier = FicheParoisse.objects.filter(
-        statut_validation=FicheParoisse.StatutValidation.VALIDEE,
-        code_officiel__isnull=True,
-    ).order_by("annee_fondation", "date_validation_manager", "id")
+    fiches_a_codifier = (
+        FicheParoisse.objects
+        .filter(
+            statut_validation=FicheParoisse.StatutValidation.VALIDEE,
+        )
+        .filter(
+            Q(code_officiel__isnull=True)
+            | Q(code_officiel="")
+        )
+        .filter(
+            Q(code_court__isnull=True)
+            | Q(code_court="")
+        )
+        .order_by(
+            "date_validation_manager",
+            "date_recensement",
+            "id",
+        )
+    )
 
     nb_generees = 0
-    for fiche in fiches_a_codifier:
+
+    for fiche in fiches_a_codifier.iterator():
         try:
-            code = generer_code_paroisse(fiche, genere_par=None)
+            code = generer_code_paroisse(
+                fiche,
+                genere_par=None,
+            )
+
             if verbose:
-                print(f"  ✓ {fiche.nom_paroisse:<50} → {code}")
+                print(
+                    f"  OK {fiche.nom_paroisse:<50} "
+                    f"→ {code}"
+                )
+
             nb_generees += 1
-        except ValueError as e:
+
+        except ValueError as exc:
             if verbose:
-                print(f"  ✗ {fiche.nom_paroisse:<50} → ERREUR : {e}")
+                print(
+                    f"  ERREUR {fiche.nom_paroisse:<50} "
+                    f"→ {exc}"
+                )
 
     return nb_generees
+
