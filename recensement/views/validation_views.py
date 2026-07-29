@@ -38,7 +38,11 @@ def fiche_a_valider(request):
 
 
 @login_required
-@role_required(Profil.Role.OP_ZONE, Profil.Role.OP_DISTRICT, Profil.Role.OP_PROVINCE,)
+@role_required(
+    Profil.Role.OP_ZONE,
+    Profil.Role.OP_DISTRICT,
+    Profil.Role.OP_PROVINCE,
+)
 @require_http_methods(["POST"])
 def fiche_valider(request, pk):
     fiche = get_object_or_404(FicheParoisse, pk=pk)
@@ -88,10 +92,7 @@ def fiche_valider(request, pk):
         except ValueError as exc:
             messages.error(
                 request,
-                (
-                    "La validation finale n'a pas été enregistrée, car le code "
-                    f"officiel n'a pas pu être généré : {exc}"
-                ),
+                (f"La validation finale n'a pas été enregistrée, car le code officiel n'a pas pu être généré : {exc}"),
             )
 
     elif role == Profil.Role.SUPER_ADMIN:

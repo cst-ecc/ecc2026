@@ -321,17 +321,13 @@ def role_required(*allowed_roles):
             role = get_role(request.user)
 
             if role != Profil.Role.SUPER_ADMIN and role not in allowed_roles:
-                raise PermissionDenied(
-                    "Vous n'avez pas les droits nécessaires pour accéder à cette page."
-                )
+                raise PermissionDenied("Vous n'avez pas les droits nécessaires pour accéder à cette page.")
 
             return view_func(request, *args, **kwargs)
 
         return _wrapped
 
     return decorator
-
-
 
 
 def peut_modifier_fiche(user, fiche):
