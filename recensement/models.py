@@ -605,6 +605,21 @@ class FicheParoisse(models.Model):
     )
     date_validation_manager = models.DateTimeField(null=True, blank=True)
 
+    valide_par_super_admin = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fiches_validees_super_admin",
+        verbose_name="Validée par le super administrateur",
+    )
+
+    date_validation_super_admin = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Date de validation par le super administrateur",
+    )
+
     # --- Informateur (personne ayant renseigné l'agent sur place, si
     #     différente du chargé de paroisse) — entièrement facultatif ---
     nom_informateur = models.CharField(max_length=200, blank=True)

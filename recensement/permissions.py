@@ -318,13 +318,20 @@ def role_required(*allowed_roles):
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped(request, *args, **kwargs):
-            if get_role(request.user) not in allowed_roles:
-                raise PermissionDenied("Vous n'avez pas les droits nécessaires pour accéder à cette page.")
+            role = get_role(request.user)
+
+            if role != Profil.Role.SUPER_ADMIN and role not in allowed_roles:
+                raise PermissionDenied(
+                    "Vous n'avez pas les droits nécessaires pour accéder à cette page."
+                )
+
             return view_func(request, *args, **kwargs)
 
         return _wrapped
 
     return decorator
+
+
 
 
 def peut_modifier_fiche(user, fiche):
@@ -348,6 +355,16 @@ def peut_modifier_fiche(user, fiche):
 
 
 def peut_valider_fiche(user, fiche):
+    from .models import FicheParoisse
+
+    role = get_role(user)
+
+    if role == Profil.Role.SUPER_ADMIN:
+        return fiche.statut_validation in (
+            FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR,
+            FicheParoisse.StatutValidation.ATTENTE_MANAGER,
+        )
+
     return peut_modifier_fiche(user, fiche)
 
 

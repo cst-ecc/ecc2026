@@ -38,7 +38,7 @@ def fiche_a_valider(request):
 
 
 @login_required
-@role_required(Profil.Role.OP_ZONE, Profil.Role.OP_DISTRICT, Profil.Role.OP_PROVINCE)
+@role_required(Profil.Role.OP_ZONE, Profil.Role.OP_DISTRICT, Profil.Role.OP_PROVINCE,)
 @require_http_methods(["POST"])
 def fiche_valider(request, pk):
     fiche = get_object_or_404(FicheParoisse, pk=pk)
@@ -63,15 +63,73 @@ def fiche_valider(request, pk):
                 fiche.statut_validation = FicheParoisse.StatutValidation.VALIDEE
                 fiche.valide_par_manager = request.user
                 fiche.date_validation_manager = timezone.now()
-                fiche.save(update_fields=["statut_validation", "valide_par_manager", "date_validation_manager"])
-                code = generer_code_paroisse(fiche, genere_par=request.user)
+
+                fiche.save(
+                    update_fields=[
+                        "statut_validation",
+                        "valide_par_manager",
+                        "date_validation_manager",
+                    ]
+                )
+
+                code = generer_code_paroisse(
+                    fiche,
+                    genere_par=request.user,
+                )
+
             messages.success(
-                request, f"Fiche « {fiche.nom_paroisse} » validée définitivement. Code officiel généré : {code}."
+                request,
+                (
+                    f"Fiche « {fiche.nom_paroisse} » validée définitivement "
+                    f"par l'OP PROVINCE. Code officiel généré : {code}."
+                ),
             )
+
         except ValueError as exc:
             messages.error(
                 request,
-                f"La validation finale n'a pas été enregistrée, car le code officiel n'a pas pu être généré : {exc}",
+                (
+                    "La validation finale n'a pas été enregistrée, car le code "
+                    f"officiel n'a pas pu être généré : {exc}"
+                ),
+            )
+
+    elif role == Profil.Role.SUPER_ADMIN:
+        try:
+            with transaction.atomic():
+                fiche.statut_validation = FicheParoisse.StatutValidation.VALIDEE
+                fiche.valide_par_super_admin = request.user
+                fiche.date_validation_super_admin = timezone.now()
+
+                fiche.save(
+                    update_fields=[
+                        "statut_validation",
+                        "valide_par_super_admin",
+                        "date_validation_super_admin",
+                    ]
+                )
+
+                code = generer_code_paroisse(
+                    fiche,
+                    genere_par=request.user,
+                )
+
+            messages.success(
+                request,
+                (
+                    f"Fiche « {fiche.nom_paroisse} » validée directement "
+                    f"par le super administrateur. Code officiel généré : {code}."
+                ),
+            )
+
+        except ValueError as exc:
+            messages.error(
+                request,
+                (
+                    "La validation par le super administrateur n'a pas été "
+                    "enregistrée, car le code officiel n'a pas pu être généré : "
+                    f"{exc}"
+                ),
             )
 
     return redirect("recensement:fiche_a_valider")
