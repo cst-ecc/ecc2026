@@ -10,6 +10,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
 
+from django.db import transaction
+
 from ..codification import generer_code_paroisse
 from ..doublons import journaliser_alerte_doublon
 from ..forms import FicheParoisseForm, MotifModificationForm, PhotosParoisseForm
@@ -31,6 +33,7 @@ from ..permissions import (
     role_required,
 )
 from .helpers import _fiches_visibles_pour, _premiere_etape_en_erreur, _snapshot_fiche
+
 
 
 @login_required
@@ -177,22 +180,33 @@ def fiche_update(request, pk):
         form = FicheParoisseForm(request.POST, request.FILES, instance=fiche, user=request.user)
         motif_form = MotifModificationForm(request.POST)
         if form.is_valid() and motif_form.is_valid():
-            avant = _snapshot_fiche(fiche)
-            fiche_modifiee = form.save()
-            journaliser_alerte_doublon(
-                fiche=fiche_modifiee,
-                utilisateur=request.user,
-                alerte=getattr(form, "alerte_doublon", None),
-                action="modification",
-            )
-            apres = _snapshot_fiche(fiche_modifiee)
-            HistoriqueModification.objects.create(
-                fiche=fiche_modifiee,
-                modifie_par=request.user,
-                motif=motif_form.cleaned_data["motif"],
-                donnees_avant=avant,
-                donnees_apres=apres,
-            )
+            with transaction.atomic():
+                # Important :
+                # form.is_valid() a déjà injecté les nouvelles valeurs dans l'objet "fiche"
+                # en mémoire. Il ne faut donc pas utiliser cet objet pour le snapshot AVANT.
+                # On relit la fiche depuis la base avant l'enregistrement réel.
+                fiche_avant = FicheParoisse.objects.select_for_update().get(pk=fiche.pk)
+                avant = _snapshot_fiche(fiche_avant)
+
+                fiche_modifiee = form.save()
+
+                journaliser_alerte_doublon(
+                    fiche=fiche_modifiee,
+                    utilisateur=request.user,
+                    alerte=getattr(form, "alerte_doublon", None),
+                    action="modification",
+                )
+
+                apres = _snapshot_fiche(fiche_modifiee)
+
+                if avant != apres:
+                    HistoriqueModification.objects.create(
+                        fiche=fiche_modifiee,
+                        modifie_par=request.user,
+                        motif=motif_form.cleaned_data["motif"],
+                        donnees_avant=avant,
+                        donnees_apres=apres,
+                    )
             messages.success(
                 request,
                 "Fiche modifiée avec succès. Le motif a été enregistré dans l'historique.",
@@ -362,11 +376,15 @@ def fiche_list(request):
 def fiche_detail(request, pk):
     """Détail d'une fiche — 404 si hors du périmètre visible (anti-IDOR)."""
     fiche = get_object_or_404(_fiches_visibles_pour(request.user), pk=pk)
+    role = get_role(request.user)
+
     context = {
         "fiche": fiche,
         "peut_modifier": peut_modifier_fiche(request.user, fiche),
         "peut_valider": peut_valider_fiche(request.user, fiche),
+        "is_super_admin": role == Profil.Role.SUPER_ADMIN,
     }
-    if get_role(request.user) == Profil.Role.SUPER_ADMIN:
+
+    if role == Profil.Role.SUPER_ADMIN:
         context["historique"] = fiche.historique.select_related("modifie_par")
     return render(request, "recensement/fiche_detail.html", context)

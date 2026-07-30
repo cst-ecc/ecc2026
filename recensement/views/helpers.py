@@ -10,6 +10,11 @@ du package ``views``. Le comportement est strictement identique à l'original.
 
 from ..permissions import fiches_visibles_pour
 
+from datetime import date, datetime, time
+from decimal import Decimal
+from pathlib import Path
+from django.db.models.fields.files import FieldFile
+
 # Caractères qu'un tableur peut interpréter comme début de formule (OWASP CSV Injection).
 _CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
@@ -56,29 +61,58 @@ def _premiere_etape_en_erreur(form, photos_form=None):
         etapes.add(_CHAMP_VERS_ETAPE.get("photos", 1))
     return min(etapes) if etapes else None
 
+def _valeur_json_safe(value):
+    """
+    Convertit les valeurs non sérialisables en JSON pour l'historique
+    des modifications.
+
+    Important :
+    - ne jamais appeler directement value.url sur un FieldFile vide ;
+    - stocker le nom du fichier suffit pour l'historique.
+    """
+    if isinstance(value, FieldFile):
+        return value.name or None
+
+    if isinstance(value, Decimal):
+        return str(value)
+
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+
+    if isinstance(value, Path):
+        return str(value)
+
+    if hasattr(value, "pk"):
+        return value.pk
+
+    if isinstance(value, dict):
+        return {key: _valeur_json_safe(val) for key, val in value.items()}
+
+    if isinstance(value, (list, tuple, set)):
+        return [_valeur_json_safe(item) for item in value]
+
+    return value
+
 
 def _snapshot_fiche(fiche):
-    return {
-        "region": fiche.region.nom,
-        "province": fiche.province.nom,
-        "district": fiche.district.nom,
-        "zone": fiche.zone.nom,
-        "village": fiche.village.nom if fiche.village_id else None,
-        "nouvelle_localite_nom": fiche.nouvelle_localite_nom,
-        "nom_paroisse": fiche.nom_paroisse,
-        "annee_fondation": fiche.annee_fondation,
-        "parish_shepherd": fiche.parish_shepherd,
-        "contact_responsable": fiche.contact_responsable,
-        "photo_charge": fiche.photo_charge.name if fiche.photo_charge else None,
-        "nombre_fideles_estime": fiche.nombre_fideles_estime,
-        "statut_batiment": fiche.get_statut_batiment_display(),
-        "latitude": str(fiche.latitude) if fiche.latitude is not None else None,
-        "longitude": str(fiche.longitude) if fiche.longitude is not None else None,
-        "precision_gps": fiche.precision_gps,
-        "nom_informateur": fiche.nom_informateur,
-        "contact_informateur": fiche.contact_informateur,
-        "observations": fiche.observations,
-    }
+    """
+    Capture l'état d'une fiche avant/après modification pour l'historique.
+
+    Les valeurs sont converties dans un format compatible JSON afin d'éviter
+    les erreurs avec Decimal, datetime, fichiers et clés étrangères.
+    """
+    data = {}
+
+    for field in fiche._meta.fields:
+        field_name = field.name
+        value = getattr(fiche, field_name)
+
+        if field.is_relation and hasattr(value, "pk"):
+            data[field_name] = value.pk
+        else:
+            data[field_name] = _valeur_json_safe(value)
+
+    return data
 
 
 def _fiches_visibles_pour(user):

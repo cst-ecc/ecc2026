@@ -1,5 +1,5 @@
 {% extends "recensement/base.html" %}
-{% load static %}
+{% load static l10n %}
 
 {% block title %}Modifier — {{ fiche.nom_paroisse }}{% endblock %}
 
@@ -14,22 +14,28 @@
 
 <form method="post" id="fiche-edit-form" class="space-y-4" enctype="multipart/form-data">
   {% csrf_token %}
-
-  {% if form.non_field_errors %}
+  
+  {% if form.errors %}
     <div class="rounded-lg bg-red-50 text-red-800 border border-red-200 px-4 py-3 text-sm">
-      {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+      <p class="font-semibold mb-2">Certaines informations doivent être corrigées :</p>
+
+      <ul class="list-disc pl-5 space-y-1">
+        {% for error in form.non_field_errors %}
+          <li>Erreur générale : {{ error }}</li>
+        {% endfor %}
+
+        {% for field in form %}
+          {% for error in field.errors %}
+            <li>{{ field.label|default:field.name }} : {{ error }}</li>
+          {% endfor %}
+        {% endfor %}
+
+        {% for error in form.hidden_field_errors %}
+          <li>Champ masqué : {{ error }}</li>
+        {% endfor %}
+      </ul>
     </div>
   {% endif %}
-  {% if form.errors %} 
-    <div class="rounded-lg bg-red-50 text-red-800 border border-red-200 px-4 py-3 text-sm"> 
-      <p class="font-semibold mb-2">Certaines informations doivent être corrigées :</p> 
-      <ul class="list-disc pl-5 space-y-1"> 
-        {% for field in form %} {% for error in field.errors %} 
-        <li>{{ field.label }} : {{ error }}</li> 
-        {% endfor %} {% endfor %} 
-      </ul> 
-    </div> 
-  {% endif %} 
   {% if motif_form.errors %} 
   <div class="rounded-lg bg-red-50 text-red-800 border border-red-200 px-4 py-3 text-sm"> 
     <p class="font-semibold mb-2">Erreur sur le motif de modification :</p> 
@@ -142,39 +148,129 @@
   </div>
 
   <div class="app-card">
-    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">GPS & observations</div>
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">
+      GPS & observations
+    </div>
+
     <div class="p-5 space-y-4">
+      <div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <p class="font-medium">Mise à jour assistée de la position GPS</p>
+        <p class="mt-1">
+          Cliquez sur le bouton ci-dessous si vous êtes actuellement sur le lieu de la paroisse.
+          Le système recherchera une position aussi précise que possible, idéalement autour de 5 mètres.
+        </p>
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        <button
+          type="button"
+          id="btn-gps"
+          class="border border-brand-600 text-brand-700 hover:bg-brand-50 font-medium px-4 py-2.5 rounded-lg min-h-[44px]"
+        >
+          Mettre à jour la position GPS
+        </button>
+
+        <button
+          type="button"
+          id="btn-gps-accept"
+          class="hidden border border-green-600 text-green-700 hover:bg-green-50 font-medium px-4 py-2.5 rounded-lg min-h-[44px]"
+        >
+          Utiliser cette position quand même
+        </button>
+
+        <button
+          type="button"
+          id="btn-gps-cancel"
+          class="hidden border border-red-600 text-red-700 hover:bg-red-50 font-medium px-4 py-2.5 rounded-lg min-h-[44px]"
+        >
+          Annuler la recherche
+        </button>
+      </div>
+
+      <div
+        id="gps-status"
+        class="gps-status text-sm"
+        aria-live="polite"
+        data-state="idle"
+      ></div>
+
       <div class="grid sm:grid-cols-3 gap-4">
         <div>
-          <label for="edit_latitude" class="block text-sm font-medium text-slate-700 mb-1">Latitude</label>
-          <input type="number" step="any" name="latitude" id="edit_latitude"
-                 value="{{ form.latitude.value|default_if_none:'' }}"
-                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label for="id_latitude" class="block text-sm font-medium text-slate-700 mb-1">
+            Latitude
+          </label>
+          <input
+            type="number"
+            step="any"
+            name="latitude"
+            id="id_latitude"
+            value="{{ form.latitude.value|default_if_none:''|unlocalize }}"
+            class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
         </div>
+
         <div>
-          <label for="edit_longitude" class="block text-sm font-medium text-slate-700 mb-1">Longitude</label>
-          <input type="number" step="any" name="longitude" id="edit_longitude"
-                 value="{{ form.longitude.value|default_if_none:'' }}"
-                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label for="id_longitude" class="block text-sm font-medium text-slate-700 mb-1">
+            Longitude
+          </label>
+          <input
+            type="number"
+            step="any"
+            name="longitude"
+            id="id_longitude"
+            value="{{ form.longitude.value|default_if_none:''|unlocalize }}"
+            class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
         </div>
+
         <div>
-          <label for="edit_precision" class="block text-sm font-medium text-slate-700 mb-1">Précision (m)</label>
-          <input type="number" step="any" name="precision_gps" id="edit_precision"
-                 value="{{ form.precision_gps.value|default_if_none:'' }}"
-                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label for="id_precision_gps" class="block text-sm font-medium text-slate-700 mb-1">
+            Précision GPS (m)
+          </label>
+          <input
+            type="number"
+            step="any"
+            name="precision_gps"
+            id="id_precision_gps"
+            value="{{ form.precision_gps.value|default_if_none:''|unlocalize }}"
+            class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
         </div>
       </div>
+
       <p class="text-xs text-slate-400">
-        À corriger uniquement si les coordonnées d'origine sont manifestement
-        erronées — l'agent ne peut pas recapturer le GPS après enregistrement.
+        Les anciennes coordonnées sont conservées tant que vous n’enregistrez pas la fiche.
+        La modification effective sera tracée dans l’historique avec le motif obligatoire.
       </p>
-      {% for error in form.latitude.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
-      {% for error in form.longitude.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
-      {% for error in form.precision_gps.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
-      <div>
-        <label for="{{ form.observations.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.observations.label }}</label>
+
+      <div id="gps-field-errors" class="mt-3 space-y-2">
+        {% for error in form.latitude.errors %}
+          <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            Latitude : {{ error }}
+          </p>
+        {% endfor %}
+
+        {% for error in form.longitude.errors %}
+          <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            Longitude : {{ error }}
+          </p>
+        {% endfor %}
+
+        {% for error in form.precision_gps.errors %}
+          <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            Précision GPS : {{ error }}
+          </p>
+        {% endfor %}
+      </div>
+
+      <div class="pt-2 border-t border-slate-100">
+        <label for="{{ form.observations.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
+          {{ form.observations.label }}
+        </label>
         {{ form.observations }}
-        {% for error in form.observations.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% for error in form.observations.errors %}
+          <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+        {% endfor %}
       </div>
     </div>
   </div>
@@ -285,6 +381,7 @@
   };
 </script>
 <script src="{% static 'recensement/js/cascade.js' %}"></script>
+<script src="{% static 'recensement/js/geolocation.js' %}" defer></script>
 <script src="{% static 'recensement/js/doublon_check.js' %}" defer></script>
 <script>
   // Le select village n'accepte que de vrais identifiants de la base :

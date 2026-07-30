@@ -102,10 +102,27 @@ class FicheParoisseForm(forms.ModelForm):
         ),
     )
 
+    CHAMPS_SENSIBLES_A_CONSERVER_SI_ABSENTS = (
+        "latitude",
+        "longitude",
+        "precision_gps",
+        "nom_informateur",
+        "contact_informateur",
+        "observations",
+    )
+
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
         self.alerte_doublon = None
+
+        # En modification, on force explicitement les valeurs initiales des champs
+        # sensibles afin d'éviter qu'un problème de rendu HTML les affiche vides.
+        if self.instance and self.instance.pk and not self.is_bound:
+            for field_name in self.CHAMPS_SENSIBLES_A_CONSERVER_SI_ABSENTS:
+                if field_name in self.fields:
+                    self.fields[field_name].initial = getattr(self.instance, field_name, None)
+
         if user is None:
             return
 
@@ -377,6 +394,19 @@ class FicheParoisseForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+
+        # Protection anti-perte de données en modification :
+        # si un champ sensible n'est pas présent dans la requête POST, on conserve
+        # la valeur déjà enregistrée en base.
+        #
+        # Important :
+        # - si le champ est présent dans le POST avec une valeur vide, on considère
+        #   que l'utilisateur l'a volontairement effacé ;
+        # - si le champ est absent du POST, on ne l'écrase pas.
+        if self.instance and self.instance.pk and self.is_bound:
+            for field_name in self.CHAMPS_SENSIBLES_A_CONSERVER_SI_ABSENTS:
+                if field_name in self.fields and field_name not in self.data:
+                    cleaned_data[field_name] = getattr(self.instance, field_name, None)
 
         statut_batiment = cleaned_data.get("statut_batiment")
         statut_batiment_autre = (cleaned_data.get("statut_batiment_autre") or "").strip()

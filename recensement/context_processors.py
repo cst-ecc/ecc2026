@@ -6,6 +6,7 @@ from .permissions import (
     get_role,
     peut_creer_utilisateur,
     peut_gerer_sites_particuliers,
+    peut_rechercher_paroisses,
     zones_autorisees,
 )
 
@@ -73,6 +74,7 @@ def role_context(request):
         "nb_notifications_non_lues": nb_notifications_non_lues(user),
         # Sites particuliers.
         "peut_gerer_sites_particuliers": peut_gerer_sites_particuliers(user),
+        "peut_rechercher_paroisses": peut_rechercher_paroisses(user),
         # Périmètre utilisateur pour l'affichage dans les templates.
         "user_scope": _build_user_scope(user, role),
     }

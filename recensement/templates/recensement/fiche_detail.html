@@ -212,21 +212,45 @@
         </div>
         <p class="text-sm text-slate-600 mb-3"><span class="text-slate-400">Motif :</span> {{ entree.motif }}</p>
         <details class="text-xs">
-          <summary class="cursor-pointer text-brand-600 hover:underline select-none">Voir le détail avant / après</summary>
-          <div class="grid sm:grid-cols-2 gap-3 mt-2">
-            <div class="bg-red-50 border border-red-100 rounded-lg p-3">
-              <div class="font-semibold text-red-700 mb-1">Avant</div>
-              {% for cle, valeur in entree.donnees_avant.items %}
-                <div class="flex justify-between gap-2 py-0.5"><span class="text-slate-500">{{ cle }}</span><span>{{ valeur|default:"—" }}</span></div>
-              {% endfor %}
-            </div>
-            <div class="bg-green-50 border border-green-100 rounded-lg p-3">
-              <div class="font-semibold text-green-700 mb-1">Après</div>
-              {% for cle, valeur in entree.donnees_apres.items %}
-                <div class="flex justify-between gap-2 py-0.5"><span class="text-slate-500">{{ cle }}</span><span>{{ valeur|default:"—" }}</span></div>
-              {% endfor %}
-            </div>
-          </div>
+          <summary class="cursor-pointer text-brand-600 hover:underline select-none">
+            Voir les champs modifiés
+          </summary>
+
+          {% with changements=entree.changements_affichables %}
+            {% if changements %}
+              <div class="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+                <table class="min-w-full divide-y divide-slate-200 bg-white text-xs">
+                  <thead class="bg-slate-50">
+                    <tr>
+                      <th class="px-3 py-2 text-left font-semibold text-slate-600">Champ</th>
+                      <th class="px-3 py-2 text-left font-semibold text-red-700">Avant</th>
+                      <th class="px-3 py-2 text-left font-semibold text-green-700">Après</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    {% for changement in changements %}
+                      <tr>
+                        <td class="px-3 py-2 font-medium text-slate-700">
+                          {{ changement.libelle }}
+                        </td>
+                        <td class="px-3 py-2 text-slate-600 bg-red-50/50">
+                          {{ changement.avant|linebreaksbr }}
+                        </td>
+                        <td class="px-3 py-2 text-slate-600 bg-green-50/50">
+                          {{ changement.apres|linebreaksbr }}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500">
+                Aucune différence exploitable détectée dans cette entrée.
+                Cela peut concerner un ancien historique enregistré avant la correction du snapshot.
+              </div>
+            {% endif %}
+          {% endwith %}
         </details>
       </div>
       {% endfor %}

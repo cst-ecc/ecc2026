@@ -16,6 +16,11 @@ import re
 import unicodedata
 from decimal import InvalidOperation
 from difflib import SequenceMatcher
+from datetime import date, datetime, time
+from decimal import Decimal
+from pathlib import Path
+
+from django.db.models.fields.files import FieldFile
 
 from django.urls import reverse
 
@@ -303,13 +308,57 @@ def appliquer_infos_doublon_sur_instance(instance, alerte, motif_confirmation=""
 
     return instance
 
+def _json_safe(value):
+    """
+    Convertit les valeurs non sérialisables en JSON avant stockage
+    dans HistoriqueAlerteDoublon.details.
+
+    Couvre notamment :
+    - datetime/date/time ;
+    - Decimal ;
+    - FieldFile ;
+    - objets Django ;
+    - listes, tuples, sets et dictionnaires imbriqués.
+    """
+    if isinstance(value, FieldFile):
+        return value.name or None
+
+    if isinstance(value, Decimal):
+        return str(value)
+
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+
+    if isinstance(value, Path):
+        return str(value)
+
+    if hasattr(value, "pk"):
+        return value.pk
+
+    if isinstance(value, dict):
+        return {str(key): _json_safe(val) for key, val in value.items()}
+
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+
+    return value
 
 def journaliser_alerte_doublon(*, fiche=None, utilisateur=None, alerte=None, action="creation", valeurs_saisies=None):
     if not alerte or alerte.get("gravite") == "aucun":
         return None
 
     correspondances = alerte.get("correspondances") or []
-    reference_id = correspondances[0]["id"] if correspondances else None
+    reference_id = None
+
+    if correspondances:
+        reference_id = correspondances[0].get("id")
+
+    details = {
+        "motif_principal": alerte.get("motif_principal", ""),
+        "correspondances": correspondances,
+        "seuils": alerte.get("seuils", {}),
+        "valeurs_saisies": valeurs_saisies or {},
+    }
 
     return HistoriqueAlerteDoublon.objects.create(
         fiche=fiche,
@@ -318,10 +367,5 @@ def journaliser_alerte_doublon(*, fiche=None, utilisateur=None, alerte=None, act
         action=action,
         niveau_risque=alerte.get("gravite", "aucun"),
         nom_normalise=alerte.get("nom_normalise", ""),
-        details={
-            "motif_principal": alerte.get("motif_principal", ""),
-            "correspondances": correspondances,
-            "seuils": alerte.get("seuils", {}),
-            "valeurs_saisies": valeurs_saisies or {},
-        },
+        details=_json_safe(details),
     )

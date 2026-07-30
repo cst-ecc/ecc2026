@@ -98,6 +98,7 @@ from .sites_particuliers_views import (
     site_particulier_update,
 )
 
+from .views_search import recherche_rapide_paroisses
 # --- Workflow de validation ------------------------------------------------
 from .validation_views import fiche_a_valider, fiche_valider
 
@@ -128,6 +129,8 @@ __all__ = [
     "ajax_districts",
     "ajax_zones",
     "ajax_villages",
+    # Recherche rapide de paroisses
+    "recherche_rapide_paroisses",
     # Relances
     "relances_liste",
     "relance_lancer",

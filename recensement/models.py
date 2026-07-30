@@ -4,6 +4,8 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.contrib.auth import get_user_model
+
 
 # ---------------------------------------------------------------------------
 # Référentiel géo-ecclésial (importé depuis le fichier Excel de cartographie)
@@ -724,18 +726,162 @@ class HistoriqueModification(models.Model):
         blank=True,
     )
     date_modification = models.DateTimeField(auto_now_add=True)
-    motif = models.TextField(help_text="Raison de la modification, fournie par la personne qui modifie.")
-    donnees_avant = models.JSONField(help_text="Valeurs des champs juste avant cette modification.")
-    donnees_apres = models.JSONField(help_text="Valeurs des champs juste après cette modification.")
+    motif = models.TextField(
+        help_text="Raison de la modification, fournie par la personne qui modifie."
+    )
+    donnees_avant = models.JSONField(
+        help_text="Valeurs des champs juste avant cette modification."
+    )
+    donnees_apres = models.JSONField(
+        help_text="Valeurs des champs juste après cette modification."
+    )
+
+    CHAMPS_HISTORIQUE_AFFICHES = (
+        ("region", "Région ecclésiale"),
+        ("province", "Province ecclésiale"),
+        ("district", "District ecclésial"),
+        ("zone", "Zone ecclésiale"),
+        ("village", "Village / quartier"),
+        ("nouvelle_localite_nom", "Nouvelle localité"),
+        ("nom_paroisse", "Nom de la paroisse"),
+        ("annee_fondation", "Année de fondation"),
+        ("parish_shepherd", "Chargé de paroisse"),
+        ("contact_responsable", "Contact du chargé"),
+        ("nombre_fideles_estime", "Nombre de fidèles estimé"),
+        ("statut_batiment", "Statut du bâtiment"),
+        ("statut_batiment_autre", "Précision du bâtiment"),
+        ("latitude", "Latitude"),
+        ("longitude", "Longitude"),
+        ("precision_gps", "Précision GPS"),
+        ("nom_informateur", "Nom de l’informateur"),
+        ("contact_informateur", "Contact de l’informateur"),
+        ("observations", "Observations"),
+        ("photo_charge", "Photo du chargé"),
+    )
 
     class Meta:
         ordering = ["-date_modification"]
         verbose_name = "Historique de modification"
         verbose_name_plural = "Historiques de modification"
 
-    def __str__(self):
-        return f"Modification de « {self.fiche.nom_paroisse} » le {self.date_modification:%d/%m/%Y %H:%M}"
+    @staticmethod
+    def _valeur_vide(value):
+        return value is None or value == ""
 
+    @staticmethod
+    def _normaliser_pour_comparaison(value):
+        if value is None:
+            return ""
+        return str(value).strip()
+
+    @staticmethod
+    def _objet_ou_reference(model, pk):
+        if pk in (None, ""):
+            return "—"
+
+        try:
+            obj = model.objects.get(pk=pk)
+        except (model.DoesNotExist, ValueError, TypeError):
+            return f"Référence #{pk}"
+
+        return str(obj)
+
+    @staticmethod
+    def _utilisateur_ou_reference(pk):
+        if pk in (None, ""):
+            return "—"
+
+        User = get_user_model()
+
+        try:
+            user = User.objects.get(pk=pk)
+        except (User.DoesNotExist, ValueError, TypeError):
+            return f"Compte #{pk}"
+
+        return user.get_full_name() or user.get_username()
+
+    def _valeur_affichable(self, champ, valeur):
+        if self._valeur_vide(valeur):
+            return "—"
+
+        if champ == "region":
+            return self._objet_ou_reference(Region, valeur)
+
+        if champ == "province":
+            return self._objet_ou_reference(Province, valeur)
+
+        if champ == "district":
+            return self._objet_ou_reference(District, valeur)
+
+        if champ == "zone":
+            return self._objet_ou_reference(Zone, valeur)
+
+        if champ == "village":
+            return self._objet_ou_reference(Village, valeur)
+
+        if champ in (
+            "cree_par",
+            "valide_par_superviseur",
+            "valide_par_manager",
+            "valide_par_super_admin",
+            "genere_par",
+        ):
+            return self._utilisateur_ou_reference(valeur)
+
+        if champ == "statut_batiment":
+            return dict(StatutBatiment.choices).get(valeur, valeur)
+
+        if champ == "statut_validation":
+            return dict(FicheParoisse.StatutValidation.choices).get(valeur, valeur)
+
+        if champ == "doublon_statut":
+            return dict(FicheParoisse.StatutDoublon.choices).get(valeur, valeur)
+
+        if champ == "precision_gps":
+            return f"{valeur} m"
+
+        if champ == "photo_charge":
+            return "Photo enregistrée" if valeur else "—"
+
+        return valeur
+
+    @property
+    def changements_affichables(self):
+        """
+        Retourne uniquement les champs réellement modifiés,
+        avec des libellés compréhensibles et des valeurs lisibles.
+        """
+        avant = self.donnees_avant or {}
+        apres = self.donnees_apres or {}
+
+        changements = []
+
+        for champ, libelle in self.CHAMPS_HISTORIQUE_AFFICHES:
+            valeur_avant = avant.get(champ)
+            valeur_apres = apres.get(champ)
+
+            if (
+                self._normaliser_pour_comparaison(valeur_avant)
+                == self._normaliser_pour_comparaison(valeur_apres)
+            ):
+                continue
+
+            changements.append(
+                {
+                    "champ": champ,
+                    "libelle": libelle,
+                    "avant": self._valeur_affichable(champ, valeur_avant),
+                    "apres": self._valeur_affichable(champ, valeur_apres),
+                }
+            )
+
+        return changements
+
+    def __str__(self):
+        return (
+            f"Modification de « {self.fiche.nom_paroisse} » "
+            f"le {self.date_modification:%d/%m/%Y %H:%M}"
+        )
 
 class HistoriqueAlerteDoublon(models.Model):
     """Journal des alertes ou tentatives de doublon détectées par le système."""

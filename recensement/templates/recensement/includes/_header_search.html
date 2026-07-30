@@ -1,0 +1,50 @@
+{% load static %}
+
+{% if peut_rechercher_paroisses %}
+  <div
+    class="relative flex items-center"
+    data-header-parish-search
+    data-search-url="{% url 'recensement:recherche_rapide_paroisses' %}"
+  >
+    <button
+      type="button"
+      class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-all duration-200 hover:border-brand-300 hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+      data-search-toggle
+      aria-label="Rechercher une paroisse"
+      aria-expanded="false"
+      aria-controls="header-parish-search-panel"
+    >
+      <svg class="h-5 w-5 transition-transform duration-200" data-search-icon viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M10.75 18.5a7.75 7.75 0 1 1 0-15.5 7.75 7.75 0 0 1 0 15.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="m16.5 16.5 4.25 4.25" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </button>
+
+    <div
+      id="header-parish-search-panel"
+      class="hidden absolute right-0 top-12 z-50 w-[min(22rem,calc(100vw-2rem))] origin-top-right rounded-2xl border border-slate-200 bg-white p-2 shadow-soft transition-all duration-200"
+      data-search-panel
+    >
+      <form class="relative" data-search-form autocomplete="off">
+        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M10.75 18.5a7.75 7.75 0 1 1 0-15.5 7.75 7.75 0 0 1 0 15.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="m16.5 16.5 4.25 4.25" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+        <input
+          type="search"
+          class="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-800 outline-none transition focus:border-brand-400 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
+          data-search-input
+          placeholder="Rechercher une paroisse, un code ou un chargé..."
+          autocomplete="off"
+        >
+      </form>
+
+      <div class="px-2 py-2 text-xs text-slate-500" data-search-status></div>
+      <div class="max-h-96 overflow-y-auto rounded-xl" data-search-results></div>
+    </div>
+  </div>
+
+  <script src="{% static 'recensement/js/header_search.js' %}" defer></script>
+{% endif %}

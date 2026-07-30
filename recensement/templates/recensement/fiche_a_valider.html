@@ -3,12 +3,21 @@
 {% block title %}Fiches à valider — Recensement{% endblock %}
 
 {% block content %}
-<h1 class="text-xl font-semibold text-slate-900 mb-1">Fiches en attente de votre validation</h1>
+<h1 class="text-xl font-semibold text-slate-900 mb-1">
+  Fiches en attente de validation
+</h1>
+
 <p class="text-sm text-slate-500 mb-3">
-  {% if is_superviseur %}
-    Fiches enregistrées dans votre district, en attente de votre validation avant transmission au manager de province.
+  {% if is_super_admin %}
+    Vue globale de toutes les fiches encore en attente dans le workflow de validation.
+  {% elif is_op_province %}
+    Fiches en attente situées dans votre province ou dans votre périmètre autorisé.
+  {% elif is_op_district %}
+    Fiches en attente situées dans votre district ou dans vos districts autorisés.
+  {% elif is_op_zone %}
+    Fiches en attente situées dans votre zone ou dans vos zones autorisées.
   {% else %}
-    Fiches déjà validées par le chef de district, en attente de votre validation finale.
+    Fiches en attente selon votre périmètre d’accès.
   {% endif %}
 </p>
 <div class="rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3 mb-6">
@@ -21,9 +30,12 @@
     <thead class="bg-brand-800 text-white text-left">
       <tr>
         <th class="px-4 py-3 font-medium">Paroisse</th>
-        <th class="px-4 py-3 font-medium">Quartier / Village</th>
+        <th class="px-4 py-3 font-medium">Région</th>
+        <th class="px-4 py-3 font-medium">Province</th>
+        <th class="px-4 py-3 font-medium">District</th>
         <th class="px-4 py-3 font-medium">Zone</th>
-        <th class="px-4 py-3 font-medium">Chargé de paroisse</th>
+        <th class="px-4 py-3 font-medium">Statut actuel</th>
+        <th class="px-4 py-3 font-medium">Validation attendue</th>
         <th class="px-4 py-3 font-medium">Agent</th>
         <th class="px-4 py-3 font-medium">Enregistrée le</th>
         <th class="px-4 py-3 font-medium">Action</th>
@@ -31,40 +43,87 @@
     </thead>
     <tbody class="divide-y divide-slate-100">
       {% for fiche in fiches %}
-      <tr class="hover:bg-slate-50">
-        <td class="px-4 py-3">
-          <a href="{% url 'recensement:fiche_detail' fiche.pk %}" class="text-brand-600 hover:underline font-medium">
-            {{ fiche.nom_paroisse }}
-          </a>
-        </td>
-        <td class="px-4 py-3">{{ fiche.localite }}</td>
-        <td class="px-4 py-3">{{ fiche.zone.nom }}</td>
-        <td class="px-4 py-3">{{ fiche.parish_shepherd }}</td>
-        <td class="px-4 py-3">{{ fiche.cree_par.get_full_name|default:fiche.cree_par.get_username|default:"—" }}</td>
-        <td class="px-4 py-3 whitespace-nowrap">{{ fiche.date_recensement|date:"d/m/Y H:i" }}</td>
-        <td class="px-4 py-3">
-          <div class="flex gap-2">
-            <form method="post" action="{% url 'recensement:fiche_valider' fiche.pk %}"
-                  data-confirm-title="Confirmer la validation"
-                  data-confirm-message="Valider « {{ fiche.nom_paroisse }} » ? Cette action transmettra la fiche au palier suivant."
-                  data-confirm-details="Après validation, vous ne pourrez plus modifier cette fiche vous-même."
-                  data-confirm-label="Valider la fiche"
-                  data-confirm-variant="success">
-              {% csrf_token %}
-              <button type="submit"
-                      class="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
-                Valider
-              </button>
-            </form>
-            <a href="{% url 'recensement:fiche_update' fiche.pk %}"
-               class="inline-flex items-center border border-brand-600 text-brand-700 hover:bg-brand-50 text-xs font-semibold px-3 py-1.5 rounded-lg">
-              Modifier
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-3">
+            <a href="{% url 'recensement:fiche_detail' fiche.pk %}" class="text-brand-600 hover:underline font-medium">
+              {{ fiche.nom_paroisse }}
             </a>
-          </div>
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="7" class="text-center text-slate-400 py-8">Aucune fiche en attente.</td></tr>
+            <div class="text-xs text-slate-400 mt-1">
+              {{ fiche.localite }}
+            </div>
+          </td>
+
+          <td class="px-4 py-3">{{ fiche.region.nom }}</td>
+          <td class="px-4 py-3">{{ fiche.province.nom }}</td>
+          <td class="px-4 py-3">{{ fiche.district.nom }}</td>
+          <td class="px-4 py-3">{{ fiche.zone.nom }}</td>
+
+          <td class="px-4 py-3">
+            {% if fiche.statut_validation == "attente_superviseur" %}
+              <span class="inline-flex px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
+                En attente OP DISTRICT / OP ZONE
+              </span>
+            {% elif fiche.statut_validation == "attente_manager" %}
+              <span class="inline-flex px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+                En attente OP PROVINCE
+              </span>
+            {% else %}
+              <span class="inline-flex px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+                {{ fiche.get_statut_validation_display }}
+              </span>
+            {% endif %}
+          </td>
+
+          <td class="px-4 py-3">
+            {{ fiche.niveau_validation_attendu }}
+          </td>
+
+          <td class="px-4 py-3">
+            {{ fiche.cree_par.get_full_name|default:fiche.cree_par.get_username|default:"—" }}
+          </td>
+
+          <td class="px-4 py-3 whitespace-nowrap">
+            {{ fiche.date_recensement|date:"d/m/Y H:i" }}
+          </td>
+
+          <td class="px-4 py-3">
+            <div class="flex gap-2 flex-wrap">
+              {% if fiche.peut_valider_par_utilisateur %}
+                <form method="post" action="{% url 'recensement:fiche_valider' fiche.pk %}"
+                      data-confirm-title="Confirmer la validation"
+                      data-confirm-message="Valider « {{ fiche.nom_paroisse }} » ?"
+                      data-confirm-details="Cette action appliquera la validation selon votre rôle."
+                      data-confirm-label="Valider la fiche"
+                      data-confirm-variant="success">
+                  {% csrf_token %}
+                  <button type="submit"
+                          class="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+                    Valider
+                  </button>
+                </form>
+              {% endif %}
+
+              {% if fiche.peut_modifier_par_utilisateur %}
+                <a href="{% url 'recensement:fiche_update' fiche.pk %}"
+                  class="inline-flex items-center border border-brand-600 text-brand-700 hover:bg-brand-50 text-xs font-semibold px-3 py-1.5 rounded-lg">
+                  Modifier
+                </a>
+              {% endif %}
+
+              {% if not fiche.peut_valider_par_utilisateur and not fiche.peut_modifier_par_utilisateur %}
+                <span class="text-xs text-slate-400">
+                  Consultation uniquement
+                </span>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10" class="text-center text-slate-400 py-8">
+            Aucune fiche en attente.
+          </td>
+        </tr>
       {% endfor %}
     </tbody>
   </table>

@@ -28,6 +28,13 @@ _RANG_ROLE = {
     Profil.Role.SUPER_ADMIN: 50,
 }
 
+_ROLES_RECHERCHE_PAROISSES = (
+    Profil.Role.AGENT,
+    Profil.Role.OP_ZONE,
+    Profil.Role.OP_DISTRICT,
+    Profil.Role.OP_PROVINCE,
+    Profil.Role.SUPER_ADMIN,
+)
 
 # ---------------------------------------------------------------------------
 # Rôle et profil
@@ -472,3 +479,63 @@ def peut_voir_historique_codes(user):
 def peut_gerer_sites_particuliers(user):
     """Seul le super administrateur peut gérer les sites particuliers."""
     return get_role(user) == Profil.Role.SUPER_ADMIN
+
+
+#---------------------------------------------------------------------------
+# Recherche rapide de paroisses
+#---------------------------------------------------------------------------
+def peut_rechercher_paroisses(user):
+    """Indique si l'utilisateur peut utiliser la recherche rapide du header."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+
+    role = get_role(user)
+    if role == Profil.Role.SUPER_ADMIN:
+        return True
+
+    profil = get_profil(user)
+    return bool(profil and role in _ROLES_RECHERCHE_PAROISSES)
+
+
+def paroisses_recherchables_pour(user):
+    """Retourne les paroisses recherchables par l'utilisateur connecté.
+
+    Cette fonction est volontairement dédiée à la recherche rapide.
+    Elle ne modifie pas ``fiches_visibles_pour`` afin de préserver les règles
+    existantes des listes et des écrans métier. Pour la recherche du header,
+    l'agent est strictement limité à ses zones autorisées.
+    """
+    from .models import FicheParoisse
+
+    qs = FicheParoisse.objects.select_related(
+        "region",
+        "province",
+        "district",
+        "zone",
+    ).only(
+        "id",
+        "nom_paroisse",
+        "parish_shepherd",
+        "code_court",
+        "code_officiel",
+        "statut_validation",
+        "region__nom",
+        "province__nom",
+        "district__nom",
+        "zone__nom",
+    )
+
+    if not peut_rechercher_paroisses(user):
+        return qs.none()
+
+    role = get_role(user)
+    if role == Profil.Role.SUPER_ADMIN:
+        return qs
+
+    zone_ids = zones_autorisees(user)
+    if zone_ids is None:
+        return qs
+    if not zone_ids:
+        return qs.none()
+
+    return qs.filter(zone_id__in=zone_ids).distinct()
