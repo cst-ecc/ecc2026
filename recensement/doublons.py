@@ -14,14 +14,12 @@ from __future__ import annotations
 import math
 import re
 import unicodedata
-from decimal import InvalidOperation
-from difflib import SequenceMatcher
 from datetime import date, datetime, time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from django.db.models.fields.files import FieldFile
-
 from django.urls import reverse
 
 from .models import FicheParoisse, HistoriqueAlerteDoublon, Profil
@@ -308,6 +306,7 @@ def appliquer_infos_doublon_sur_instance(instance, alerte, motif_confirmation=""
 
     return instance
 
+
 def _json_safe(value):
     """
     Convertit les valeurs non sérialisables en JSON avant stockage
@@ -342,6 +341,7 @@ def _json_safe(value):
         return [_json_safe(item) for item in value]
 
     return value
+
 
 def journaliser_alerte_doublon(*, fiche=None, utilisateur=None, alerte=None, action="creation", valeurs_saisies=None):
     if not alerte or alerte.get("gravite") == "aucun":

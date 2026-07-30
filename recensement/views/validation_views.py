@@ -41,17 +41,14 @@ def fiche_a_valider(request):
         zone_ids = zones_autorisees(request.user) or set()
         fiches = fiches.filter(zone_id__in=zone_ids)
 
-    fiches = (
-        fiches.select_related(
-            "region",
-            "province",
-            "district",
-            "zone",
-            "village",
-            "cree_par",
-        )
-        .order_by("statut_validation", "date_recensement")
-    )
+    fiches = fiches.select_related(
+        "region",
+        "province",
+        "district",
+        "zone",
+        "village",
+        "cree_par",
+    ).order_by("statut_validation", "date_recensement")
 
     fiches_a_afficher = []
     for fiche in fiches:
@@ -79,6 +76,7 @@ def fiche_a_valider(request):
             "is_op_province": role == Profil.Role.OP_PROVINCE,
         },
     )
+
 
 @login_required
 @role_required(

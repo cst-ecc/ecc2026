@@ -8,12 +8,13 @@ Rien de public n'est exposé côté URL : ce module est un détail d'implémenta
 du package ``views``. Le comportement est strictement identique à l'original.
 """
 
-from ..permissions import fiches_visibles_pour
-
 from datetime import date, datetime, time
 from decimal import Decimal
 from pathlib import Path
+
 from django.db.models.fields.files import FieldFile
+
+from ..permissions import fiches_visibles_pour
 
 # Caractères qu'un tableur peut interpréter comme début de formule (OWASP CSV Injection).
 _CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
@@ -60,6 +61,7 @@ def _premiere_etape_en_erreur(form, photos_form=None):
     if photos_form is not None and photos_form.errors:
         etapes.add(_CHAMP_VERS_ETAPE.get("photos", 1))
     return min(etapes) if etapes else None
+
 
 def _valeur_json_safe(value):
     """

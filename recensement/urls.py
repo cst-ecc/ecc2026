@@ -4,6 +4,7 @@ from recensement.healthcheck import healthcheck
 
 from . import access_views, views
 from .views import doublon_views, notifications_views, qrcode_views
+
 app_name = "recensement"
 
 urlpatterns = [
@@ -82,7 +83,6 @@ urlpatterns = [
         qrcode_views.paroisse_qrcode,
         name="paroisse_qrcode",
     ),
-
     # Endpoint JSON pour la recherche rapide de paroisses (header)
     path(
         "paroisses/recherche-rapide/",

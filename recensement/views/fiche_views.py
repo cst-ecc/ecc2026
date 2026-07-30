@@ -10,8 +10,6 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
 
-from django.db import transaction
-
 from ..codification import generer_code_paroisse
 from ..doublons import journaliser_alerte_doublon
 from ..forms import FicheParoisseForm, MotifModificationForm, PhotosParoisseForm
@@ -33,7 +31,6 @@ from ..permissions import (
     role_required,
 )
 from .helpers import _fiches_visibles_pour, _premiere_etape_en_erreur, _snapshot_fiche
-
 
 
 @login_required

@@ -481,9 +481,9 @@ def peut_gerer_sites_particuliers(user):
     return get_role(user) == Profil.Role.SUPER_ADMIN
 
 
-#---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Recherche rapide de paroisses
-#---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 def peut_rechercher_paroisses(user):
     """Indique si l'utilisateur peut utiliser la recherche rapide du header."""
     if not getattr(user, "is_authenticated", False):

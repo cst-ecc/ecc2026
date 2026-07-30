@@ -98,9 +98,9 @@ from .sites_particuliers_views import (
     site_particulier_update,
 )
 
-from .views_search import recherche_rapide_paroisses
 # --- Workflow de validation ------------------------------------------------
 from .validation_views import fiche_a_valider, fiche_valider
+from .views_search import recherche_rapide_paroisses
 
 __all__ = [
     # Pages publiques

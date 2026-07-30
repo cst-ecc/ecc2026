@@ -15,7 +15,6 @@ from django.views.decorators.http import require_GET
 
 from ..permissions import paroisses_recherchables_pour, peut_rechercher_paroisses
 
-
 MIN_LONGUEUR_RECHERCHE = 2
 MAX_RESULTATS_RECHERCHE = 8
 
