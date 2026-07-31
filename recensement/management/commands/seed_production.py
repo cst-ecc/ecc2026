@@ -88,51 +88,105 @@ DEFAULT_NOM = "ASSOGBA"
 # Source : migrations 0019 + 0020 et spécifications métier.
 # ---------------------------------------------------------------------------
 
+CHAMPS_OFFICIELS_SITES_PARTICULIERS = (
+    "type_site",
+    "pays",
+    "localite",
+    "titre_responsable",
+    "description",
+    "informations_historiques",
+    "details_officiels",
+)
+
+DESCRIPTION_GENERALE_SITE_PARTICULIER = (
+    "Site particulier officiel de l’Église du Christianisme Céleste, géré "
+    "hors du circuit ordinaire de recensement des paroisses."
+)
+
+DETAILS_GENERAUX_SITE_PARTICULIER = (
+    "Donnée officielle issue du seed de production. Toute correction des "
+    "informations de référence doit être réalisée par une procédure contrôlée."
+)
+
 SITES_PARTICULIERS = [
     {
         "nom": "Paroisse Mère",
         "type_site": "paroisse_mere",
         "pays": "Bénin",
         "localite": "Porto-Novo",
+        "titre_responsable": "Pasteur de l'Église du Christianisme Céleste",
+        "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
+        "informations_historiques": "",
+        "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
+        "statut": "Ouvert",
     },
     {
         "nom": "Cathédrale de Tchakou",
         "type_site": "cathedrale",
         "pays": "Bénin",
         "localite": "Tchakou",
+        "titre_responsable": "Responsable du Département Chargé du Patrimoine",
+        "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
+        "informations_historiques": "",
+        "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
+        "statut": "Ouvert",
     },
     {
-        "nom": "Cathédrale d'Agonguè",
-        "type_site": "cathedrale",
+        "nom": "Site d'Agonguè",
+        "type_site": "site",
         "pays": "Bénin",
         "localite": "Agonguè",
+        "titre_responsable": "Responsable du Département Chargé du Patrimoine",
+        "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
+        "informations_historiques": "",
+        "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
+        "statut": "Ouvert",
     },
     {
         "nom": "Site de la Nativité de Sèmè-Plage",
         "type_site": "site_nativite",
         "pays": "Bénin",
         "localite": "Sèmè-Plage",
+        "titre_responsable": "Responsable du Département Chargé du Patrimoine",
+        "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
+        "informations_historiques": "",
+        "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
+        "statut": "Ouvert",
     },
     {
-        "nom": "La Basilique d'Imèko",
+        "nom": "La Cité Céleste d'Imèko",
         "type_site": "basilique",
         "pays": "Nigéria",
         "localite": "Imèko",
+        "titre_responsable": "Responsable du Département Chargé du Patrimoine",
+        "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
+        "informations_historiques": "",
+        "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
+        "statut": "Ouvert",
     },
     {
         "nom": "Saint SBJ Oshoffa Cathedral",
         "type_site": "cathedrale",
         "pays": "Nigéria",
         "localite": "Ketu",
+        "titre_responsable": "Responsable du Département Chargé du Patrimoine",
+        "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
+        "informations_historiques": "",
+        "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
+        "statut": "Ouvert",
     },
     {
         "nom": "Cathédrale de Makoko",
         "type_site": "cathedrale",
         "pays": "Nigéria",
         "localite": "Makoko",
+        "titre_responsable": "Responsable officiel désigné par l’Église",
+        "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
+        "informations_historiques": "",
+        "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
+        "statut": "Ouvert",
     },
 ]
-
 
 class Command(BaseCommand):
     help = (
@@ -358,32 +412,60 @@ class Command(BaseCommand):
 
     # ------------------------------------------------- sites particuliers
     def _seeder_sites_particuliers(self):
-        """Insère les sites particuliers dans le modèle autonome ``SiteParticulier``.
+        """Insère ou complète prudemment les sites particuliers.
 
-        Ces sites (cathédrales, basiliques, Paroisse Mère, site de la Nativité…)
-        sont gérés **en dehors du circuit de recensement ordinaire**. Ils ne
-        dépendent pas de la hiérarchie Région→Province→District→Zone.
-
-        Idempotent : ``get_or_create`` sur le nom.
+        La commande ne remplace pas brutalement les valeurs existantes en
+        production. Elle complète seulement les champs officiels vides. Les
+        corrections de valeurs non vides doivent passer par une procédure
+        contrôlée.
         """
         self.stdout.write("\n── Étape 2 : Sites particuliers (modèle autonome) ──")
 
         nb_crees = 0
         nb_existants = 0
+        nb_completes = 0
 
         for donnees in SITES_PARTICULIERS:
-            _, created = SiteParticulier.objects.get_or_create(
+            site, created = SiteParticulier.objects.get_or_create(
                 nom=donnees["nom"],
                 defaults=donnees,
             )
+
             if created:
                 nb_crees += 1
                 self.stdout.write(f"  ✓ « {donnees['nom']} » créé ({donnees['type_site']})")
-            else:
-                nb_existants += 1
+                continue
+
+            nb_existants += 1
+            champs_a_mettre_a_jour = []
+
+            for champ in CHAMPS_OFFICIELS_SITES_PARTICULIERS:
+                valeur_actuelle = getattr(site, champ, None)
+                valeur_seed = donnees.get(champ)
+
+                if not valeur_actuelle and valeur_seed:
+                    setattr(site, champ, valeur_seed)
+                    champs_a_mettre_a_jour.append(champ)
+
+            # Le statut est une information variable. On le complète si vide,
+            # mais on n'écrase pas une valeur déjà renseignée en production.
+            if not site.statut and donnees.get("statut"):
+                site.statut = donnees["statut"]
+                champs_a_mettre_a_jour.append("statut")
+
+            if champs_a_mettre_a_jour:
+                site.save(update_fields=champs_a_mettre_a_jour)
+                nb_completes += 1
+                self.stdout.write(
+                    f"  ↳ « {site.nom} » complété : {', '.join(champs_a_mettre_a_jour)}"
+                )
 
         self.stdout.write(
-            self.style.SUCCESS(f"Sites particuliers : {nb_crees} créé(s), {nb_existants} déjà existant(s).")
+            self.style.SUCCESS(
+                "Sites particuliers : "
+                f"{nb_crees} créé(s), {nb_existants} déjà existant(s), "
+                f"{nb_completes} complété(s) sans écrasement."
+            )
         )
 
     # ----------------------------------------------------------- super-admin

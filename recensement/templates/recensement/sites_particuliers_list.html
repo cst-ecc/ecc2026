@@ -12,20 +12,25 @@
   </div>
   <a href="{% url 'recensement:site_particulier_create' %}"
      class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg px-4 py-2.5">
-    + Nouveau site
+    + Nouveau site particulier
   </a>
+</div>
+
+<div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 mb-4">
+  Les noms, localisations, titres officiels et informations de référence sont fixés par le seed ou par décision pastorale lors de la création. Après création, ils sont protégés contre les modifications ordinaires.
 </div>
 
 <div class="overflow-x-auto app-card">
   <table class="min-w-full text-sm app-table">
     <thead class="bg-brand-800 text-white text-left">
       <tr>
-        <th class="px-4 py-3 font-medium">Nom</th>
+        <th class="px-4 py-3 font-medium">Nom officiel</th>
         <th class="px-4 py-3 font-medium">Type</th>
         <th class="px-4 py-3 font-medium">Pays</th>
         <th class="px-4 py-3 font-medium">Localité</th>
-        <th class="px-4 py-3 font-medium">Statut</th>
+        <th class="px-4 py-3 font-medium">Titre responsable</th>
         <th class="px-4 py-3 font-medium">Responsable</th>
+        <th class="px-4 py-3 font-medium">GPS</th>
         <th class="px-4 py-3 font-medium">Dernière modification</th>
         <th class="px-4 py-3 font-medium">Actions</th>
       </tr>
@@ -39,18 +44,25 @@
         <td class="px-4 py-3">{{ site.get_type_site_display }}</td>
         <td class="px-4 py-3">{{ site.pays|default:"—" }}</td>
         <td class="px-4 py-3">{{ site.localite|default:"—" }}</td>
-        <td class="px-4 py-3">{{ site.statut|default:"—" }}</td>
+        <td class="px-4 py-3">{{ site.titre_responsable|default:"—" }}</td>
         <td class="px-4 py-3">{{ site.responsable|default:"—" }}</td>
+        <td class="px-4 py-3">
+          {% if site.gps_est_defini %}
+            <span class="inline-block rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Défini</span>
+          {% else %}
+            <span class="inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">À définir</span>
+          {% endif %}
+        </td>
         <td class="px-4 py-3 whitespace-nowrap text-slate-500">{{ site.date_modification|date:"d/m/Y H:i" }}</td>
         <td class="px-4 py-3 whitespace-nowrap">
           <a href="{% url 'recensement:site_particulier_detail' site.pk %}" class="text-brand-600 hover:underline text-xs">Consulter</a>
           <span class="text-slate-300 mx-1">|</span>
-          <a href="{% url 'recensement:site_particulier_update' site.pk %}" class="text-brand-600 hover:underline text-xs">Modifier</a>
+          <a href="{% url 'recensement:site_particulier_update' site.pk %}" class="text-brand-600 hover:underline text-xs">Compléter</a>
         </td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="8" class="text-center text-slate-400 py-8">
+        <td colspan="9" class="text-center text-slate-400 py-8">
           Aucun site particulier enregistré.
         </td>
       </tr>

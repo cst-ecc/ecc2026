@@ -11,6 +11,27 @@
     <p class="text-green-700 mt-1">L'identifiant a été généré automatiquement.</p>
   </div>
 
+  {% if statut_email_creation %}
+    {% if statut_email_creation.statut == "envoye" %}
+      <div class="mb-6 rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-green-800">
+        <p class="font-semibold">E-mail d’accès envoyé</p>
+        <p class="mt-1 text-sm">Le nouvel utilisateur a reçu ses informations de connexion à l’adresse {{ statut_email_creation.email }}.</p>
+      </div>
+    {% elif statut_email_creation.statut == "non_envoye" %}
+      <div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-800">
+        <p class="font-semibold">E-mail d’accès non envoyé</p>
+        <p class="mt-1 text-sm">{{ statut_email_creation.motif }}</p>
+        <p class="mt-1 text-sm">Vous pouvez copier les informations ci-dessous et les transmettre par un canal sécurisé.</p>
+      </div>
+    {% else %}
+      <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-800">
+        <p class="font-semibold">Échec d’envoi de l’e-mail d’accès</p>
+        <p class="mt-1 text-sm">{{ statut_email_creation.motif|default:"Erreur technique non précisée." }}</p>
+        <p class="mt-1 text-sm">Le compte est bien créé. Vous pouvez transmettre les informations manuellement.</p>
+      </div>
+    {% endif %}
+  {% endif %}
+
   <div class="app-card p-6 space-y-4">
 
     <div>

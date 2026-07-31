@@ -13,7 +13,7 @@
   <div class="flex items-center gap-2">
     <a href="{% url 'recensement:site_particulier_update' site.pk %}"
        class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg px-4 py-2.5">
-      Modifier
+      Compléter les informations
     </a>
     <a href="{% url 'recensement:site_particulier_list' %}"
        class="border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg px-4 py-2.5">
@@ -22,24 +22,67 @@
   </div>
 </div>
 
+<section class="app-card p-5 mb-6">
+  <div class="flex items-start justify-between gap-3 flex-wrap border-b border-slate-100 pb-3 mb-4">
+    <div>
+      <h2 class="text-sm font-semibold text-brand-900">Informations officielles non modifiables</h2>
+      <p class="text-xs text-slate-500 mt-0.5">Données de référence issues du seed officiel.</p>
+    </div>
+    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Lecture seule</span>
+  </div>
+
+  <dl class="grid md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+    <div>
+      <dt class="text-xs font-medium text-slate-500">Nom officiel</dt>
+      <dd class="mt-1 font-semibold text-slate-900">{{ site.nom }}</dd>
+    </div>
+    <div>
+      <dt class="text-xs font-medium text-slate-500">Type</dt>
+      <dd class="mt-1 text-slate-900">{{ site.get_type_site_display }}</dd>
+    </div>
+    <div>
+      <dt class="text-xs font-medium text-slate-500">Pays</dt>
+      <dd class="mt-1 text-slate-900">{{ site.pays|default:"—" }}</dd>
+    </div>
+    <div>
+      <dt class="text-xs font-medium text-slate-500">Localité</dt>
+      <dd class="mt-1 text-slate-900">{{ site.localite|default:"—" }}</dd>
+    </div>
+    <div class="md:col-span-2">
+      <dt class="text-xs font-medium text-slate-500">Titre officiel du responsable</dt>
+      <dd class="mt-1 text-slate-900">{{ site.titre_responsable|default:"—" }}</dd>
+    </div>
+    <div class="md:col-span-2">
+      <dt class="text-xs font-medium text-slate-500">Description officielle</dt>
+      <dd class="mt-1 text-slate-900 whitespace-pre-line">{{ site.description|default:"—" }}</dd>
+    </div>
+    <div class="md:col-span-2">
+      <dt class="text-xs font-medium text-slate-500">Informations historiques ou liturgiques</dt>
+      <dd class="mt-1 text-slate-900 whitespace-pre-line">{{ site.informations_historiques|default:"—" }}</dd>
+    </div>
+    <div class="md:col-span-2">
+      <dt class="text-xs font-medium text-slate-500">Détails officiels</dt>
+      <dd class="mt-1 text-slate-900 whitespace-pre-line">{{ site.details_officiels|default:"—" }}</dd>
+    </div>
+  </dl>
+</section>
+
 <div class="grid lg:grid-cols-2 gap-6">
-  <div class="app-card p-5 space-y-4">
-    <h2 class="text-sm font-semibold text-slate-800 border-b border-slate-100 pb-2">Informations générales</h2>
+  <section class="app-card p-5 space-y-4">
+    <h2 class="text-sm font-semibold text-slate-800 border-b border-slate-100 pb-2">Informations à compléter ou variables</h2>
     <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-      <dt class="text-slate-500">Pays</dt>
-      <dd class="text-slate-900">{{ site.pays|default:"—" }}</dd>
-      <dt class="text-slate-500">Localité</dt>
-      <dd class="text-slate-900">{{ site.localite|default:"—" }}</dd>
-      <dt class="text-slate-500">Statut</dt>
-      <dd class="text-slate-900">{{ site.statut|default:"—" }}</dd>
-      <dt class="text-slate-500">Responsable</dt>
+      <dt class="text-slate-500">Nom du responsable</dt>
       <dd class="text-slate-900">{{ site.responsable|default:"—" }}</dd>
       <dt class="text-slate-500">Contact</dt>
       <dd class="text-slate-900">{{ site.contact_responsable|default:"—" }}</dd>
+      <dt class="text-slate-500">Statut actuel</dt>
+      <dd class="text-slate-900">{{ site.statut|default:"—" }}</dd>
+      <dt class="text-slate-500">Observations</dt>
+      <dd class="text-slate-900 whitespace-pre-line">{{ site.observations|default:"—" }}</dd>
     </dl>
-  </div>
+  </section>
 
-  <div class="app-card p-5 space-y-4">
+  <section class="app-card p-5 space-y-4">
     <h2 class="text-sm font-semibold text-slate-800 border-b border-slate-100 pb-2">Géolocalisation</h2>
     {% if site.latitude and site.longitude %}
     <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
@@ -51,34 +94,38 @@
       <dt class="text-slate-500">Précision</dt>
       <dd class="text-slate-900">{{ site.precision_gps }} m</dd>
       {% endif %}
+      {% if site.date_definition_gps %}
+      <dt class="text-slate-500">Définie le</dt>
+      <dd class="text-slate-900">{{ site.date_definition_gps|date:"d/m/Y H:i" }}</dd>
+      {% endif %}
+      {% if site.gps_defini_par %}
+      <dt class="text-slate-500">Définie par</dt>
+      <dd class="text-slate-900">{{ site.gps_defini_par.get_full_name|default:site.gps_defini_par.get_username }}</dd>
+      {% endif %}
     </dl>
     {% else %}
     <p class="text-sm text-slate-400">Coordonnées GPS non renseignées.</p>
     {% endif %}
-  </div>
+  </section>
 </div>
 
-{% if site.description or site.informations_historiques or site.observations %}
-<div class="app-card p-5 mt-6 space-y-4">
-  {% if site.description %}
-  <div>
-    <h2 class="text-sm font-semibold text-slate-800 mb-1">Description</h2>
-    <p class="text-sm text-slate-700 whitespace-pre-line">{{ site.description }}</p>
+{% if historique %}
+<section class="app-card p-5 mt-6">
+  <h2 class="text-sm font-semibold text-slate-800 border-b border-slate-100 pb-2 mb-3">Historique récent</h2>
+  <div class="divide-y divide-slate-100">
+    {% for entree in historique %}
+      <div class="py-3 text-sm">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <p class="font-medium text-slate-800">{{ entree.get_action_display }}</p>
+          <p class="text-xs text-slate-400">{{ entree.date_action|date:"d/m/Y H:i" }}</p>
+        </div>
+        <p class="mt-1 text-xs text-slate-500">
+          Par {{ entree.effectue_par.get_full_name|default:entree.effectue_par.get_username|default:"Compte supprimé" }}
+        </p>
+      </div>
+    {% endfor %}
   </div>
-  {% endif %}
-  {% if site.informations_historiques %}
-  <div>
-    <h2 class="text-sm font-semibold text-slate-800 mb-1">Informations historiques ou liturgiques</h2>
-    <p class="text-sm text-slate-700 whitespace-pre-line">{{ site.informations_historiques }}</p>
-  </div>
-  {% endif %}
-  {% if site.observations %}
-  <div>
-    <h2 class="text-sm font-semibold text-slate-800 mb-1">Observations</h2>
-    <p class="text-sm text-slate-700 whitespace-pre-line">{{ site.observations }}</p>
-  </div>
-  {% endif %}
-</div>
+</section>
 {% endif %}
 
 <div class="mt-6 text-xs text-slate-400">

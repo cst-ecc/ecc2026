@@ -1,10 +1,11 @@
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.contrib.auth import get_user_model
+
 
 # ---------------------------------------------------------------------------
 # Référentiel géo-ecclésial (importé depuis le fichier Excel de cartographie)
@@ -725,9 +726,15 @@ class HistoriqueModification(models.Model):
         blank=True,
     )
     date_modification = models.DateTimeField(auto_now_add=True)
-    motif = models.TextField(help_text="Raison de la modification, fournie par la personne qui modifie.")
-    donnees_avant = models.JSONField(help_text="Valeurs des champs juste avant cette modification.")
-    donnees_apres = models.JSONField(help_text="Valeurs des champs juste après cette modification.")
+    motif = models.TextField(
+        help_text="Raison de la modification, fournie par la personne qui modifie."
+    )
+    donnees_avant = models.JSONField(
+        help_text="Valeurs des champs juste avant cette modification."
+    )
+    donnees_apres = models.JSONField(
+        help_text="Valeurs des champs juste après cette modification."
+    )
 
     CHAMPS_HISTORIQUE_AFFICHES = (
         ("region", "Région ecclésiale"),
@@ -853,7 +860,10 @@ class HistoriqueModification(models.Model):
             valeur_avant = avant.get(champ)
             valeur_apres = apres.get(champ)
 
-            if self._normaliser_pour_comparaison(valeur_avant) == self._normaliser_pour_comparaison(valeur_apres):
+            if (
+                self._normaliser_pour_comparaison(valeur_avant)
+                == self._normaliser_pour_comparaison(valeur_apres)
+            ):
                 continue
 
             changements.append(
@@ -868,8 +878,10 @@ class HistoriqueModification(models.Model):
         return changements
 
     def __str__(self):
-        return f"Modification de « {self.fiche.nom_paroisse} » le {self.date_modification:%d/%m/%Y %H:%M}"
-
+        return (
+            f"Modification de « {self.fiche.nom_paroisse} » "
+            f"le {self.date_modification:%d/%m/%Y %H:%M}"
+        )
 
 class HistoriqueAlerteDoublon(models.Model):
     """Journal des alertes ou tentatives de doublon détectées par le système."""
@@ -1258,6 +1270,61 @@ class HistoriqueContactUtilisateur(models.Model):
         return f"Contacts de {self.utilisateur.get_username()} modifiés le {self.date_modification:%d/%m/%Y %H:%M}"
 
 
+class HistoriqueCreationUtilisateurEmail(models.Model):
+    """Trace l'envoi de l'e-mail d'accès après création d'un compte."""
+
+    class Statut(models.TextChoices):
+        ENVOYE = "envoye", "Envoyé"
+        NON_ENVOYE = "non_envoye", "Non envoyé"
+        ECHEC = "echec", "Échec"
+
+    utilisateur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historiques_email_creation",
+        verbose_name="Compte créé",
+    )
+    email_utilise = models.EmailField(
+        blank=True,
+        verbose_name="Adresse e-mail utilisée",
+    )
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="emails_creation_utilisateurs_declenches",
+        verbose_name="Compte créé par",
+    )
+    statut = models.CharField(
+        max_length=20,
+        choices=Statut.choices,
+        db_index=True,
+    )
+    motif = models.TextField(
+        blank=True,
+        help_text="Motif d'absence d'envoi ou message d'erreur technique.",
+    )
+    date_action = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_action", "-id"]
+        verbose_name = "Historique d'e-mail de création de compte"
+        verbose_name_plural = "Historiques d'e-mails de création de compte"
+        indexes = [
+            models.Index(
+                fields=["statut", "date_action"],
+                name="email_creation_statut_date_idx",
+            ),
+        ]
+
+    def __str__(self):
+        utilisateur = self.utilisateur.get_username() if self.utilisateur_id else "Compte supprimé"
+        return f"{utilisateur} — {self.get_statut_display()} — {self.date_action:%d/%m/%Y %H:%M}"
+
+
 class NotificationInterne(models.Model):
     """Notification interne affichée dans l'application."""
 
@@ -1433,6 +1500,15 @@ class SiteParticulier(models.Model):
     )
     pays = models.CharField(max_length=100, blank=True, verbose_name="Pays")
     localite = models.CharField(max_length=200, blank=True, verbose_name="Localité")
+    titre_responsable = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Titre officiel du responsable",
+        help_text=(
+            "Titre officiel connu du responsable du site, "
+            "renseigné par le seed ou à la création."
+        ),
+    )
     description = models.TextField(blank=True)
     responsable = models.CharField(max_length=200, blank=True, verbose_name="Responsable de référence")
     contact_responsable = models.CharField(max_length=50, blank=True, verbose_name="Contact du responsable")
@@ -1443,7 +1519,14 @@ class SiteParticulier(models.Model):
     )
     observations = models.TextField(blank=True)
     informations_historiques = models.TextField(blank=True, verbose_name="Informations historiques ou liturgiques")
-
+    details_officiels = models.TextField(
+        blank=True,
+        verbose_name="Détails officiels du site",
+        help_text=(
+            "Détails officiels ou description institutionnelle "
+            "du caractère particulier du site."
+        ),
+    )
     # --- Géolocalisation (facultative) ---
     latitude = models.DecimalField(
         max_digits=10,
@@ -1492,3 +1575,72 @@ class SiteParticulier(models.Model):
 
     def __str__(self):
         return self.nom
+
+class HistoriqueSiteParticulier(models.Model):
+    """Historique des actions effectuées sur un site particulier.
+
+    Permet de tracer :
+    - les modifications des informations variables ;
+    - la première définition de la position GPS ;
+    - les réinitialisations exceptionnelles du GPS ;
+    - les corrections officielles réservées au super administrateur.
+    """
+
+    class Action(models.TextChoices):
+        CREATION = "creation", "Création du site"
+        MODIFICATION_VARIABLE = "modification_variable", "Modification des informations variables"
+        DEFINITION_GPS = "definition_gps", "Définition initiale du GPS"
+        REINITIALISATION_GPS = "reinitialisation_gps", "Réinitialisation du GPS"
+        CORRECTION_OFFICIELLE = "correction_officielle", "Correction officielle"
+
+    site = models.ForeignKey(
+        SiteParticulier,
+        on_delete=models.CASCADE,
+        related_name="historique",
+        verbose_name="Site particulier",
+    )
+
+    action = models.CharField(
+        max_length=40,
+        choices=Action.choices,
+        verbose_name="Action",
+    )
+
+    effectue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historiques_sites_particuliers",
+        verbose_name="Effectué par",
+    )
+
+    motif = models.TextField(
+        blank=True,
+        verbose_name="Motif",
+    )
+
+    donnees_avant = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Données avant",
+    )
+
+    donnees_apres = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Données après",
+    )
+
+    date_action = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Date de l'action",
+    )
+
+    class Meta:
+        ordering = ["-date_action", "-id"]
+        verbose_name = "Historique de site particulier"
+        verbose_name_plural = "Historiques de sites particuliers"
+
+    def __str__(self):
+        return f"{self.get_action_display()} — {self.site.nom} — {self.date_action:%d/%m/%Y %H:%M}"

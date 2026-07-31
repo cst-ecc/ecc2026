@@ -1,0 +1,58 @@
+{% extends "recensement/emails/base_email.html" %}
+
+{% block content %}
+  <div style="margin-bottom:18px;">
+    {% include "recensement/emails/includes/email_badge.html" with badge_label="Compte créé" %}
+  </div>
+
+  <h1 style="margin:0 0 12px 0; color:#0f172a; font-size:24px; line-height:1.3;">
+    Votre compte a été créé
+  </h1>
+
+  <p style="margin:0 0 16px 0; color:#334155; font-size:15px; line-height:1.7;">
+    Bonjour {{ nom_utilisateur }},
+  </p>
+
+  <p style="margin:0 0 18px 0; color:#334155; font-size:15px; line-height:1.7;">
+    Votre compte a été créé sur la plateforme de recensement des paroisses.
+    Voici les informations nécessaires pour accéder à votre espace.
+  </p>
+
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e2e8f0; border-radius:14px; overflow:hidden; margin:20px 0;">
+    <tr>
+      <td style="background:#f8fafc; padding:12px 16px; font-size:13px; font-weight:700; color:#334155;">
+        Informations de connexion
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:8px 16px 14px 16px;">
+        {% include "recensement/emails/includes/email_summary_row.html" with label="Identifiant" value=identifiant %}
+        {% include "recensement/emails/includes/email_summary_row.html" with label="Rôle" value=role %}
+        {% include "recensement/emails/includes/email_summary_row.html" with label="Périmètre" value=perimetre %}
+        {% if mot_de_passe_envoye and mot_de_passe_provisoire %}
+          {% include "recensement/emails/includes/email_summary_row.html" with label="Mot de passe provisoire" value=mot_de_passe_provisoire %}
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+
+  {% if mot_de_passe_envoye and mot_de_passe_provisoire %}
+    <div style="margin:20px 0; border-left:4px solid #f59e0b; background:#fffbeb; border-radius:12px; padding:14px 16px;">
+      <p style="margin:0; font-size:13px; line-height:1.6; color:#92400e;">
+        Ce mot de passe est provisoire. Pour des raisons de sécurité, merci de le modifier lors de votre première connexion, si cette option est disponible.
+      </p>
+    </div>
+  {% else %}
+    <div style="margin:20px 0; border-left:4px solid #f59e0b; background:#fffbeb; border-radius:12px; padding:14px 16px;">
+      <p style="margin:0; font-size:13px; line-height:1.6; color:#92400e;">
+        Pour des raisons de sécurité, le mot de passe provisoire n'est pas indiqué dans cet e-mail. Il vous sera transmis par votre responsable ou réinitialisé avant votre première connexion.
+      </p>
+    </div>
+  {% endif %}
+
+  {% include "recensement/emails/includes/email_button.html" with action_url=action_url action_label=action_label %}
+
+  <p style="margin:14px 0 0 0; color:#64748b; font-size:13px; line-height:1.6;">
+    Si le bouton ne fonctionne pas, copiez le lien de la plateforme depuis votre navigateur ou contactez votre responsable.
+  </p>
+{% endblock %}

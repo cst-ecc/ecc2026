@@ -18,13 +18,13 @@ from .forms import TailwindSetPasswordForm
 from .identifiants import generer_identifiant, generer_mot_de_passe_provisoire
 from .models import (
     AffectationTerritoriale,
-    District,
     HistoriqueAffectationTerritoriale,
     HistoriqueContactUtilisateur,
     Profil,
     Province,
     Region,
     Zone,
+    District,
 )
 from .permissions import (
     get_role,
@@ -39,6 +39,7 @@ from .services.services_affectations import (
     journaliser_modification_principale,
     serialiser_profil,
 )
+from .services.services_utilisateurs_mailing import envoyer_email_creation_utilisateur
 
 
 def _exiger_gestionnaire(user):
@@ -197,9 +198,36 @@ def utilisateur_create(request):
                     profil.full_clean()
                     profil.save()
 
-                    request.session["mdp_provisoire_username"] = username
-                    request.session["mdp_provisoire_valeur"] = mot_de_passe
-                    return redirect("recensement:utilisateur_created", pk=utilisateur.pk)
+                resultat_email = envoyer_email_creation_utilisateur(
+                    utilisateur=utilisateur,
+                    mot_de_passe_provisoire=mot_de_passe,
+                    cree_par=request.user,
+                    request=request,
+                )
+
+                request.session["mdp_provisoire_username"] = username
+                request.session["mdp_provisoire_valeur"] = mot_de_passe
+                request.session["creation_utilisateur_email"] = resultat_email
+
+                if resultat_email["statut"] == "envoye":
+                    messages.success(
+                        request,
+                        "Compte créé avec succès. L'e-mail d'accès a été envoyé au nouvel utilisateur.",
+                    )
+                elif resultat_email["statut"] == "non_envoye":
+                    messages.warning(
+                        request,
+                        "Compte créé avec succès, mais l'e-mail d'accès n'a pas été envoyé : "
+                        f"{resultat_email['motif']}",
+                    )
+                else:
+                    messages.warning(
+                        request,
+                        "Compte créé avec succès, mais l'envoi de l'e-mail d'accès a échoué : "
+                        f"{resultat_email['motif']}",
+                    )
+
+                return redirect("recensement:utilisateur_created", pk=utilisateur.pk)
             except (ValueError, ValidationError) as exc:
                 profil_form.add_error(None, exc)
         messages.error(request, "Veuillez corriger les erreurs indiquées.")
@@ -223,10 +251,16 @@ def utilisateur_created(request, pk):
     username_session = request.session.pop("mdp_provisoire_username", None)
     if username_session != utilisateur.username:
         mot_de_passe = None
+    statut_email_creation = request.session.pop("creation_utilisateur_email", None)
+
     return render(
         request,
         "recensement/utilisateur_created.html",
-        {"utilisateur": utilisateur, "mdp_provisoire": mot_de_passe},
+        {
+            "utilisateur": utilisateur,
+            "mdp_provisoire": mot_de_passe,
+            "statut_email_creation": statut_email_creation,
+        },
     )
 
 
@@ -335,7 +369,9 @@ def affectation_ajouter(request, pk):
             continue
 
         if not valeur.isdigit():
-            raise PermissionDenied("La valeur territoriale transmise est invalide.")
+            raise PermissionDenied(
+                "La valeur territoriale transmise est invalide."
+            )
 
         valeur_id = int(valeur)
         queryset = form.fields[champ].queryset
@@ -349,25 +385,35 @@ def affectation_ajouter(request, pk):
         if role_connecte == Profil.Role.SUPER_ADMIN:
             if champ == "region":
                 if not Region.objects.filter(pk=valeur_id).exists():
-                    raise PermissionDenied("La région demandée n'existe pas.")
+                    raise PermissionDenied(
+                        "La région demandée n'existe pas."
+                    )
                 continue
 
             if champ == "province":
                 if not Province.objects.filter(pk=valeur_id).exists():
-                    raise PermissionDenied("La province demandée n'existe pas.")
+                    raise PermissionDenied(
+                        "La province demandée n'existe pas."
+                    )
                 continue
 
             if champ == "district":
                 if not District.objects.filter(pk=valeur_id).exists():
-                    raise PermissionDenied("Le district demandé n'existe pas.")
+                    raise PermissionDenied(
+                        "Le district demandé n'existe pas."
+                    )
                 continue
 
             if champ == "zone":
                 if not Zone.objects.filter(pk=valeur_id).exists():
-                    raise PermissionDenied("La zone demandée n'existe pas.")
+                    raise PermissionDenied(
+                        "La zone demandée n'existe pas."
+                    )
                 continue
 
-        raise PermissionDenied("Le territoire demandé est hors de votre périmètre.")
+        raise PermissionDenied(
+            "Le territoire demandé est hors de votre périmètre."
+        )
 
     if get_role(request.user) == Profil.Role.SUPER_ADMIN:
         zone_id = (request.POST.get("zone") or "").strip()
@@ -409,24 +455,16 @@ def affectation_ajouter(request, pk):
                     "Ce district est déjà une affectation supplémentaire active.",
                 )
 
+
     if form.is_valid():
         try:
-            niveau = form.niveau
-
-            district_a_attribuer = None
-            zone_a_attribuer = None
-
-            if niveau == AffectationTerritoriale.Niveau.DISTRICT:
-                district_a_attribuer = form.cleaned_data.get("district")
-
-            elif niveau == AffectationTerritoriale.Niveau.ZONE:
-                zone_a_attribuer = form.cleaned_data.get("zone")
-
             ajouter_affectation(
                 attributeur=request.user,
                 utilisateur=utilisateur,
-                district=district_a_attribuer,
-                zone=zone_a_attribuer,
+                district=form.cleaned_data.get(
+                    "district"
+                ),
+                zone=form.cleaned_data.get("zone"),
                 motif=form.cleaned_data["motif"],
             )
 
@@ -449,11 +487,14 @@ def affectation_ajouter(request, pk):
         cible=utilisateur,
     )
 
-    contact_form = UtilisateurContactForm(cible=utilisateur)
+    contact_form = UtilisateurContactForm(
+        cible=utilisateur
+    )
 
     messages.error(
         request,
-        "L'affectation supplémentaire n'a pas été ajoutée. Veuillez corriger les erreurs indiquées.",
+        "L'affectation supplémentaire n'a pas été ajoutée. "
+        "Veuillez corriger les erreurs indiquées.",
     )
 
     return render(
