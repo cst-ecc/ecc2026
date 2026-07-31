@@ -8,9 +8,8 @@ elle n'a pas encore été définie.
 from django import forms
 
 from ..models import SiteParticulier
-from .base import GPSDecimalField, INPUT_CSS, SELECT_CSS
+from .base import INPUT_CSS, SELECT_CSS, GPSDecimalField
 from .validators import valider_telephone_international
-
 
 CHAMPS_OFFICIELS_SITE = (
     "nom",
@@ -93,9 +92,7 @@ class _SiteParticulierBaseForm(forms.ModelForm):
         longitude = cleaned.get("longitude")
 
         if (latitude is None) ^ (longitude is None):
-            raise forms.ValidationError(
-                "La latitude et la longitude doivent être renseignées ensemble."
-            )
+            raise forms.ValidationError("La latitude et la longitude doivent être renseignées ensemble.")
 
         return cleaned
 
@@ -143,7 +140,9 @@ class SiteParticulierCreationForm(_SiteParticulierBaseForm):
             "informations_historiques": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 4}),
             "details_officiels": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 4}),
             "responsable": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Nom du responsable"}),
-            "contact_responsable": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Téléphone du responsable"}),
+            "contact_responsable": forms.TextInput(
+                attrs={"class": INPUT_CSS, "placeholder": "Téléphone du responsable"}
+            ),
             "statut": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : Ouvert, En travaux, Fermé…"}),
             "observations": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 3}),
         }
@@ -169,7 +168,9 @@ class SiteParticulierUpdateForm(_SiteParticulierBaseForm):
         ]
         widgets = {
             "responsable": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Nom du responsable"}),
-            "contact_responsable": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Téléphone du responsable"}),
+            "contact_responsable": forms.TextInput(
+                attrs={"class": INPUT_CSS, "placeholder": "Téléphone du responsable"}
+            ),
             "statut": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : Ouvert, En travaux, Fermé…"}),
             "observations": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 3}),
         }

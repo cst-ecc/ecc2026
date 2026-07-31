@@ -1,11 +1,10 @@
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.contrib.auth import get_user_model
-
 
 # ---------------------------------------------------------------------------
 # Référentiel géo-ecclésial (importé depuis le fichier Excel de cartographie)
@@ -726,15 +725,9 @@ class HistoriqueModification(models.Model):
         blank=True,
     )
     date_modification = models.DateTimeField(auto_now_add=True)
-    motif = models.TextField(
-        help_text="Raison de la modification, fournie par la personne qui modifie."
-    )
-    donnees_avant = models.JSONField(
-        help_text="Valeurs des champs juste avant cette modification."
-    )
-    donnees_apres = models.JSONField(
-        help_text="Valeurs des champs juste après cette modification."
-    )
+    motif = models.TextField(help_text="Raison de la modification, fournie par la personne qui modifie.")
+    donnees_avant = models.JSONField(help_text="Valeurs des champs juste avant cette modification.")
+    donnees_apres = models.JSONField(help_text="Valeurs des champs juste après cette modification.")
 
     CHAMPS_HISTORIQUE_AFFICHES = (
         ("region", "Région ecclésiale"),
@@ -860,10 +853,7 @@ class HistoriqueModification(models.Model):
             valeur_avant = avant.get(champ)
             valeur_apres = apres.get(champ)
 
-            if (
-                self._normaliser_pour_comparaison(valeur_avant)
-                == self._normaliser_pour_comparaison(valeur_apres)
-            ):
+            if self._normaliser_pour_comparaison(valeur_avant) == self._normaliser_pour_comparaison(valeur_apres):
                 continue
 
             changements.append(
@@ -878,10 +868,8 @@ class HistoriqueModification(models.Model):
         return changements
 
     def __str__(self):
-        return (
-            f"Modification de « {self.fiche.nom_paroisse} » "
-            f"le {self.date_modification:%d/%m/%Y %H:%M}"
-        )
+        return f"Modification de « {self.fiche.nom_paroisse} » le {self.date_modification:%d/%m/%Y %H:%M}"
+
 
 class HistoriqueAlerteDoublon(models.Model):
     """Journal des alertes ou tentatives de doublon détectées par le système."""
@@ -1504,10 +1492,7 @@ class SiteParticulier(models.Model):
         max_length=200,
         blank=True,
         verbose_name="Titre officiel du responsable",
-        help_text=(
-            "Titre officiel connu du responsable du site, "
-            "renseigné par le seed ou à la création."
-        ),
+        help_text=("Titre officiel connu du responsable du site, renseigné par le seed ou à la création."),
     )
     description = models.TextField(blank=True)
     responsable = models.CharField(max_length=200, blank=True, verbose_name="Responsable de référence")
@@ -1522,10 +1507,7 @@ class SiteParticulier(models.Model):
     details_officiels = models.TextField(
         blank=True,
         verbose_name="Détails officiels du site",
-        help_text=(
-            "Détails officiels ou description institutionnelle "
-            "du caractère particulier du site."
-        ),
+        help_text=("Détails officiels ou description institutionnelle du caractère particulier du site."),
     )
     # --- Géolocalisation (facultative) ---
     latitude = models.DecimalField(
@@ -1575,6 +1557,7 @@ class SiteParticulier(models.Model):
 
     def __str__(self):
         return self.nom
+
 
 class HistoriqueSiteParticulier(models.Model):
     """Historique des actions effectuées sur un site particulier.

@@ -10,7 +10,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from ..forms.sites_particuliers_forms import SiteParticulierCreationForm, SiteParticulierUpdateForm
 from ..models import HistoriqueSiteParticulier, SiteParticulier
 from ..permissions import peut_gerer_sites_particuliers
-from ..services.services_sites_particuliers import snapshot_site_particulier, mettre_a_jour_site_particulier
+from ..services.services_sites_particuliers import mettre_a_jour_site_particulier, snapshot_site_particulier
 
 
 def _exiger_acces_sites_particuliers(user):

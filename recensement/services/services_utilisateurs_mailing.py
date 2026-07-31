@@ -11,7 +11,6 @@ from django.utils import timezone
 
 from ..models import HistoriqueCreationUtilisateurEmail, NotificationInterne
 
-
 TYPE_NOTIFICATION_CREATION_UTILISATEUR = "creation_utilisateur"
 
 
@@ -171,7 +170,9 @@ def envoyer_email_creation_utilisateur(*, utilisateur, mot_de_passe_provisoire, 
     if url_connexion:
         message_texte += f"\nLien vers la plateforme : {url_connexion}\n"
 
-    message_texte += "\nMerci de modifier votre mot de passe lors de votre première connexion, si cette option est disponible."
+    message_texte += (
+        "\nMerci de modifier votre mot de passe lors de votre première connexion, si cette option est disponible."
+    )
 
     try:
         email_message = EmailMultiAlternatives(

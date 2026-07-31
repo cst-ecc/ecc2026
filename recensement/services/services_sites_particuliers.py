@@ -7,7 +7,6 @@ from django.utils import timezone
 from ..forms.sites_particuliers_forms import CHAMPS_GPS_SITE, CHAMPS_VARIABLES_SITE
 from ..models import HistoriqueSiteParticulier, SiteParticulier
 
-
 CHAMPS_SNAPSHOT_SITE = (
     "responsable",
     "contact_responsable",
@@ -28,10 +27,7 @@ def _json_value(value):
 
 
 def snapshot_site_particulier(site):
-    return {
-        champ: _json_value(getattr(site, champ, None))
-        for champ in CHAMPS_SNAPSHOT_SITE
-    }
+    return {champ: _json_value(getattr(site, champ, None)) for champ in CHAMPS_SNAPSHOT_SITE}
 
 
 def _gps_dans_donnees(donnees):
@@ -74,9 +70,7 @@ def mettre_a_jour_site_particulier(*, site_id, donnees, utilisateur):
 
         if latitude is not None or longitude is not None:
             if latitude is None or longitude is None:
-                raise ValidationError(
-                    "La latitude et la longitude doivent être renseignées ensemble."
-                )
+                raise ValidationError("La latitude et la longitude doivent être renseignées ensemble.")
             site.latitude = latitude
             site.longitude = longitude
             site.precision_gps = precision

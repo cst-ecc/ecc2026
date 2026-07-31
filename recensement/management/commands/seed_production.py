@@ -188,6 +188,7 @@ SITES_PARTICULIERS = [
     },
 ]
 
+
 class Command(BaseCommand):
     help = (
         "Initialise une base de PRODUCTION vierge : import du référentiel "
@@ -456,9 +457,7 @@ class Command(BaseCommand):
             if champs_a_mettre_a_jour:
                 site.save(update_fields=champs_a_mettre_a_jour)
                 nb_completes += 1
-                self.stdout.write(
-                    f"  ↳ « {site.nom} » complété : {', '.join(champs_a_mettre_a_jour)}"
-                )
+                self.stdout.write(f"  ↳ « {site.nom} » complété : {', '.join(champs_a_mettre_a_jour)}")
 
         self.stdout.write(
             self.style.SUCCESS(
