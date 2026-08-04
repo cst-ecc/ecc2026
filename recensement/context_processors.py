@@ -8,6 +8,7 @@ from .permissions import (
     peut_gerer_responsables_ecclesiaux,
     peut_gerer_sites_particuliers,
     peut_rechercher_paroisses,
+    provinces_autorisees,
     zones_autorisees,
 )
 
@@ -32,11 +33,11 @@ def role_context(request):
             ).count()
 
     elif role == Profil.Role.OP_PROVINCE:
-        profil = getattr(user, "profil", None)
-        if profil and profil.province_id:
+        province_ids = provinces_autorisees(user) or set()
+        if province_ids:
             nb_a_valider = FicheParoisse.objects.filter(
                 statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER,
-                province_id=profil.province_id,
+                province_id__in=province_ids,
             ).count()
 
     peut_gerer_utilisateurs = peut_creer_utilisateur(user)
@@ -133,6 +134,7 @@ def _build_user_scope(user, role):
 
     # Affectations supplémentaires ACTIVES.
     if role in (
+        Profil.Role.OP_PROVINCE,
         Profil.Role.OP_DISTRICT,
         Profil.Role.OP_ZONE,
         Profil.Role.AGENT,
@@ -142,8 +144,8 @@ def _build_user_scope(user, role):
                 utilisateur=user,
                 statut=AffectationTerritoriale.Statut.ACTIVE,
             )
-            .select_related("district", "zone")
-            .order_by("niveau", "district__nom", "zone__nom")
+            .select_related("province", "district", "zone")
+            .order_by("niveau", "province__nom", "district__nom", "zone__nom")
         )
         aff_list = []
         for aff in actives:
@@ -160,16 +162,9 @@ def _build_user_scope(user, role):
     if role == Profil.Role.SUPER_ADMIN:
         scope["couverture_label"] = "Accès global à l'ensemble du système"
     elif role == Profil.Role.OP_PROVINCE:
-        from .models import District as DistrictModel
-
-        nb = (
-            DistrictModel.objects.filter(province_id=profil.province_id, est_sites_particuliers=False)
-            .exclude(nom__icontains="sites particuliers")
-            .count()
-            if profil.province_id
-            else 0
-        )
-        scope["couverture_label"] = f"{nb} district{'s' if nb > 1 else ''} dans la province"
+        province_ids = provinces_autorisees(user) or set()
+        nb = len(province_ids)
+        scope["couverture_label"] = f"{nb} province{'s' if nb > 1 else ''} autorisée{'s' if nb > 1 else ''}"
     elif role == Profil.Role.OP_DISTRICT:
         d_ids = districts_autorises(user) or set()
         scope["couverture_label"] = (

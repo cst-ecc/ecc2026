@@ -25,7 +25,6 @@ from ..services.services_responsables_ecclesiaux import (
     remplacer_responsable,
 )
 
-
 POSTES_PAR_PAGE = 25
 
 

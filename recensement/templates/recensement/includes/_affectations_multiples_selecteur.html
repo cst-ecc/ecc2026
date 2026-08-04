@@ -1,0 +1,104 @@
+{% comment %}
+Sélecteur multiple des affectations supplémentaires.
+Variables attendues : affectations_multiples_form, role_cible_affectations.
+{% endcomment %}
+
+{% if affectations_multiples_form.non_field_errors %}
+  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in affectations_multiples_form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+{% endif %}
+
+<div id="affectations-multiples-root"
+     data-role-initial="{{ role_cible_affectations|default:'' }}"
+     data-follow-role-select="{% if is_edit %}0{% else %}1{% endif %}"
+     class="space-y-4">
+
+  <div data-affectation-panel data-roles="op_province" data-main-select="id_province_profil" class="hidden rounded-xl border border-slate-200 p-4">
+    <div class="flex items-start justify-between gap-3 flex-wrap mb-3">
+      <div>
+        <h3 class="font-semibold text-slate-800">Provinces supplémentaires</h3>
+        <p class="text-xs text-slate-500 mt-1">La province principale reste définie dans le bloc précédent.</p>
+      </div>
+      <span data-selected-count class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">0 sélectionnée</span>
+    </div>
+    <div class="flex gap-2 flex-wrap mb-3">
+      <input type="search" data-territory-search placeholder="Rechercher une province…"
+             class="min-w-[220px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500">
+      <button type="button" data-select-all class="rounded-lg border border-brand-600 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-brand-50">Tout sélectionner</button>
+      <button type="button" data-clear-all class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Tout retirer</button>
+    </div>
+    <div data-checkbox-list class="max-h-72 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1">
+      {% for choice in affectations_multiples_form.provinces %}
+        <label data-territory-option class="flex items-start gap-2 rounded-md px-2 py-2 text-sm text-slate-700 hover:bg-white">
+          {{ choice.tag }}<span>{{ choice.choice_label }}</span>
+        </label>
+      {% empty %}<p class="text-sm text-slate-400">Aucune province disponible.</p>{% endfor %}
+    </div>
+    {% for error in affectations_multiples_form.provinces.errors %}<p class="mt-2 text-sm text-red-600">{{ error }}</p>{% endfor %}
+    <div data-selected-badges class="mt-3 flex flex-wrap gap-1.5"></div>
+  </div>
+
+  <div data-affectation-panel data-roles="op_district" data-main-select="id_district_profil" class="hidden rounded-xl border border-slate-200 p-4">
+    <div class="flex items-start justify-between gap-3 flex-wrap mb-3">
+      <div>
+        <h3 class="font-semibold text-slate-800">Districts supplémentaires</h3>
+        <p class="text-xs text-slate-500 mt-1">Seuls les districts appartenant au périmètre du supérieur sont proposés.</p>
+      </div>
+      <span data-selected-count class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">0 sélectionné</span>
+    </div>
+    <div class="flex gap-2 flex-wrap mb-3">
+      <input type="search" data-territory-search placeholder="Rechercher un district…"
+             class="min-w-[220px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500">
+      <button type="button" data-select-all class="rounded-lg border border-brand-600 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-brand-50">Tout sélectionner</button>
+      <button type="button" data-clear-all class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Tout retirer</button>
+    </div>
+    <div data-checkbox-list class="max-h-72 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1">
+      {% for choice in affectations_multiples_form.districts %}
+        <label data-territory-option class="flex items-start gap-2 rounded-md px-2 py-2 text-sm text-slate-700 hover:bg-white">
+          {{ choice.tag }}<span>{{ choice.choice_label }}</span>
+        </label>
+      {% empty %}<p class="text-sm text-slate-400">Aucun district disponible.</p>{% endfor %}
+    </div>
+    {% for error in affectations_multiples_form.districts.errors %}<p class="mt-2 text-sm text-red-600">{{ error }}</p>{% endfor %}
+    <div data-selected-badges class="mt-3 flex flex-wrap gap-1.5"></div>
+  </div>
+
+  <div data-affectation-panel data-roles="op_zone agent" data-main-select="id_zone_profil" class="hidden rounded-xl border border-slate-200 p-4">
+    <div class="flex items-start justify-between gap-3 flex-wrap mb-3">
+      <div>
+        <h3 class="font-semibold text-slate-800">Zones supplémentaires</h3>
+        <p class="text-xs text-slate-500 mt-1">La recherche porte sur la province, le district et le nom de la zone.</p>
+      </div>
+      <span data-selected-count class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">0 sélectionnée</span>
+    </div>
+    <div class="flex gap-2 flex-wrap mb-3">
+      <input type="search" data-territory-search placeholder="Rechercher une zone…"
+             class="min-w-[220px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500">
+      <button type="button" data-select-all class="rounded-lg border border-brand-600 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-brand-50">Tout sélectionner</button>
+      <button type="button" data-clear-all class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Tout retirer</button>
+    </div>
+    <div data-checkbox-list class="max-h-80 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1">
+      {% for choice in affectations_multiples_form.zones %}
+        <label data-territory-option class="flex items-start gap-2 rounded-md px-2 py-2 text-sm text-slate-700 hover:bg-white">
+          {{ choice.tag }}<span>{{ choice.choice_label }}</span>
+        </label>
+      {% empty %}<p class="text-sm text-slate-400">Aucune zone disponible.</p>{% endfor %}
+    </div>
+    {% for error in affectations_multiples_form.zones.errors %}<p class="mt-2 text-sm text-red-600">{{ error }}</p>{% endfor %}
+    <div data-selected-badges class="mt-3 flex flex-wrap gap-1.5"></div>
+  </div>
+
+  <div data-no-multi-role class="hidden rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+    Sélectionnez d’abord un rôle afin d’afficher le type de périmètre supplémentaire correspondant.
+  </div>
+
+  <div>
+    <label for="{{ affectations_multiples_form.motif_affectations.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
+      {{ affectations_multiples_form.motif_affectations.label }}
+    </label>
+    {{ affectations_multiples_form.motif_affectations }}
+    <p class="mt-1 text-xs text-slate-500">Obligatoire dès que la sélection active change.</p>
+    {% for error in affectations_multiples_form.motif_affectations.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+  </div>
+</div>

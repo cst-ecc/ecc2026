@@ -26,7 +26,7 @@
         <td class="px-3 py-3 font-mono text-xs">{{ entree.utilisateur.username }}</td>
         <td class="px-3 py-3">{{ entree.get_action_display }}</td>
         <td class="px-3 py-3">{{ entree.niveau|default:'—' }}</td>
-        <td class="px-3 py-3">{{ entree.effectue_par.get_username|default:'Compte supprimé' }}<br><span class="text-xs text-slate-400">{{ entree.role_effecteur }}</span></td>
+        <td class="px-3 py-3">{% if entree.effectue_par %}{{ entree.effectue_par.get_username }}{% else %}Compte supprimé{% endif %}<br><span class="text-xs text-slate-400">{{ entree.role_effecteur }}</span></td>
         <td class="px-3 py-3 max-w-xs">{{ entree.motif|default:'—' }}</td>
         <td class="px-3 py-3"><details><summary class="cursor-pointer text-brand-600">Voir</summary><pre class="mt-2 min-w-[360px] whitespace-pre-wrap rounded bg-slate-50 p-3 text-xs">Avant : {{ entree.ancien_perimetre }}
 Après : {{ entree.nouveau_perimetre }}</pre></details></td>

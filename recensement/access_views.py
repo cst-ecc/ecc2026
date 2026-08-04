@@ -10,6 +10,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from .access_forms import (
     ActionAffectationForm,
+    AffectationsMultiplesForm,
     AffectationTerritorialeForm,
     ProfilTerritorialForm,
     UtilisateurContactForm,
@@ -38,6 +39,7 @@ from .services.services_affectations import (
     changer_statut_affectation,
     journaliser_modification_principale,
     serialiser_profil,
+    synchroniser_affectations_multiples,
 )
 from .services.services_utilisateurs_mailing import envoyer_email_creation_utilisateur
 
@@ -76,7 +78,14 @@ def _journaliser_contacts_si_modifies(*, utilisateur, effectue_par, ancien, nouv
 
 
 def _contexte_formulaire(
-    request, *, profil_form, utilisateur=None, is_edit=False, affectation_form=None, contact_form=None
+    request,
+    *,
+    profil_form,
+    utilisateur=None,
+    is_edit=False,
+    affectation_form=None,
+    affectations_multiples_form=None,
+    contact_form=None,
 ):
     affectations = []
     historique = []
@@ -84,6 +93,7 @@ def _contexte_formulaire(
         affectations = list(
             AffectationTerritoriale.objects.filter(utilisateur=utilisateur)
             .select_related(
+                "province__region",
                 "district__province",
                 "zone__district__province",
                 "attribue_par",
@@ -99,23 +109,31 @@ def _contexte_formulaire(
     if contact_form is None:
         contact_form = UtilisateurContactForm(cible=utilisateur)
 
+    role_cible = None
+    if utilisateur is not None:
+        role_cible = utilisateur.profil.role
+    elif getattr(profil_form, "is_bound", False):
+        role_cible = (profil_form.data.get("role") or "").strip() or None
+
+    if affectations_multiples_form is None:
+        affectations_multiples_form = AffectationsMultiplesForm(
+            responsable=request.user,
+            cible=utilisateur,
+            role_cible=role_cible,
+        )
+
     return {
         "profil_form": profil_form,
         "contact_form": contact_form,
         "utilisateur": utilisateur,
         "is_edit": is_edit,
         "affectation_form": affectation_form,
+        "affectations_multiples_form": affectations_multiples_form,
         "affectations": affectations,
         "historique_affectations": historique,
-        "peut_ajouter_affectation": bool(
-            affectation_form
-            and affectation_form.niveau
-            and any(
-                field_name in affectation_form.fields and affectation_form.fields[field_name].queryset.exists()
-                for field_name in ("district", "zone")
-            )
-        ),
+        "peut_ajouter_affectation": bool(affectations_multiples_form.champ_perimetre or not is_edit),
         "role_connecte": get_role(request.user),
+        "role_cible_affectations": role_cible or "",
     }
 
 
@@ -161,9 +179,15 @@ def utilisateur_create(request):
     _exiger_gestionnaire(request.user)
 
     if request.method == "POST":
+        role_cible = (request.POST.get("role") or "").strip() or None
         profil_form = ProfilTerritorialForm(request.POST, responsable=request.user)
         contact_form = UtilisateurContactForm(request.POST)
-        if profil_form.is_valid() and contact_form.is_valid():
+        affectations_multiples_form = AffectationsMultiplesForm(
+            request.POST,
+            responsable=request.user,
+            role_cible=role_cible,
+        )
+        if profil_form.is_valid() and contact_form.is_valid() and affectations_multiples_form.is_valid():
             try:
                 with transaction.atomic():
                     role = profil_form.cleaned_data["role"]
@@ -198,6 +222,15 @@ def utilisateur_create(request):
                     profil.full_clean()
                     profil.save()
 
+                    synchroniser_affectations_multiples(
+                        attributeur=request.user,
+                        utilisateur=utilisateur,
+                        provinces=affectations_multiples_form.cleaned_data.get("provinces"),
+                        districts=affectations_multiples_form.cleaned_data.get("districts"),
+                        zones=affectations_multiples_form.cleaned_data.get("zones"),
+                        motif=affectations_multiples_form.cleaned_data.get("motif_affectations", ""),
+                    )
+
                 resultat_email = envoyer_email_creation_utilisateur(
                     utilisateur=utilisateur,
                     mot_de_passe_provisoire=mot_de_passe,
@@ -212,33 +245,40 @@ def utilisateur_create(request):
                 if resultat_email["statut"] == "envoye":
                     messages.success(
                         request,
-                        "Compte créé avec succès. L'e-mail d'accès a été envoyé au nouvel utilisateur.",
+                        "Compte et périmètre territorial créés avec succès. L'e-mail d'accès a été envoyé.",
                     )
                 elif resultat_email["statut"] == "non_envoye":
                     messages.warning(
                         request,
-                        "Compte créé avec succès, mais l'e-mail d'accès n'a pas été envoyé : "
+                        "Compte et périmètre créés, mais l'e-mail d'accès n'a pas été envoyé : "
                         f"{resultat_email['motif']}",
                     )
                 else:
                     messages.warning(
                         request,
-                        "Compte créé avec succès, mais l'envoi de l'e-mail d'accès a échoué : "
+                        "Compte et périmètre créés, mais l'envoi de l'e-mail d'accès a échoué : "
                         f"{resultat_email['motif']}",
                     )
 
                 return redirect("recensement:utilisateur_created", pk=utilisateur.pk)
-            except (ValueError, ValidationError) as exc:
+            except (ValueError, ValidationError, PermissionDenied) as exc:
                 profil_form.add_error(None, exc)
         messages.error(request, "Veuillez corriger les erreurs indiquées.")
     else:
         profil_form = ProfilTerritorialForm(responsable=request.user)
         contact_form = UtilisateurContactForm()
+        affectations_multiples_form = AffectationsMultiplesForm(responsable=request.user)
 
     return render(
         request,
         "recensement/utilisateur_form.html",
-        _contexte_formulaire(request, profil_form=profil_form, is_edit=False, contact_form=contact_form),
+        _contexte_formulaire(
+            request,
+            profil_form=profil_form,
+            is_edit=False,
+            contact_form=contact_form,
+            affectations_multiples_form=affectations_multiples_form,
+        ),
     )
 
 
@@ -324,10 +364,6 @@ def utilisateur_update(request, pk):
         )
         contact_form = UtilisateurContactForm(cible=utilisateur)
 
-    affectation_form = AffectationTerritorialeForm(
-        responsable=request.user,
-        cible=utilisateur,
-    )
     return render(
         request,
         "recensement/utilisateur_form.html",
@@ -336,9 +372,68 @@ def utilisateur_update(request, pk):
             profil_form=profil_form,
             utilisateur=utilisateur,
             is_edit=True,
-            affectation_form=affectation_form,
             contact_form=contact_form,
         ),
+    )
+
+
+@login_required
+@require_POST
+def affectations_multiples_synchroniser(request, pk):
+    """Applique en une seule transaction la sélection complète du périmètre."""
+    _exiger_gestionnaire(request.user)
+    utilisateur = _cible_gerable(request, pk)
+    form = AffectationsMultiplesForm(
+        request.POST,
+        responsable=request.user,
+        cible=utilisateur,
+        role_cible=utilisateur.profil.role,
+    )
+
+    if form.is_valid():
+        try:
+            resume = synchroniser_affectations_multiples(
+                attributeur=request.user,
+                utilisateur=utilisateur,
+                provinces=form.cleaned_data.get("provinces"),
+                districts=form.cleaned_data.get("districts"),
+                zones=form.cleaned_data.get("zones"),
+                motif=form.cleaned_data.get("motif_affectations", ""),
+            )
+        except (ValidationError, PermissionDenied) as exc:
+            form.add_error(None, exc)
+        else:
+            total_actions = resume["ajoutees"] + resume["retirees"] + resume["reactivees"]
+            if total_actions:
+                messages.success(
+                    request,
+                    "Périmètre mis à jour : "
+                    f"{resume['ajoutees']} ajout(s), {resume['reactivees']} réactivation(s), "
+                    f"{resume['retirees']} retrait(s).",
+                )
+            else:
+                messages.info(request, "Aucune modification du périmètre n'était nécessaire.")
+            return redirect("recensement:utilisateur_update", pk=utilisateur.pk)
+
+    profil_form = ProfilTerritorialForm(
+        instance=utilisateur.profil,
+        responsable=request.user,
+        cible=utilisateur,
+    )
+    contact_form = UtilisateurContactForm(cible=utilisateur)
+    messages.error(request, "Le périmètre n'a pas été modifié. Corrigez les erreurs indiquées.")
+    return render(
+        request,
+        "recensement/utilisateur_form.html",
+        _contexte_formulaire(
+            request,
+            profil_form=profil_form,
+            utilisateur=utilisateur,
+            is_edit=True,
+            affectations_multiples_form=form,
+            contact_form=contact_form,
+        ),
+        status=400,
     )
 
 
@@ -404,10 +499,22 @@ def affectation_ajouter(request, pk):
         raise PermissionDenied("Le territoire demandé est hors de votre périmètre.")
 
     if get_role(request.user) == Profil.Role.SUPER_ADMIN:
+        province_id = (request.POST.get("province") or "").strip()
         zone_id = (request.POST.get("zone") or "").strip()
         district_id = (request.POST.get("district") or "").strip()
 
-        if form.niveau == AffectationTerritoriale.Niveau.ZONE and zone_id.isdigit():
+        if form.niveau == AffectationTerritoriale.Niveau.PROVINCE and province_id.isdigit():
+            if utilisateur.profil.province_id == int(province_id):
+                form.add_error("province", "Cette province est déjà l'affectation principale de cet utilisateur.")
+            elif AffectationTerritoriale.objects.filter(
+                utilisateur=utilisateur,
+                niveau=AffectationTerritoriale.Niveau.PROVINCE,
+                province_id=int(province_id),
+                statut=AffectationTerritoriale.Statut.ACTIVE,
+            ).exists():
+                form.add_error("province", "Cette province est déjà une affectation supplémentaire active.")
+
+        elif form.niveau == AffectationTerritoriale.Niveau.ZONE and zone_id.isdigit():
             if utilisateur.profil.zone_id == int(zone_id):
                 form.add_error(
                     "zone",
@@ -448,6 +555,11 @@ def affectation_ajouter(request, pk):
             ajouter_affectation(
                 attributeur=request.user,
                 utilisateur=utilisateur,
+                province=(
+                    form.cleaned_data.get("province")
+                    if form.niveau == AffectationTerritoriale.Niveau.PROVINCE
+                    else None
+                ),
                 district=form.cleaned_data.get("district"),
                 zone=form.cleaned_data.get("zone"),
                 motif=form.cleaned_data["motif"],
@@ -502,6 +614,7 @@ def affectation_action(request, pk, affectation_pk, action):
     affectation = get_object_or_404(
         AffectationTerritoriale.objects.select_related(
             "utilisateur__profil",
+            "province__region",
             "district__province",
             "zone__district__province",
         ),

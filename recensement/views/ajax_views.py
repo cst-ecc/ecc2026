@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
 from ..models import District, Profil, Province, Village, Zone
-from ..permissions import districts_autorises, get_role, zones_autorisees
+from ..permissions import districts_autorises, get_role, provinces_autorisees, zones_autorisees
 
 _NOM_SITES_PARTICULIERS = "sites particuliers"
 
@@ -22,10 +22,10 @@ def ajax_provinces(request, region_id):
     # Seul le district spécial est exclu au niveau suivant.
     qs = Province.objects.filter(region_id=region_id)
     role = get_role(request.user)
-    profil = getattr(request.user, "profil", None)
     if role != Profil.Role.SUPER_ADMIN:
-        if role == Profil.Role.OP_PROVINCE and profil and profil.province_id:
-            qs = qs.filter(pk=profil.province_id)
+        if role == Profil.Role.OP_PROVINCE:
+            province_ids = provinces_autorisees(request.user) or set()
+            qs = qs.filter(pk__in=province_ids)
         else:
             zone_ids = zones_autorisees(request.user) or set()
             qs = qs.filter(districts__zones__id__in=zone_ids).distinct()

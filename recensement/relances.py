@@ -1,6 +1,8 @@
 """Logique métier du système de relances de validation.
 
-Correction ciblée : notification interne + e-mail, avec cible OP ZONE pour les fiches de sa zone.
+Les destinataires et les fiches visibles sont résolus à partir de l'ensemble
+des affectations territoriales ACTIVES : province principale/supplémentaires,
+district principal/supplémentaires et zone principale/supplémentaires.
 """
 
 from datetime import timedelta
@@ -18,7 +20,7 @@ from django.utils import timezone
 
 from .codification import generer_code_paroisse
 from .models import FicheParoisse, HistoriqueRelance, NotificationInterne, Profil, RelanceValidation
-from .permissions import districts_autorises, get_profil, get_role
+from .permissions import districts_autorises, get_role, provinces_autorisees
 
 DELAI_AVANT_RELANCE_2 = timedelta(days=7)
 DELAI_AVANT_RELANCE_3 = timedelta(days=3)
@@ -38,10 +40,10 @@ def fiches_en_attente_pour(user):
     if role == Profil.Role.SUPER_ADMIN:
         return qs.order_by("date_recensement")
     if role == Profil.Role.OP_PROVINCE:
-        profil = get_profil(user)
-        if not profil or not profil.province_id:
+        ids = provinces_autorisees(user) or set()
+        if not ids:
             return qs.none()
-        return qs.filter(province_id=profil.province_id).order_by("date_recensement")
+        return qs.filter(province_id__in=ids).order_by("date_recensement")
     if role == Profil.Role.OP_DISTRICT:
         ids = districts_autorises(user) or set()
         if not ids:
@@ -64,13 +66,11 @@ def peut_relancer_fiche(responsable, fiche):
     if role == Profil.Role.SUPER_ADMIN:
         return True
     if role == Profil.Role.OP_PROVINCE:
-        profil = get_profil(responsable)
-        return bool(profil and profil.province_id and fiche.province_id == profil.province_id)
+        return fiche.province_id in (provinces_autorisees(responsable) or set())
     if role == Profil.Role.OP_DISTRICT:
         if fiche.statut_validation != FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR:
             return False
-        ids = districts_autorises(responsable) or set()
-        return fiche.district_id in ids
+        return fiche.district_id in (districts_autorises(responsable) or set())
     return False
 
 
@@ -97,11 +97,7 @@ def _perimetre_utilisateur(user):
 
 
 def utilisateurs_relances_pour_fiche(fiche):
-    """Destinataires de la relance.
-
-    ATTENTE_SUPERVISEUR : OP ZONE de la zone en priorité, puis OP DISTRICT en secours.
-    ATTENTE_MANAGER : OP PROVINCE.
-    """
+    """Retourne tous les opérateurs actifs responsables du palier bloqué."""
     User = get_user_model()
     if fiche.statut_validation == FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR:
         op_zones = (
@@ -134,11 +130,17 @@ def utilisateurs_relances_pour_fiche(fiche):
         )
     if fiche.statut_validation == FicheParoisse.StatutValidation.ATTENTE_MANAGER:
         return list(
-            User.objects.filter(
-                is_active=True,
-                profil__role=Profil.Role.OP_PROVINCE,
-                profil__province_id=fiche.province_id,
-            ).select_related("profil")
+            User.objects.filter(is_active=True, profil__role=Profil.Role.OP_PROVINCE)
+            .filter(
+                Q(profil__province_id=fiche.province_id)
+                | Q(
+                    affectations_territoriales__niveau="province",
+                    affectations_territoriales__statut="active",
+                    affectations_territoriales__province_id=fiche.province_id,
+                )
+            )
+            .select_related("profil")
+            .distinct()
         )
     return []
 
@@ -163,22 +165,13 @@ def _message_relance(fiche, niveau_relance):
 
 def _envoyer_email_relance(*, destinataire, fiche, niveau_relance):
     email = (getattr(destinataire, "email", "") or "").strip()
-
     if not _email_valide(email):
-        return (
-            "non_envoye",
-            "Aucune adresse e-mail valide renseignée pour cet utilisateur.",
-        )
+        return "non_envoye", "Aucune adresse e-mail valide renseignée pour cet utilisateur."
 
     sujet = f"Relance de validation — {fiche.nom_paroisse}"
-
     site_url = (getattr(settings, "SITE_URL", "") or "").rstrip("/")
     url_relative = _url_fiche(fiche)
-
-    fiche_url = ""
-    if site_url and url_relative:
-        fiche_url = f"{site_url}{url_relative}"
-
+    fiche_url = f"{site_url}{url_relative}" if site_url and url_relative else ""
     contexte = {
         "sujet": sujet,
         "destinataire": destinataire,
@@ -186,52 +179,27 @@ def _envoyer_email_relance(*, destinataire, fiche, niveau_relance):
         "niveau_relance": niveau_relance,
         "fiche_url": fiche_url,
     }
-
-    message_html = render_to_string(
-        "recensement/emails/relance_validation.html",
-        contexte,
-    )
-
-    # Version texte pour les clients de messagerie qui n'affichent pas le HTML.
-    message_texte = _message_relance(
-        fiche,
-        niveau_relance,
-    )
-
+    message_html = render_to_string("recensement/emails/relance_validation.html", contexte)
+    message_texte = _message_relance(fiche, niveau_relance)
     if fiche_url:
         message_texte += f"\n\nLien vers la fiche : {fiche_url}"
-
-    expediteur = getattr(
-        settings,
-        "DEFAULT_FROM_EMAIL",
-        None,
-    )
 
     try:
         email_message = EmailMultiAlternatives(
             subject=sujet,
             body=message_texte,
-            from_email=expediteur,
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
             to=[email],
         )
-
-        email_message.attach_alternative(
-            message_html,
-            "text/html",
-        )
-
-        resultat = email_message.send(
-            fail_silently=False,
-        )
-
-        if resultat == 1:
-            return "envoye", ""
-
+        email_message.attach_alternative(message_html, "text/html")
         return (
-            "echec",
-            "Le serveur SMTP n'a pas confirmé l'envoi.",
+            ("envoye", "")
+            if email_message.send(fail_silently=False) == 1
+            else (
+                "echec",
+                "Le serveur SMTP n'a pas confirmé l'envoi.",
+            )
         )
-
     except Exception as exc:
         return "echec", str(exc)
 
@@ -249,7 +217,9 @@ def _creer_notification_et_historique(*, fiche, action, effectue_par, destinatai
         cree_par=effectue_par,
     )
     statut_email, motif_email = _envoyer_email_relance(
-        destinataire=destinataire, fiche=fiche, niveau_relance=niveau_relance
+        destinataire=destinataire,
+        fiche=fiche,
+        niveau_relance=niveau_relance,
     )
     HistoriqueRelance.objects.create(
         fiche=fiche,
@@ -294,15 +264,17 @@ def etat_relance(fiche, relance_obj=None):
     return {
         "nb_relances": relance_obj.nb_relances,
         "peut_relancer_maintenant": peut_relancer,
-        "prochaine_relance_le": relance_obj.date_prochaine_relance_autorisee
-        if relance_obj.nb_relances < 3 and not peut_relancer
-        else None,
+        "prochaine_relance_le": (
+            relance_obj.date_prochaine_relance_autorisee if relance_obj.nb_relances < 3 and not peut_relancer else None
+        ),
         "intervention_possible": intervention_possible,
-        "intervention_le": relance_obj.date_intervention_super_admin_autorisee
-        if relance_obj.nb_relances >= 3
-        and not intervention_possible
-        and not relance_obj.intervention_super_admin_effectuee
-        else None,
+        "intervention_le": (
+            relance_obj.date_intervention_super_admin_autorisee
+            if relance_obj.nb_relances >= 3
+            and not intervention_possible
+            and not relance_obj.intervention_super_admin_effectuee
+            else None
+        ),
         "derniere_relance_effectuee": relance_obj.nb_relances >= 3,
     }
 
@@ -369,6 +341,7 @@ def lancer_relance(*, fiche, utilisateur):
         raise ValidationError(
             f"La prochaine relance ne sera possible que le {obj.date_prochaine_relance_autorisee:%d/%m/%Y à %H:%M}."
         )
+
     obj.nb_relances += 1
     n = obj.nb_relances
     if n == 1:
@@ -400,6 +373,7 @@ def lancer_relance(*, fiche, utilisateur):
             intervention_super_admin_possible=obj.date_intervention_super_admin_autorisee,
         )
         return obj
+
     for destinataire in destinataires:
         _creer_notification_et_historique(
             fiche=fiche,
@@ -429,6 +403,7 @@ def intervenir_super_admin(*, fiche, super_admin):
         )
     if obj.intervention_super_admin_effectuee:
         raise ValidationError("L'intervention du super administrateur a déjà été effectuée pour cette fiche.")
+
     if fiche.statut_validation == FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR:
         fiche.statut_validation = FicheParoisse.StatutValidation.ATTENTE_MANAGER
         fiche.valide_par_superviseur = super_admin
@@ -441,6 +416,7 @@ def intervenir_super_admin(*, fiche, super_admin):
         fiche.date_validation_manager = now
         fiche.save(update_fields=["statut_validation", "valide_par_manager", "date_validation_manager"])
         code = generer_code_paroisse(fiche, genere_par=super_admin)
+
     obj.intervention_super_admin_effectuee = True
     obj.date_prochaine_relance_autorisee = None
     obj.save(update_fields=["intervention_super_admin_effectuee", "date_prochaine_relance_autorisee"])

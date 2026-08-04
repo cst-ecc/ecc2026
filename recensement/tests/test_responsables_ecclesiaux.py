@@ -10,7 +10,6 @@ from openpyxl import load_workbook
 from recensement.models import (
     District,
     FicheParoisse,
-    MandatResponsableEcclesial,
     NiveauResponsabiliteEcclesiale,
     Profil,
     Province,
@@ -268,9 +267,7 @@ class ResponsablesEcclesiauxTests(TestCase):
 
         self.client.force_login(self.super_admin)
 
-        premiere_page = self.client.get(
-            reverse("recensement:responsable_ecclesial_list")
-        )
+        premiere_page = self.client.get(reverse("recensement:responsable_ecclesial_list"))
         self.assertEqual(premiere_page.status_code, 200)
         self.assertEqual(premiere_page.context["total"], 31)
         self.assertEqual(len(premiere_page.context["postes"]), 25)

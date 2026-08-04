@@ -131,6 +131,19 @@
     </div>
   </div>
 
+  {% if not is_edit %}
+  <div class="app-card">
+    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Périmètre d’intervention autorisé</div>
+    <div class="p-5 space-y-4">
+      <div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        L’affectation principale reste obligatoire. Vous pouvez sélectionner ici plusieurs territoires supplémentaires,
+        ou utiliser « Tout sélectionner » pour attribuer uniquement les territoires que votre propre périmètre autorise.
+      </div>
+      {% include "recensement/includes/_affectations_multiples_selecteur.html" %}
+    </div>
+  </div>
+  {% endif %}
+
   <div class="flex justify-end gap-2">
     <a href="{% url 'recensement:utilisateur_list' %}" class="border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg">Annuler</a>
     <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-5 py-2.5 rounded-lg">
@@ -152,114 +165,24 @@
       {% if peut_ajouter_affectation %}
         <form
           method="post"
-          id="affectation-supplementaire-form"
-          action="{% url 'recensement:affectation_ajouter' utilisateur.pk %}"
+          id="affectations-multiples-form"
+          action="{% url 'recensement:affectations_multiples_synchroniser' utilisateur.pk %}"
           class="rounded-xl border border-slate-200 p-4 mb-5 space-y-4"
         >
           {% csrf_token %}
-
           <div>
-            <h2 class="font-semibold text-slate-800">
-              Ajouter une affectation supplémentaire
-            </h2>
-
+            <h2 class="font-semibold text-slate-800">Sélectionner les affectations supplémentaires actives</h2>
             <p class="text-sm text-slate-500 mt-1">
-              Sélectionnez successivement la région, la province puis le territoire
-              à attribuer.
+              La sélection enregistrée devient la liste complète des accès supplémentaires actifs.
+              Une affectation active décochée sera retirée et restera visible dans l’historique.
             </p>
           </div>
-
-          {% if affectation_form.non_field_errors %}
-            <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {% for error in affectation_form.non_field_errors %}
-                <p>{{ error }}</p>
-              {% endfor %}
-            </div>
-          {% endif %}
-
-          <div id="champ-affectation-region">
-            <label
-              for="{{ affectation_form.region.id_for_label }}"
-              class="block text-sm font-medium text-slate-700 mb-1"
-            >
-              {{ affectation_form.region.label }}
-            </label>
-
-            {{ affectation_form.region }}
-
-            {% for error in affectation_form.region.errors %}
-              <p class="text-red-600 text-sm mt-1">{{ error }}</p>
-            {% endfor %}
-          </div>
-
-          <div id="champ-affectation-province">
-            <label
-              for="{{ affectation_form.province.id_for_label }}"
-              class="block text-sm font-medium text-slate-700 mb-1"
-            >
-              {{ affectation_form.province.label }}
-            </label>
-
-            {{ affectation_form.province }}
-
-            {% for error in affectation_form.province.errors %}
-              <p class="text-red-600 text-sm mt-1">{{ error }}</p>
-            {% endfor %}
-          </div>
-
-          <div id="champ-affectation-district">
-            <label
-              for="{{ affectation_form.district.id_for_label }}"
-              class="block text-sm font-medium text-slate-700 mb-1"
-            >
-              {{ affectation_form.district.label }}
-            </label>
-
-            {{ affectation_form.district }}
-
-            {% for error in affectation_form.district.errors %}
-              <p class="text-red-600 text-sm mt-1">{{ error }}</p>
-            {% endfor %}
-          </div>
-
-          {% if affectation_form.zone %}
-            <div id="champ-affectation-zone">
-              <label
-                for="{{ affectation_form.zone.id_for_label }}"
-                class="block text-sm font-medium text-slate-700 mb-1"
-              >
-                {{ affectation_form.zone.label }}
-              </label>
-
-              {{ affectation_form.zone }}
-
-              {% for error in affectation_form.zone.errors %}
-                <p class="text-red-600 text-sm mt-1">{{ error }}</p>
-              {% endfor %}
-            </div>
-          {% endif %}
-
-          <div>
-            <label
-              for="{{ affectation_form.motif.id_for_label }}"
-              class="block text-sm font-medium text-slate-700 mb-1"
-            >
-              {{ affectation_form.motif.label }}
-            </label>
-
-            {{ affectation_form.motif }}
-
-            {% for error in affectation_form.motif.errors %}
-              <p class="text-red-600 text-sm mt-1">{{ error }}</p>
-            {% endfor %}
-          </div>
-
+          {% include "recensement/includes/_affectations_multiples_selecteur.html" %}
           <button
             type="submit"
-            id="btn-ajouter-affectation"
-            class="bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2.5 rounded-lg"
+            class="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg"
           >
-            Ajouter l’affectation
+            Enregistrer le périmètre autorisé
           </button>
         </form>
       {% endif %}
@@ -284,7 +207,7 @@
                 {% elif affectation.statut == 'revoquee' %}<span class="text-red-700">Retirée</span>
                 {% else %}<span class="text-slate-500">{{ affectation.get_statut_display }}</span>{% endif %}
               </td>
-              <td class="px-3 py-2">{{ affectation.attribue_par.get_username|default:'—' }}<br><span class="text-xs text-slate-400">{{ affectation.role_attributeur }}</span></td>
+              <td class="px-3 py-2">{% if affectation.attribue_par %}{{ affectation.attribue_par.get_username }}{% else %}—{% endif %}<br><span class="text-xs text-slate-400">{{ affectation.role_attributeur }}</span></td>
               <td class="px-3 py-2 whitespace-nowrap">{{ affectation.date_attribution|date:'d/m/Y H:i' }}</td>
               <td class="px-3 py-2 whitespace-nowrap">
                 {% if affectation.statut == 'active' %}
@@ -311,7 +234,7 @@
       {% for entree in historique_affectations %}
       <div class="p-4 text-sm">
         <div class="flex justify-between gap-4"><strong>{{ entree.get_action_display }}</strong><span class="text-xs text-slate-400">{{ entree.date_action|date:'d/m/Y H:i' }}</span></div>
-        <p class="text-slate-600 mt-1">Par {{ entree.effectue_par.get_username|default:'Compte supprimé' }} ({{ entree.role_effecteur|default:'—' }})</p>
+        <p class="text-slate-600 mt-1">Par {% if entree.effectue_par %}{{ entree.effectue_par.get_username }}{% else %}Compte supprimé{% endif %} ({{ entree.role_effecteur|default:'—' }})</p>
         {% if entree.motif %}<p class="mt-1"><span class="text-slate-400">Motif :</span> {{ entree.motif }}</p>{% endif %}
         <details class="mt-2 text-xs"><summary class="cursor-pointer text-brand-600">Voir avant / après</summary><pre class="mt-2 overflow-auto rounded bg-slate-50 p-3">Avant : {{ entree.ancien_perimetre }}
 Après : {{ entree.nouveau_perimetre }}</pre></details>
@@ -327,7 +250,7 @@ Après : {{ entree.nouveau_perimetre }}</pre></details>
       {% for entree in utilisateur.historique_contacts.all|slice:":10" %}
       <div class="p-4 text-sm">
         <div class="flex justify-between gap-4"><strong>Coordonnées modifiées</strong><span class="text-xs text-slate-400">{{ entree.date_modification|date:'d/m/Y H:i' }}</span></div>
-        <p class="text-slate-600 mt-1">Par {{ entree.effectue_par.get_username|default:'Compte supprimé' }}</p>
+        <p class="text-slate-600 mt-1">Par {% if entree.effectue_par %}{{ entree.effectue_par.get_username }}{% else %}Compte supprimé{% endif %}</p>
         <div class="grid sm:grid-cols-2 gap-3 mt-3 text-xs">
           <div class="rounded bg-red-50 border border-red-100 p-3"><span class="font-semibold text-red-700">Avant</span><br>E-mail : {{ entree.ancien_email|default:'Non renseigné' }}<br>Téléphone : {{ entree.ancien_telephone|default:'Non renseigné' }}</div>
           <div class="rounded bg-green-50 border border-green-100 p-3"><span class="font-semibold text-green-700">Après</span><br>E-mail : {{ entree.nouveau_email|default:'Non renseigné' }}<br>Téléphone : {{ entree.nouveau_telephone|default:'Non renseigné' }}</div>
@@ -355,13 +278,6 @@ Après : {{ entree.nouveau_perimetre }}</pre></details>
     district: "{{ profil_form.district.value|default:''|escapejs }}",
     zone: "{{ profil_form.zone.value|default:''|escapejs }}"
   };
-  window.AFFECTATION_SUPPLEMENTAIRE = {
-    niveau: "{{ affectation_form.niveau|default:''|escapejs }}",
-    region: "{{ affectation_form.region.value|default:''|escapejs }}",
-    province: "{{ affectation_form.province.value|default:''|escapejs }}",
-    district: "{{ affectation_form.district.value|default:''|escapejs }}",
-    zone: "{% if affectation_form.zone %}{{ affectation_form.zone.value|default:''|escapejs }}{% endif %}"
-  };
 </script>
 
 <script
@@ -369,7 +285,7 @@ Après : {{ entree.nouveau_perimetre }}</pre></details>
   defer
 ></script>
 <script
-  src="{% static 'recensement/js/affectation_cascade.js' %}"
+  src="{% static 'recensement/js/affectations_multiples.js' %}"
   defer
 ></script>
 {% endblock %}

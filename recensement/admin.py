@@ -130,6 +130,7 @@ class ProfilAdmin(admin.ModelAdmin):
         "user__first_name",
         "user__last_name",
         "province__nom",
+        "province__nom",
         "district__nom",
         "zone__nom",
     )
@@ -312,11 +313,12 @@ class AffectationTerritorialeAdmin(admin.ModelAdmin):
         "utilisateur__username",
         "utilisateur__first_name",
         "utilisateur__last_name",
+        "province__nom",
         "district__nom",
         "zone__nom",
         "attribue_par__username",
     )
-    autocomplete_fields = ("utilisateur", "district", "zone", "attribue_par")
+    autocomplete_fields = ("utilisateur", "province", "district", "zone", "attribue_par")
     readonly_fields = ("date_attribution", "date_modification", "role_attributeur")
 
     @admin.display(description="Périmètre")

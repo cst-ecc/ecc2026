@@ -71,10 +71,53 @@ def est_strictement_subordonne(cible, responsable):
 # ---------------------------------------------------------------------------
 
 
+def provinces_autorisees(user):
+    """Retourne les IDs des provinces actives de l'utilisateur.
+
+    ``None`` signifie accès global pour le Super administrateur. Pour un
+    OP PROVINCE, le résultat agrège la province principale et les provinces
+    supplémentaires actives. Pour les autres rôles, il est déduit de leurs
+    districts ou zones autorisés.
+    """
+    from .models import Province
+
+    role = get_role(user)
+    if role == Profil.Role.SUPER_ADMIN:
+        return None
+
+    profil = get_profil(user)
+    if not profil:
+        return set()
+
+    if role == Profil.Role.OP_PROVINCE:
+        province_ids = set()
+        if profil.province_id:
+            province_ids.add(profil.province_id)
+        province_ids.update(
+            AffectationTerritoriale.objects.filter(
+                utilisateur=user,
+                niveau=AffectationTerritoriale.Niveau.PROVINCE,
+                statut=AffectationTerritoriale.Statut.ACTIVE,
+                province__isnull=False,
+            ).values_list("province_id", flat=True)
+        )
+        return set(Province.objects.filter(pk__in=province_ids).values_list("id", flat=True))
+
+    if role == Profil.Role.OP_DISTRICT:
+        district_ids = districts_autorises(user) or set()
+        return set(Province.objects.filter(districts__id__in=district_ids).distinct().values_list("id", flat=True))
+
+    if role in (Profil.Role.OP_ZONE, Profil.Role.AGENT):
+        zone_ids = zones_autorisees(user) or set()
+        return set(Province.objects.filter(districts__zones__id__in=zone_ids).distinct().values_list("id", flat=True))
+
+    return set()
+
+
 def districts_autorises(user):
     """Retourne les IDs des districts actifs de l'utilisateur.
 
-    ``None`` signifie accès global pour le super administrateur.
+    ``None`` signifie accès global pour le Super administrateur.
     """
     from .models import District
 
@@ -87,14 +130,29 @@ def districts_autorises(user):
         return set()
 
     if role == Profil.Role.OP_PROVINCE:
-        if not profil.province_id:
+        province_ids = provinces_autorisees(user) or set()
+        if not province_ids:
             return set()
         return set(
             District.objects.filter(
-                province_id=profil.province_id,
+                province_id__in=province_ids,
                 est_sites_particuliers=False,
             )
             .exclude(nom__icontains=_NOM_SITES_PARTICULIERS)
+            .values_list("id", flat=True)
+        )
+
+    if role in (Profil.Role.OP_ZONE, Profil.Role.AGENT):
+        zone_ids = zones_autorisees(user) or set()
+        if not zone_ids:
+            return set()
+        return set(
+            District.objects.filter(
+                zones__id__in=zone_ids,
+                est_sites_particuliers=False,
+            )
+            .exclude(nom__icontains=_NOM_SITES_PARTICULIERS)
+            .distinct()
             .values_list("id", flat=True)
         )
 
@@ -126,7 +184,7 @@ def zones_autorisees(user):
     """Retourne les IDs de zones accessibles pour le rôle connecté.
 
     - super_admin : ``None`` (toutes les zones) ;
-    - op_province : toutes les zones de sa province ;
+    - op_province : zones de toutes ses provinces actives ;
     - op_district : zones de ses districts principal et supplémentaires ;
     - op_zone/agent : zone principale + zones supplémentaires actives.
     """
@@ -141,11 +199,12 @@ def zones_autorisees(user):
         return set()
 
     if role == Profil.Role.OP_PROVINCE:
-        if not profil.province_id:
+        province_ids = provinces_autorisees(user) or set()
+        if not province_ids:
             return set()
         return set(
             Zone.objects.filter(
-                district__province_id=profil.province_id,
+                district__province_id__in=province_ids,
                 district__est_sites_particuliers=False,
             )
             .exclude(district__nom__icontains=_NOM_SITES_PARTICULIERS)
@@ -226,13 +285,13 @@ def fiches_visibles_pour(user):
 
     zone_ids = zones_autorisees(user)
     if zone_ids:
-        if role == Profil.Role.AGENT:
-            # L'agent voit les fiches de ses zones actives, plus ses propres
-            # fiches historiques si une affectation a depuis été retirée.
-            return qs.filter(Q(zone_id__in=zone_ids) | Q(cree_par=user)).distinct()
-        return qs.filter(zone_id__in=zone_ids)
+        # Le périmètre effectif est strictement constitué de l'affectation
+        # principale et des affectations supplémentaires ACTIVES. Une zone
+        # suspendue ou retirée ne laisse donc aucun accès résiduel, même aux
+        # anciennes fiches créées par l'agent.
+        return qs.filter(zone_id__in=zone_ids).distinct()
 
-    return qs.filter(cree_par=user) if role == Profil.Role.AGENT else qs.none()
+    return qs.none()
 
 
 # ---------------------------------------------------------------------------
@@ -266,12 +325,15 @@ def utilisateurs_visibles_pour(user):
     if not profil:
         return qs.none()
 
-    if role == Profil.Role.OP_PROVINCE and profil.province_id:
-        # La responsabilité du compte est déterminée par son affectation
-        # principale. Une affectation supplémentaire dans la province ne doit
-        # pas permettre de prendre le contrôle global d'un compte rattaché à
-        # une autre province.
-        return qs.filter(profil__province_id=profil.province_id).distinct()
+    if role == Profil.Role.OP_PROVINCE:
+        province_ids = provinces_autorisees(user) or set()
+        if not province_ids:
+            return qs.none()
+        # La responsabilité d'un compte reste déterminée par son affectation
+        # principale. L'OP PROVINCE peut toutefois gérer les subordonnés dont
+        # cette affectation principale se trouve dans l'une de ses provinces
+        # officiellement autorisées.
+        return qs.filter(profil__province_id__in=province_ids).distinct()
 
     if role == Profil.Role.OP_DISTRICT:
         district_ids = districts_autorises(user)
@@ -304,6 +366,15 @@ def peut_gerer_utilisateur(responsable, cible):
     return utilisateurs_visibles_pour(responsable).filter(pk=cible.pk).exists()
 
 
+def peut_attribuer_province(attributeur, cible, province):
+    """Seul le Super administrateur peut étendre le périmètre d'un OP PROVINCE."""
+    if get_role(cible) != Profil.Role.OP_PROVINCE:
+        return False
+    if not peut_gerer_utilisateur(attributeur, cible):
+        return False
+    return get_role(attributeur) == Profil.Role.SUPER_ADMIN
+
+
 def peut_attribuer_district(attributeur, cible, district):
     """Un district supplémentaire ne peut être attribué qu'à un OP DISTRICT."""
     if district.est_sites_particuliers or _NOM_SITES_PARTICULIERS in district.nom.lower():
@@ -316,8 +387,9 @@ def peut_attribuer_district(attributeur, cible, district):
     role = get_role(attributeur)
     if role == Profil.Role.SUPER_ADMIN:
         return True
-    profil = get_profil(attributeur)
-    return bool(role == Profil.Role.OP_PROVINCE and profil and profil.province_id == district.province_id)
+    if role == Profil.Role.OP_PROVINCE:
+        return district.province_id in (provinces_autorisees(attributeur) or set())
+    return False
 
 
 def peut_attribuer_zone(attributeur, cible, zone):
@@ -337,7 +409,7 @@ def peut_attribuer_zone(attributeur, cible, zone):
         return False
 
     if role == Profil.Role.OP_PROVINCE:
-        return zone.district.province_id == profil.province_id
+        return zone.district.province_id in (provinces_autorisees(attributeur) or set())
 
     if role == Profil.Role.OP_DISTRICT:
         ids = districts_autorises(attributeur)
@@ -353,6 +425,11 @@ def peut_attribuer_zone(attributeur, cible, zone):
 def peut_modifier_affectation(attributeur, affectation):
     if not peut_gerer_utilisateur(attributeur, affectation.utilisateur):
         return False
+    if affectation.niveau == AffectationTerritoriale.Niveau.PROVINCE:
+        return bool(
+            affectation.province_id
+            and peut_attribuer_province(attributeur, affectation.utilisateur, affectation.province)
+        )
     if affectation.niveau == AffectationTerritoriale.Niveau.DISTRICT:
         return bool(
             affectation.district_id
@@ -466,24 +543,16 @@ def perimetre_creation_autorise(createur, profil_cible_data):
 
     if (
         district_id
-        and District.objects.filter(
-            pk=district_id,
-        )
-        .filter(
-            Q(est_sites_particuliers=True) | Q(nom__icontains=_NOM_SITES_PARTICULIERS),
-        )
+        and District.objects.filter(pk=district_id)
+        .filter(Q(est_sites_particuliers=True) | Q(nom__icontains=_NOM_SITES_PARTICULIERS))
         .exists()
     ):
         return False, "Ce district est exclu du recensement ordinaire."
 
     if (
         zone_id
-        and Zone.objects.filter(
-            pk=zone_id,
-        )
-        .filter(
-            Q(district__est_sites_particuliers=True) | Q(district__nom__icontains=_NOM_SITES_PARTICULIERS),
-        )
+        and Zone.objects.filter(pk=zone_id)
+        .filter(Q(district__est_sites_particuliers=True) | Q(district__nom__icontains=_NOM_SITES_PARTICULIERS))
         .exists()
     ):
         return False, "Cette zone est exclue du recensement ordinaire."
@@ -498,8 +567,9 @@ def perimetre_creation_autorise(createur, profil_cible_data):
     province_id = profil_cible_data.get("province_id")
 
     if role_createur == Profil.Role.OP_PROVINCE:
-        if province_id != profil.province_id:
-            return False, "Le périmètre choisi est situé hors de votre province."
+        ids = provinces_autorisees(createur)
+        if province_id not in (ids or set()):
+            return False, "La province choisie est située hors de votre périmètre."
 
     elif role_createur == Profil.Role.OP_DISTRICT:
         ids = districts_autorises(createur)
@@ -529,7 +599,7 @@ def peut_affecter_zone(attributeur, zone):
     if not profil:
         return False
     if role == Profil.Role.OP_PROVINCE:
-        return zone.district.province_id == profil.province_id
+        return zone.district.province_id in (provinces_autorisees(attributeur) or set())
     if role == Profil.Role.OP_DISTRICT:
         return zone.district_id in (districts_autorises(attributeur) or set())
     if role == Profil.Role.OP_ZONE:

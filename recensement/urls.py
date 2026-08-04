@@ -41,6 +41,12 @@ urlpatterns = [
     path("utilisateurs/nouveau/", access_views.utilisateur_create, name="utilisateur_create"),
     path("utilisateurs/<int:pk>/cree/", access_views.utilisateur_created, name="utilisateur_created"),
     path("utilisateurs/<int:pk>/modifier/", access_views.utilisateur_update, name="utilisateur_update"),
+    path(
+        "utilisateurs/<int:pk>/affectations/synchroniser/",
+        access_views.affectations_multiples_synchroniser,
+        name="affectations_multiples_synchroniser",
+    ),
+    # Ancienne route unitaire conservée pour compatibilité avec les liens existants.
     path("utilisateurs/<int:pk>/affectations/ajouter/", access_views.affectation_ajouter, name="affectation_ajouter"),
     path(
         "utilisateurs/<int:pk>/affectations/<int:affectation_pk>/<str:action>/",

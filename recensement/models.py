@@ -1068,9 +1068,9 @@ class AffectationTerritoriale(models.Model):
     """Affectation territoriale supplémentaire d'un utilisateur.
 
     L'affectation principale reste portée par ``Profil``. Ce modèle complète
-    ce périmètre sans modifier l'identifiant du compte ni supprimer les
-    affectations antérieures. Il couvre :
+    ce périmètre sans modifier l'identifiant du compte et couvre :
 
+    - les provinces supplémentaires des OP PROVINCE ;
     - les districts supplémentaires des OP DISTRICT ;
     - les zones supplémentaires des OP ZONE et des agents recenseurs.
 
@@ -1079,6 +1079,7 @@ class AffectationTerritoriale(models.Model):
     """
 
     class Niveau(models.TextChoices):
+        PROVINCE = "province", "Province"
         DISTRICT = "district", "District"
         ZONE = "zone", "Zone"
 
@@ -1094,6 +1095,13 @@ class AffectationTerritoriale(models.Model):
         related_name="affectations_territoriales",
     )
     niveau = models.CharField(max_length=10, choices=Niveau.choices)
+    province = models.ForeignKey(
+        Province,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="affectations_territoriales",
+    )
     district = models.ForeignKey(
         District,
         on_delete=models.PROTECT,
@@ -1134,17 +1142,34 @@ class AffectationTerritoriale(models.Model):
             models.CheckConstraint(
                 check=(
                     models.Q(
+                        niveau="province",
+                        province__isnull=False,
+                        district__isnull=True,
+                        zone__isnull=True,
+                    )
+                    | models.Q(
                         niveau="district",
+                        province__isnull=True,
                         district__isnull=False,
                         zone__isnull=True,
                     )
                     | models.Q(
                         niveau="zone",
+                        province__isnull=True,
                         district__isnull=True,
                         zone__isnull=False,
                     )
                 ),
                 name="affectation_territoriale_niveau_coherent",
+            ),
+            models.UniqueConstraint(
+                fields=["utilisateur", "province"],
+                condition=models.Q(
+                    niveau="province",
+                    statut="active",
+                    province__isnull=False,
+                ),
+                name="unique_affectation_active_utilisateur_province",
             ),
             models.UniqueConstraint(
                 fields=["utilisateur", "district"],
@@ -1168,7 +1193,11 @@ class AffectationTerritoriale(models.Model):
 
     @property
     def perimetre(self):
-        return self.district if self.niveau == self.Niveau.DISTRICT else self.zone
+        if self.niveau == self.Niveau.PROVINCE:
+            return self.province
+        if self.niveau == self.Niveau.DISTRICT:
+            return self.district
+        return self.zone
 
     @property
     def libelle_perimetre(self):
@@ -1180,10 +1209,16 @@ class AffectationTerritoriale(models.Model):
         profil = getattr(self.utilisateur, "profil", None)
         role = profil.role if profil else None
 
-        if self.niveau == self.Niveau.DISTRICT:
+        if self.niveau == self.Niveau.PROVINCE:
+            if role != Profil.Role.OP_PROVINCE:
+                raise ValidationError({"niveau": "Seul un OP PROVINCE peut recevoir une province supplémentaire."})
+            if not self.province_id or self.district_id or self.zone_id:
+                raise ValidationError("Une affectation de niveau province doit renseigner uniquement une province.")
+
+        elif self.niveau == self.Niveau.DISTRICT:
             if role != Profil.Role.OP_DISTRICT:
                 raise ValidationError({"niveau": "Seul un OP DISTRICT peut recevoir un district supplémentaire."})
-            if not self.district_id or self.zone_id:
+            if self.province_id or not self.district_id or self.zone_id:
                 raise ValidationError("Une affectation de niveau district doit renseigner uniquement un district.")
 
         elif self.niveau == self.Niveau.ZONE:
@@ -1191,8 +1226,10 @@ class AffectationTerritoriale(models.Model):
                 raise ValidationError(
                     {"niveau": "Seuls un OP ZONE ou un agent peuvent recevoir une zone supplémentaire."}
                 )
-            if not self.zone_id or self.district_id:
+            if self.province_id or self.district_id or not self.zone_id:
                 raise ValidationError("Une affectation de niveau zone doit renseigner uniquement une zone.")
+        else:
+            raise ValidationError({"niveau": "Niveau d'affectation territoriale inconnu."})
 
         if self.district_id and self.district.est_sites_particuliers:
             raise ValidationError({"district": "Ce district est exclu du recensement ordinaire."})
