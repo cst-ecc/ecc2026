@@ -1,0 +1,44 @@
+{% comment %}
+Badge du statut de validation d'une fiche.
+
+Variables attendues :
+  fiche    (FicheParoisse, obligatoire)
+  variante (str, obligatoire) : "liste" | "detail" | "validation"
+
+Les trois variantes existaient déjà dans le projet avec des LIBELLÉS ET DES
+CLASSES DIFFÉRENTS ; elles sont conservées telles quelles, aucun texte n'a
+été harmonisé afin de ne rien changer au rendu :
+  - "liste"      : fiche_list.html      (badges compacts px-2 py-0.5)
+  - "detail"     : fiche_detail.html    (badges px-2.5 py-1 avec emoji)
+  - "validation" : fiche_a_valider.html (libellés OP DISTRICT / OP PROVINCE)
+{% endcomment %}{% if variante == "validation" %}
+  {% if fiche.statut_validation == "attente_superviseur" %}
+    <span class="inline-flex px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
+      En attente OP DISTRICT / OP ZONE
+    </span>
+  {% elif fiche.statut_validation == "attente_manager" %}
+    <span class="inline-flex px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+      En attente OP PROVINCE
+    </span>
+  {% else %}
+    <span class="inline-flex px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+      {{ fiche.get_statut_validation_display }}
+    </span>
+  {% endif %}
+{% elif variante == "detail" %}
+  {% if fiche.statut_validation == "validee" %}
+    <span class="inline-block px-2.5 py-1 rounded-full bg-green-50 text-green-700 text-xs font-medium">✅ Validée</span>
+  {% elif fiche.statut_validation == "attente_manager" %}
+    <span class="inline-block px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">⏳ En attente du chef de province</span>
+  {% else %}
+    <span class="inline-block px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">⏳ En attente du chef de district</span>
+  {% endif %}
+{% else %}
+  {% if fiche.statut_validation == "validee" %}
+    <span class="inline-block px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-medium">Validée</span>
+  {% elif fiche.statut_validation == "attente_manager" %}
+    <span class="inline-block px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">Attente province</span>
+  {% else %}
+    <span class="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">Attente district</span>
+  {% endif %}
+{% endif %}

@@ -90,8 +90,21 @@ from .relances_views import (
     relances_liste,
 )
 
+# --- Responsables ecclésiaux -------------------------------------------------
+from .responsables_ecclesiaux_views import (
+    mandat_responsable_cloture,
+    mandat_responsable_create,
+    mandat_responsable_update,
+    responsable_ecclesial_create,
+    responsable_ecclesial_detail,
+    responsable_ecclesial_list,
+    responsable_ecclesial_remplacer,
+    responsable_ecclesial_update,
+)
+
 # --- Sites particuliers -------------------------------------------------------
 from .sites_particuliers_views import (
+    responsabilite_hierarchique_update,
     site_particulier_create,
     site_particulier_detail,
     site_particulier_list,
@@ -137,11 +150,21 @@ __all__ = [
     "relance_intervention_super_admin",
     "notifications_liste",
     "notification_marquer_lue",
+    # Responsables ecclésiaux
+    "responsable_ecclesial_list",
+    "responsable_ecclesial_detail",
+    "responsable_ecclesial_create",
+    "responsable_ecclesial_update",
+    "responsable_ecclesial_remplacer",
+    "mandat_responsable_create",
+    "mandat_responsable_update",
+    "mandat_responsable_cloture",
     # Sites particuliers
     "site_particulier_list",
     "site_particulier_detail",
     "site_particulier_create",
     "site_particulier_update",
+    "responsabilite_hierarchique_update",
     # Vues utilisateur héritées (non routées)
     "utilisateur_list",
     "utilisateur_create",

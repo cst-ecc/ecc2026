@@ -36,6 +36,8 @@ _ROLES_RECHERCHE_PAROISSES = (
     Profil.Role.SUPER_ADMIN,
 )
 
+_NOM_SITES_PARTICULIERS = "sites particuliers"
+
 # ---------------------------------------------------------------------------
 # Rôle et profil
 # ---------------------------------------------------------------------------
@@ -87,7 +89,14 @@ def districts_autorises(user):
     if role == Profil.Role.OP_PROVINCE:
         if not profil.province_id:
             return set()
-        return set(District.objects.filter(province_id=profil.province_id).values_list("id", flat=True))
+        return set(
+            District.objects.filter(
+                province_id=profil.province_id,
+                est_sites_particuliers=False,
+            )
+            .exclude(nom__icontains=_NOM_SITES_PARTICULIERS)
+            .values_list("id", flat=True)
+        )
 
     district_ids = set()
     if profil.district_id:
@@ -103,7 +112,14 @@ def districts_autorises(user):
             ).values_list("district_id", flat=True)
         )
 
-    return district_ids
+    return set(
+        District.objects.filter(
+            pk__in=district_ids,
+            est_sites_particuliers=False,
+        )
+        .exclude(nom__icontains=_NOM_SITES_PARTICULIERS)
+        .values_list("id", flat=True)
+    )
 
 
 def zones_autorisees(user):
@@ -127,13 +143,27 @@ def zones_autorisees(user):
     if role == Profil.Role.OP_PROVINCE:
         if not profil.province_id:
             return set()
-        return set(Zone.objects.filter(district__province_id=profil.province_id).values_list("id", flat=True))
+        return set(
+            Zone.objects.filter(
+                district__province_id=profil.province_id,
+                district__est_sites_particuliers=False,
+            )
+            .exclude(district__nom__icontains=_NOM_SITES_PARTICULIERS)
+            .values_list("id", flat=True)
+        )
 
     if role == Profil.Role.OP_DISTRICT:
         district_ids = districts_autorises(user)
         if not district_ids:
             return set()
-        return set(Zone.objects.filter(district_id__in=district_ids).values_list("id", flat=True))
+        return set(
+            Zone.objects.filter(
+                district_id__in=district_ids,
+                district__est_sites_particuliers=False,
+            )
+            .exclude(district__nom__icontains=_NOM_SITES_PARTICULIERS)
+            .values_list("id", flat=True)
+        )
 
     zone_ids = set()
     if profil.zone_id:
@@ -155,7 +185,14 @@ def zones_autorisees(user):
             statut=AffectationSupplementaire.Statut.ACTIVE,
         ).values_list("zone_id", flat=True)
     )
-    return zone_ids
+    return set(
+        Zone.objects.filter(
+            pk__in=zone_ids,
+            district__est_sites_particuliers=False,
+        )
+        .exclude(district__nom__icontains=_NOM_SITES_PARTICULIERS)
+        .values_list("id", flat=True)
+    )
 
 
 def perimetre_zone_ids(user):
@@ -178,7 +215,11 @@ def fiche_dans_perimetre(user, fiche):
 def fiches_visibles_pour(user):
     from .models import FicheParoisse
 
-    qs = FicheParoisse.objects.select_related("region", "province", "district", "zone", "village", "cree_par")
+    qs = (
+        FicheParoisse.objects.filter(district__est_sites_particuliers=False)
+        .exclude(district__nom__icontains=_NOM_SITES_PARTICULIERS)
+        .select_related("region", "province", "district", "zone", "village", "cree_par")
+    )
     role = get_role(user)
     if role == Profil.Role.SUPER_ADMIN:
         return qs
@@ -265,6 +306,8 @@ def peut_gerer_utilisateur(responsable, cible):
 
 def peut_attribuer_district(attributeur, cible, district):
     """Un district supplémentaire ne peut être attribué qu'à un OP DISTRICT."""
+    if district.est_sites_particuliers or _NOM_SITES_PARTICULIERS in district.nom.lower():
+        return False
     if get_role(cible) != Profil.Role.OP_DISTRICT:
         return False
     if not peut_gerer_utilisateur(attributeur, cible):
@@ -278,6 +321,8 @@ def peut_attribuer_district(attributeur, cible, district):
 
 
 def peut_attribuer_zone(attributeur, cible, zone):
+    if zone.district.est_sites_particuliers or _NOM_SITES_PARTICULIERS in zone.district.nom.lower():
+        return False
     if get_role(cible) not in (Profil.Role.OP_ZONE, Profil.Role.AGENT):
         return False
     if not peut_gerer_utilisateur(attributeur, cible):
@@ -414,6 +459,35 @@ def perimetre_creation_autorise(createur, profil_cible_data):
     if role_cible and not peut_creer_role(createur, role_cible):
         return False, "Vous ne pouvez pas attribuer ce rôle."
 
+    from .models import District, Zone
+
+    district_id = profil_cible_data.get("district_id")
+    zone_id = profil_cible_data.get("zone_id")
+
+    if (
+        district_id
+        and District.objects.filter(
+            pk=district_id,
+        )
+        .filter(
+            Q(est_sites_particuliers=True) | Q(nom__icontains=_NOM_SITES_PARTICULIERS),
+        )
+        .exists()
+    ):
+        return False, "Ce district est exclu du recensement ordinaire."
+
+    if (
+        zone_id
+        and Zone.objects.filter(
+            pk=zone_id,
+        )
+        .filter(
+            Q(district__est_sites_particuliers=True) | Q(district__nom__icontains=_NOM_SITES_PARTICULIERS),
+        )
+        .exists()
+    ):
+        return False, "Cette zone est exclue du recensement ordinaire."
+
     if role_createur == Profil.Role.SUPER_ADMIN:
         return True, None
 
@@ -421,8 +495,6 @@ def perimetre_creation_autorise(createur, profil_cible_data):
     if not profil:
         return False, "Votre profil est incomplet."
 
-    district_id = profil_cible_data.get("district_id")
-    zone_id = profil_cible_data.get("zone_id")
     province_id = profil_cible_data.get("province_id")
 
     if role_createur == Profil.Role.OP_PROVINCE:
@@ -448,6 +520,8 @@ def perimetre_creation_autorise(createur, profil_cible_data):
 
 
 def peut_affecter_zone(attributeur, zone):
+    if zone.district.est_sites_particuliers or _NOM_SITES_PARTICULIERS in zone.district.nom.lower():
+        return False
     role = get_role(attributeur)
     if role == Profil.Role.SUPER_ADMIN:
         return True
@@ -481,6 +555,11 @@ def peut_gerer_sites_particuliers(user):
     return get_role(user) == Profil.Role.SUPER_ADMIN
 
 
+def peut_gerer_responsables_ecclesiaux(user):
+    """Seul le Super administrateur peut modifier les postes et mandats ecclésiaux."""
+    return get_role(user) == Profil.Role.SUPER_ADMIN
+
+
 # ---------------------------------------------------------------------------
 # Recherche rapide de paroisses
 # ---------------------------------------------------------------------------
@@ -507,22 +586,27 @@ def paroisses_recherchables_pour(user):
     """
     from .models import FicheParoisse
 
-    qs = FicheParoisse.objects.select_related(
-        "region",
-        "province",
-        "district",
-        "zone",
-    ).only(
-        "id",
-        "nom_paroisse",
-        "parish_shepherd",
-        "code_court",
-        "code_officiel",
-        "statut_validation",
-        "region__nom",
-        "province__nom",
-        "district__nom",
-        "zone__nom",
+    qs = (
+        FicheParoisse.objects.filter(district__est_sites_particuliers=False)
+        .exclude(district__nom__icontains=_NOM_SITES_PARTICULIERS)
+        .select_related(
+            "region",
+            "province",
+            "district",
+            "zone",
+        )
+        .only(
+            "id",
+            "nom_paroisse",
+            "parish_shepherd",
+            "code_court",
+            "code_officiel",
+            "statut_validation",
+            "region__nom",
+            "province__nom",
+            "district__nom",
+            "zone__nom",
+        )
     )
 
     if not peut_rechercher_paroisses(user):

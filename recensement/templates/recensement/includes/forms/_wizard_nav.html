@@ -1,0 +1,16 @@
+{% comment %}
+Barre de navigation d'une étape du wizard de création de fiche.
+
+Variables attendues :
+  premier (bool, optionnel) : True pour l'étape 1 (pas de bouton "Précédent",
+                              alignement justify-end comme à l'origine).
+
+Les classes btn-prev / btn-next sont inchangées : wizard.js continue de piloter
+les étapes sans modification. L'étape 6 (bouton de soumission) reste écrite
+en clair dans fiche_form.html car elle est unique.
+{% endcomment %}<div class="flex {% if premier %}justify-end{% else %}justify-between{% endif %} gap-2 flex-wrap mb-8">
+  {% if not premier %}
+    <button type="button" class="btn-prev bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-5 py-2.5 rounded-lg min-h-[44px]">← Précédent</button>
+  {% endif %}
+  <button type="button" class="btn-next bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-lg min-h-[44px]">Suivant →</button>
+</div>

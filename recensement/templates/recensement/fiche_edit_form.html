@@ -14,143 +14,87 @@
 
 <form method="post" id="fiche-edit-form" class="space-y-4" enctype="multipart/form-data">
   {% csrf_token %}
-  
-  {% if form.errors %}
-    <div class="rounded-lg bg-red-50 text-red-800 border border-red-200 px-4 py-3 text-sm">
-      <p class="font-semibold mb-2">Certaines informations doivent être corrigées :</p>
 
-      <ul class="list-disc pl-5 space-y-1">
-        {% for error in form.non_field_errors %}
-          <li>Erreur générale : {{ error }}</li>
-        {% endfor %}
-
-        {% for field in form %}
-          {% for error in field.errors %}
-            <li>{{ field.label|default:field.name }} : {{ error }}</li>
-          {% endfor %}
-        {% endfor %}
-
-        {% for error in form.hidden_field_errors %}
-          <li>Champ masqué : {{ error }}</li>
-        {% endfor %}
-      </ul>
-    </div>
-  {% endif %}
-  {% if motif_form.errors %} 
-  <div class="rounded-lg bg-red-50 text-red-800 border border-red-200 px-4 py-3 text-sm"> 
-    <p class="font-semibold mb-2">Erreur sur le motif de modification :</p> 
-    <ul class="list-disc pl-5 space-y-1"> 
-      {% for field in motif_form %} {% for error in field.errors %} 
-      <li>{{ field.label }} : {{ error }}</li> {% endfor %} {% endfor %} 
-    </ul> 
-  </div> 
-  {% endif %}
+  {% include "recensement/includes/forms/_form_errors.html" with form=form %}
+  {% include "recensement/includes/forms/_form_errors.html" with form=motif_form titre="Erreur sur le motif de modification :" simple=True %}
 
   <div class="app-card">
-    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Localisation ecclésiale</div>
+    {% include "recensement/includes/components/_card_header.html" with titre="Localisation ecclésiale" %}
       <div id="territoire-notice"
            class="hidden mx-5 mt-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800"
            aria-live="polite"></div>
     <div class="p-5 grid sm:grid-cols-2 gap-4">
       <div>
-        <label for="id_region" class="block text-sm font-medium text-slate-700 mb-1">{{ form.region.label }}</label>
-        {{ form.region }}
-        {% for error in form.region.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.region %}
       </div>
       <div>
-        <label for="id_province" class="block text-sm font-medium text-slate-700 mb-1">{{ form.province.label }}</label>
-        {{ form.province }}
-        {% for error in form.province.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.province %}
       </div>
       <div>
-        <label for="id_district" class="block text-sm font-medium text-slate-700 mb-1">{{ form.district.label }}</label>
-        {{ form.district }}
-        {% for error in form.district.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.district %}
       </div>
       <div>
-        <label for="id_zone" class="block text-sm font-medium text-slate-700 mb-1">{{ form.zone.label }}</label>
-        {{ form.zone }}
-        {% for error in form.zone.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.zone %}
       </div>
       <div>
-        <label for="id_village" class="block text-sm font-medium text-slate-700 mb-1">{{ form.village.label }}</label>
-        {{ form.village }}
+        {% include "recensement/includes/forms/_field.html" with field=form.village %}
+        {# Champ caché sans rendu visuel : sa position dans le DOM est sans effet     #}
+        {# sur l'affichage, il est relu par le script de soumission en bas de page.   #}
         <input type="hidden" id="id_initial_village" value="{{ fiche.village_id|default:'' }}">
-        {% for error in form.village.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
       </div>
       <div id="nouvelle-localite-wrapper" class="{% if not form.nouvelle_localite_nom.value and not form.nouvelle_localite_nom.errors %}hidden{% endif %}">
-        <label for="id_nouvelle_localite_nom" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nouvelle_localite_nom.label }}</label>
-        {{ form.nouvelle_localite_nom }}
-        {% for error in form.nouvelle_localite_nom.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.nouvelle_localite_nom %}
       </div>
     </div>
   </div>
 
   <div class="app-card">
-    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Identité de la paroisse</div>
+    {% include "recensement/includes/components/_card_header.html" with titre="Identité de la paroisse" %}
     <div class="p-5 grid sm:grid-cols-2 gap-4">
       <div class="sm:col-span-2">
-        <label for="{{ form.nom_paroisse.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nom_paroisse.label }}</label>
-        {{ form.nom_paroisse }}
-        {% for error in form.nom_paroisse.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.nom_paroisse %}
         <div id="doublon-live-warning" class="hidden mt-3" aria-live="polite"></div>
       </div>
       <div>
-        <label for="{{ form.annee_fondation.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.annee_fondation.label }}</label>
-        {{ form.annee_fondation }}
-        {% for error in form.annee_fondation.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.annee_fondation %}
       </div>
       <div>
-        <label for="{{ form.statut_batiment.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.statut_batiment.label }}</label>
-        {{ form.statut_batiment }}
-        {% for error in form.statut_batiment.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.statut_batiment %}
       </div>
-      <div id="statut-batiment-autre-wrapper" class="{% if form.statut_batiment.value != 'autre' %}hidden{% endif %}"> 
-        <label for="{{ form.statut_batiment_autre.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1"> 
-          {{ form.statut_batiment_autre.label }} 
-        </label> 
-        {{ form.statut_batiment_autre }} 
-        <p class="text-xs text-slate-400 mt-1"> À renseigner uniquement si le statut du bâtiment ne correspond à aucune option proposée. </p> 
-        {% for error in form.statut_batiment_autre.errors %} 
-        <p class="text-red-600 text-sm mt-1">{{ error }}</p> 
-        {% endfor %} 
+      <div id="statut-batiment-autre-wrapper" class="{% if form.statut_batiment.value != 'autre' %}hidden{% endif %}">
+        {% include "recensement/includes/forms/_field.html" with field=form.statut_batiment_autre aide="À renseigner uniquement si le statut du bâtiment ne correspond à aucune option proposée." %}
       </div>
       <div>
-        <label for="{{ form.nombre_fideles_estime.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nombre_fideles_estime.label }}</label>
-        {{ form.nombre_fideles_estime }}
-        {% for error in form.nombre_fideles_estime.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.nombre_fideles_estime %}
       </div>
     </div>
   </div>
 
   <div class="app-card">
-    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Chargé de paroisse</div>
+    {% include "recensement/includes/components/_card_header.html" with titre="Chargé de paroisse" %}
     <div class="p-5 grid sm:grid-cols-2 gap-4">
       <div>
-        <label for="{{ form.parish_shepherd.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.parish_shepherd.label }}</label>
-        {{ form.parish_shepherd }}
-        {% for error in form.parish_shepherd.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.parish_shepherd %}
       </div>
       <div>
-        <label for="{{ form.contact_responsable.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.contact_responsable.label }}</label>
-        {{ form.contact_responsable }}
-        {% for error in form.contact_responsable.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.contact_responsable %}
       </div>
       <div class="sm:col-span-2">
+        {# Champ non factorisé : le rappel "Photo actuelle" s'intercale entre le label #}
+        {# et le widget, ce que le composant _field.html ne permet pas sans altérer    #}
+        {# l'ordre d'affichage.                                                        #}
         <label for="{{ form.photo_charge.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.photo_charge.label }}</label>
         {% if fiche.photo_charge %}
           <p class="text-xs text-slate-400 mb-1">Photo actuelle : <a href="{{ fiche.photo_charge.url }}" target="_blank" rel="noopener" class="text-brand-600 hover:underline">voir</a> — sélectionnez un fichier ci-dessous pour la remplacer.</p>
         {% endif %}
         {{ form.photo_charge }}
-        {% for error in form.photo_charge.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field_errors.html" with field=form.photo_charge %}
       </div>
     </div>
   </div>
 
   <div class="app-card">
-    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">
-      GPS & observations
-    </div>
+    {% include "recensement/includes/components/_card_header.html" with titre="GPS & observations" %}
 
     <div class="p-5 space-y-4">
       <div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -161,81 +105,12 @@
         </p>
       </div>
 
-      <div class="flex flex-wrap gap-2">
-        <button
-          type="button"
-          id="btn-gps"
-          class="border border-brand-600 text-brand-700 hover:bg-brand-50 font-medium px-4 py-2.5 rounded-lg min-h-[44px]"
-        >
-          Mettre à jour la position GPS
-        </button>
-
-        <button
-          type="button"
-          id="btn-gps-accept"
-          class="hidden border border-green-600 text-green-700 hover:bg-green-50 font-medium px-4 py-2.5 rounded-lg min-h-[44px]"
-        >
-          Utiliser cette position quand même
-        </button>
-
-        <button
-          type="button"
-          id="btn-gps-cancel"
-          class="hidden border border-red-600 text-red-700 hover:bg-red-50 font-medium px-4 py-2.5 rounded-lg min-h-[44px]"
-        >
-          Annuler la recherche
-        </button>
-      </div>
-
-      <div
-        id="gps-status"
-        class="gps-status text-sm"
-        aria-live="polite"
-        data-state="idle"
-      ></div>
+      {% include "recensement/includes/forms/_gps_buttons.html" with label_recherche="Mettre à jour la position GPS" %}
 
       <div class="grid sm:grid-cols-3 gap-4">
-        <div>
-          <label for="id_latitude" class="block text-sm font-medium text-slate-700 mb-1">
-            Latitude
-          </label>
-          <input
-            type="number"
-            step="any"
-            name="latitude"
-            id="id_latitude"
-            value="{{ form.latitude.value|default_if_none:''|unlocalize }}"
-            class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-        </div>
-
-        <div>
-          <label for="id_longitude" class="block text-sm font-medium text-slate-700 mb-1">
-            Longitude
-          </label>
-          <input
-            type="number"
-            step="any"
-            name="longitude"
-            id="id_longitude"
-            value="{{ form.longitude.value|default_if_none:''|unlocalize }}"
-            class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-        </div>
-
-        <div>
-          <label for="id_precision_gps" class="block text-sm font-medium text-slate-700 mb-1">
-            Précision GPS (m)
-          </label>
-          <input
-            type="number"
-            step="any"
-            name="precision_gps"
-            id="id_precision_gps"
-            value="{{ form.precision_gps.value|default_if_none:''|unlocalize }}"
-            class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-        </div>
+        {% include "recensement/includes/forms/_gps_input.html" with nom="latitude" libelle="Latitude" valeur=form.latitude.value %}
+        {% include "recensement/includes/forms/_gps_input.html" with nom="longitude" libelle="Longitude" valeur=form.longitude.value %}
+        {% include "recensement/includes/forms/_gps_input.html" with nom="precision_gps" libelle="Précision GPS (m)" valeur=form.precision_gps.value %}
       </div>
 
       <p class="text-xs text-slate-400">
@@ -243,91 +118,39 @@
         La modification effective sera tracée dans l’historique avec le motif obligatoire.
       </p>
 
-      <div id="gps-field-errors" class="mt-3 space-y-2">
-        {% for error in form.latitude.errors %}
-          <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            Latitude : {{ error }}
-          </p>
-        {% endfor %}
-
-        {% for error in form.longitude.errors %}
-          <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            Longitude : {{ error }}
-          </p>
-        {% endfor %}
-
-        {% for error in form.precision_gps.errors %}
-          <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            Précision GPS : {{ error }}
-          </p>
-        {% endfor %}
-      </div>
+      {% include "recensement/includes/forms/_gps_errors.html" with form=form %}
 
       <div class="pt-2 border-t border-slate-100">
-        <label for="{{ form.observations.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
-          {{ form.observations.label }}
-        </label>
-        {{ form.observations }}
-        {% for error in form.observations.errors %}
-          <p class="text-red-600 text-sm mt-1">{{ error }}</p>
-        {% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.observations %}
       </div>
     </div>
   </div>
 
   <div class="app-card">
-    <div class="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800">Informateur</div>
+    {% include "recensement/includes/components/_card_header.html" with titre="Informateur" %}
     <div class="p-5 grid sm:grid-cols-2 gap-4">
       <div>
-        <label for="{{ form.nom_informateur.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.nom_informateur.label }}</label>
-        {{ form.nom_informateur }}
-        {% for error in form.nom_informateur.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.nom_informateur %}
       </div>
       <div>
-        <label for="{{ form.contact_informateur.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ form.contact_informateur.label }}</label>
-        {{ form.contact_informateur }}
-        {% for error in form.contact_informateur.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+        {% include "recensement/includes/forms/_field.html" with field=form.contact_informateur %}
       </div>
     </div>
   </div>
 
   <div class="bg-white rounded-2xl border border-amber-200 shadow-sm">
-    <div class="px-5 py-3 border-b border-amber-100 font-semibold text-amber-800">Motif de la modification (obligatoire)</div>
+    {% include "recensement/includes/components/_card_header.html" with titre="Motif de la modification (obligatoire)" variante="amber" %}
     <div class="p-5">
       <p class="text-sm text-slate-500 mb-3">
         Ce motif est enregistré dans l'historique de la fiche, consultable par
         le super admin — expliquez ce qui était erroné et pourquoi vous le corrigez.
       </p>
       {{ motif_form.motif }}
-      {% for error in motif_form.motif.errors %}<p class="text-red-600 text-sm mt-1">{{ error }}</p>{% endfor %}
+      {% include "recensement/includes/forms/_field_errors.html" with field=motif_form.motif %}
     </div>
   </div>
 
-  {% if form.alerte_doublon and form.alerte_doublon.gravite != "aucun" %}
-    <div class="rounded-xl border {% if form.alerte_doublon.gravite == 'bloquant' %}border-red-200 bg-red-50 text-red-800{% else %}border-amber-200 bg-amber-50 text-amber-800{% endif %} px-4 py-3 text-sm">
-      <div class="font-semibold">Alerte de doublon</div>
-      <p class="mt-1">{{ form.alerte_doublon.motif_principal }}</p>
-      <ul class="mt-2 space-y-2">
-        {% for item in form.alerte_doublon.correspondances %}
-          <li class="rounded-lg bg-white/70 px-3 py-2">
-            <div class="font-semibold">{{ item.nom }}</div>
-            <div class="text-xs opacity-80">{{ item.zone }} · {{ item.statut }}{% if item.distance_metres %} · GPS : {{ item.distance_metres|floatformat:0 }} m{% endif %}</div>
-          </li>
-        {% endfor %}
-      </ul>
-      {% if form.alerte_doublon.peut_confirmer %}
-        <div class="mt-3 border-t border-amber-200 pt-3">
-          <label class="flex items-start gap-2 text-sm font-medium">{{ form.confirmer_doublon_possible }} <span>{{ form.confirmer_doublon_possible.label }}</span></label>
-          {% for error in form.confirmer_doublon_possible.errors %}<p class="text-red-600 text-xs mt-1">{{ error }}</p>{% endfor %}
-          <div class="mt-3">
-            <label for="{{ form.motif_doublon_possible.id_for_label }}" class="block text-xs font-medium mb-1">{{ form.motif_doublon_possible.label }}</label>
-            {{ form.motif_doublon_possible }}
-            {% for error in form.motif_doublon_possible.errors %}<p class="text-red-600 text-xs mt-1">{{ error }}</p>{% endfor %}
-          </div>
-        </div>
-      {% endif %}
-    </div>
-  {% endif %}
+  {% include "recensement/includes/forms/_alerte_doublon.html" with form=form variante="edition" %}
 
   <div class="flex justify-end gap-2">
     <a href="{% url 'recensement:fiche_detail' fiche.pk %}"

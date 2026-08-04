@@ -129,8 +129,11 @@ class District(models.Model):
     )
     est_sites_particuliers = models.BooleanField(
         default=False,
-        help_text="Marque ce district comme réservé aux sites particuliers "
-        "(exclu des cascades et du recensement ordinaire).",
+        editable=False,
+        help_text=(
+            "Champ de compatibilité et de sécurité. Aucun district des Sites "
+            "particuliers ne doit rester dans le référentiel de recensement."
+        ),
     )
 
     class Meta:
@@ -152,10 +155,11 @@ class District(models.Model):
 
 
 class Zone(models.Model):
-    """Zone ecclésiale, rattachée à un district. C'est la plus petite unité
-    administrative officielle du référentiel (ex: 'Zone ecclésiale de Banikoara').
-    Inclut aussi les 'Sites particuliers' qui suivent la même profondeur
-    hiérarchique dans le fichier de cartographie."""
+    """Zone ecclésiale ordinaire, rattachée à un district de recensement.
+
+    Les sites particuliers ne sont jamais importés ni enregistrés dans ce
+    référentiel territorial. Ils sont gérés dans leur module autonome.
+    """
 
     district = models.ForeignKey(District, on_delete=models.CASCADE, related_name="zones")
     nom = models.CharField(max_length=200)
@@ -363,6 +367,12 @@ class Profil(models.Model):
                 raise ValidationError({"district": "Un district est requis pour ce rôle."})
             if not self.zone_id:
                 raise ValidationError({"zone": "Une zone est requise pour ce rôle."})
+
+        if self.district_id and self.district.est_sites_particuliers:
+            raise ValidationError({"district": "Ce district est exclu du recensement ordinaire."})
+
+        if self.zone_id and self.zone.district.est_sites_particuliers:
+            raise ValidationError({"zone": "Cette zone est exclue du recensement ordinaire."})
 
     # ------------------------------------------------------------------
     # Propriétés de commodité (conservées pour compatibilité ascendante)
@@ -675,6 +685,13 @@ class FicheParoisse(models.Model):
             models.Index(fields=["zone", "nom_paroisse_normalise"], name="fiche_zone_nomnorm_idx"),
             models.Index(fields=["zone", "doublon_statut"], name="fiche_zone_doublon_idx"),
         ]
+
+    def clean(self):
+        super().clean()
+        if self.district_id and self.district.est_sites_particuliers:
+            raise ValidationError({"district": "Ce district est exclu du recensement ordinaire."})
+        if self.zone_id and self.zone.district.est_sites_particuliers:
+            raise ValidationError({"zone": "Cette zone est exclue du recensement ordinaire."})
 
     def __str__(self):
         return f"{self.nom_paroisse} — {self.localite}"
@@ -1177,6 +1194,11 @@ class AffectationTerritoriale(models.Model):
             if not self.zone_id or self.district_id:
                 raise ValidationError("Une affectation de niveau zone doit renseigner uniquement une zone.")
 
+        if self.district_id and self.district.est_sites_particuliers:
+            raise ValidationError({"district": "Ce district est exclu du recensement ordinaire."})
+        if self.zone_id and self.zone.district.est_sites_particuliers:
+            raise ValidationError({"zone": "Cette zone est exclue du recensement ordinaire."})
+
     def __str__(self):
         return f"{self.utilisateur.get_username()} → {self.libelle_perimetre} ({self.get_statut_display()})"
 
@@ -1472,12 +1494,472 @@ class TypeSiteParticulier(models.TextChoices):
     AUTRE = "autre", "Autre"
 
 
-class SiteParticulier(models.Model):
-    """Site ecclésial particulier, géré en dehors du circuit de recensement
-    ordinaire. Ces sites (cathédrales, basiliques, sites de pèlerinage…) sont
-    sous l'autorité directe du Siège mondial et ne dépendent pas de la
-    hiérarchie Région→Province→District→Zone utilisée pour les paroisses.
+class NiveauResponsabiliteEcclesiale(models.TextChoices):
+    REGION = "region", "Région ecclésiale"
+    PROVINCE = "province", "Province ecclésiale"
+    DISTRICT = "district", "District ecclésial"
+    ZONE = "zone", "Zone ecclésiale"
+    SITE_PARTICULIER = "site_particulier", "Site particulier"
+    STRUCTURE_SPECIALE = "structure_speciale", "Structure ecclésiale spéciale"
+
+
+class StatutMandatResponsableEcclesial(models.TextChoices):
+    A_RENSEIGNER = "a_renseigner", "À renseigner"
+    VACANT = "vacant", "Vacant"
+    ACTIF = "actif", "Actif"
+    SUSPENDU = "suspendu", "Suspendu"
+    TERMINE = "termine", "Terminé"
+    REMPLACE = "remplace", "Remplacé"
+
+
+class ResponsabiliteHierarchique(models.Model):
+    """Poste ecclésial permanent, distinct des comptes opérateurs.
+
+    Le poste existe indépendamment de la personne qui l'occupe. Les titulaires
+    successifs sont enregistrés dans ``MandatResponsableEcclesial``. Le champ
+    historique ``nom_responsable`` est conservé temporairement pour faciliter
+    la migration des anciennes installations, mais n'est plus utilisé par
+    l'interface ni par les exports.
     """
+
+    CHAMPS_REFERENCE = (
+        "code",
+        "niveau",
+        "region_id",
+        "province_id",
+        "district_id",
+        "zone_id",
+        "site_particulier_id",
+        "structure_nom",
+        "parent_code",
+        "titre_officiel",
+        "titre_verrouille",
+    )
+
+    code = models.SlugField(max_length=120, unique=True, editable=False)
+    niveau = models.CharField(
+        max_length=30,
+        choices=NiveauResponsabiliteEcclesiale.choices,
+        db_index=True,
+    )
+    region = models.ForeignKey(
+        Region,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="postes_ecclesiaux",
+    )
+    province = models.ForeignKey(
+        Province,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="postes_ecclesiaux",
+    )
+    district = models.ForeignKey(
+        District,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="postes_ecclesiaux",
+    )
+    zone = models.ForeignKey(
+        Zone,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="postes_ecclesiaux",
+    )
+    site_particulier = models.ForeignKey(
+        "SiteParticulier",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="postes_ecclesiaux",
+    )
+    structure_nom = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Structure ecclésiale spéciale ou libellé historique",
+    )
+    parent_code = models.SlugField(
+        max_length=120,
+        blank=True,
+        help_text="Code facultatif d'un poste ou d'une structure parente autonome.",
+    )
+    ordre = models.PositiveSmallIntegerField(default=0)
+    titre_officiel = models.CharField(max_length=255)
+    titre_verrouille = models.BooleanField(
+        default=False,
+        help_text="Empêche la modification ordinaire d'un titre officiel seedé.",
+    )
+    est_actif = models.BooleanField(default=True, db_index=True)
+
+    # Compatibilité transitoire avec l'ancien modèle. Ne plus écrire ici.
+    nom_responsable = models.CharField(
+        max_length=200,
+        blank=True,
+        editable=False,
+        help_text="Champ historique à migrer vers les mandats.",
+    )
+    observations = models.TextField(
+        blank=True,
+        editable=False,
+        help_text="Champ historique à migrer vers les mandats.",
+    )
+
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="postes_ecclesiaux_crees",
+    )
+    modifie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="postes_ecclesiaux_modifies",
+    )
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["niveau", "ordre", "titre_officiel", "code"]
+        verbose_name = "Poste ecclésial"
+        verbose_name_plural = "Postes ecclésiaux"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["region", "titre_officiel"],
+                condition=models.Q(region__isnull=False),
+                name="unique_poste_titre_region",
+            ),
+            models.UniqueConstraint(
+                fields=["province", "titre_officiel"],
+                condition=models.Q(province__isnull=False),
+                name="unique_poste_titre_province",
+            ),
+            models.UniqueConstraint(
+                fields=["district", "titre_officiel"],
+                condition=models.Q(district__isnull=False),
+                name="unique_poste_titre_district",
+            ),
+            models.UniqueConstraint(
+                fields=["zone", "titre_officiel"],
+                condition=models.Q(zone__isnull=False),
+                name="unique_poste_titre_zone",
+            ),
+            models.UniqueConstraint(
+                fields=["site_particulier", "titre_officiel"],
+                condition=models.Q(site_particulier__isnull=False),
+                name="unique_poste_titre_site_particulier",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["niveau", "est_actif"], name="poste_niveau_actif_idx"),
+        ]
+
+    @property
+    def structure(self):
+        if self.region_id:
+            return self.region
+        if self.province_id:
+            return self.province
+        if self.district_id:
+            return self.district
+        if self.zone_id:
+            return self.zone
+        if self.site_particulier_id:
+            return self.site_particulier
+        return self.structure_nom
+
+    @property
+    def libelle_structure(self):
+        structure = self.structure
+        return str(structure) if structure else "Structure non renseignée"
+
+    @property
+    def rattachement_hierarchique(self):
+        if self.region_id:
+            return self.region.nom
+        if self.province_id:
+            return f"{self.province.region.nom} → {self.province.nom}"
+        if self.district_id:
+            return f"{self.district.province.region.nom} → {self.district.province.nom} → {self.district.nom}"
+        if self.zone_id:
+            return (
+                f"{self.zone.district.province.region.nom} → "
+                f"{self.zone.district.province.nom} → "
+                f"{self.zone.district.nom} → {self.zone.nom}"
+            )
+        if self.site_particulier_id:
+            return f"Site particulier → {self.site_particulier.nom}"
+        return self.structure_nom or "—"
+
+    @property
+    def mandat_courant(self):
+        prefetched = getattr(self, "mandats_courants", None)
+        if prefetched is not None:
+            return prefetched[0] if prefetched else None
+        return (
+            self.mandats.filter(
+                statut__in=MandatResponsableEcclesial.STATUTS_COURANTS,
+            )
+            .order_by("-date_debut", "-date_creation")
+            .first()
+        )
+
+    @property
+    def nom_responsable_actuel(self):
+        mandat = self.mandat_courant
+        if not mandat or not mandat.nom_responsable:
+            return "Non renseigné"
+        return mandat.nom_responsable
+
+    def clean(self):
+        super().clean()
+        cibles = [
+            self.region_id,
+            self.province_id,
+            self.district_id,
+            self.zone_id,
+            self.site_particulier_id,
+        ]
+        nb_cibles = sum(bool(value) for value in cibles)
+
+        attendu = {
+            NiveauResponsabiliteEcclesiale.REGION: self.region_id,
+            NiveauResponsabiliteEcclesiale.PROVINCE: self.province_id,
+            NiveauResponsabiliteEcclesiale.DISTRICT: self.district_id,
+            NiveauResponsabiliteEcclesiale.ZONE: self.zone_id,
+            NiveauResponsabiliteEcclesiale.SITE_PARTICULIER: self.site_particulier_id,
+        }
+
+        if self.niveau == NiveauResponsabiliteEcclesiale.STRUCTURE_SPECIALE:
+            if nb_cibles:
+                raise ValidationError("Une structure spéciale ne doit pas cibler le référentiel du recensement.")
+            if not (self.structure_nom or "").strip():
+                raise ValidationError({"structure_nom": "Le nom de la structure spéciale est obligatoire."})
+        else:
+            if nb_cibles != 1 or not attendu.get(self.niveau):
+                raise ValidationError("Le niveau et l'entité ecclésiale sélectionnée ne correspondent pas.")
+
+    def save(self, *args, autoriser_correction_reference=False, **kwargs):
+        if self.pk:
+            precedente = type(self).objects.filter(pk=self.pk).first()
+            if precedente:
+                cible_modifiee = any(
+                    getattr(precedente, champ) != getattr(self, champ)
+                    for champ in (
+                        "niveau",
+                        "region_id",
+                        "province_id",
+                        "district_id",
+                        "zone_id",
+                        "site_particulier_id",
+                        "structure_nom",
+                    )
+                )
+                if cible_modifiee and not autoriser_correction_reference:
+                    raise ValidationError("Le rattachement d'un poste existant ne peut pas être modifié.")
+                if (
+                    precedente.titre_verrouille
+                    and precedente.titre_officiel != self.titre_officiel
+                    and not autoriser_correction_reference
+                ):
+                    raise ValidationError("Le titre officiel de ce poste est verrouillé.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.titre_officiel} — {self.libelle_structure}"
+
+
+class MandatResponsableEcclesial(models.Model):
+    """Occupation d'un poste ecclésial pendant une période déterminée."""
+
+    STATUTS_COURANTS = (
+        StatutMandatResponsableEcclesial.A_RENSEIGNER,
+        StatutMandatResponsableEcclesial.VACANT,
+        StatutMandatResponsableEcclesial.ACTIF,
+        StatutMandatResponsableEcclesial.SUSPENDU,
+    )
+
+    poste = models.ForeignKey(
+        ResponsabiliteHierarchique,
+        on_delete=models.PROTECT,
+        related_name="mandats",
+    )
+    nom_responsable = models.CharField(max_length=200, blank=True)
+    contact_responsable = models.CharField(max_length=50, blank=True)
+    date_debut = models.DateField(null=True, blank=True)
+    date_fin = models.DateField(null=True, blank=True)
+    statut = models.CharField(
+        max_length=20,
+        choices=StatutMandatResponsableEcclesial.choices,
+        default=StatutMandatResponsableEcclesial.A_RENSEIGNER,
+        db_index=True,
+    )
+    observations = models.TextField(blank=True)
+    motif_cloture = models.TextField(blank=True)
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mandats_ecclesiaux_crees",
+    )
+    modifie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mandats_ecclesiaux_modifies",
+    )
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date_debut", "-date_creation", "-id"]
+        verbose_name = "Mandat de responsable ecclésial"
+        verbose_name_plural = "Mandats de responsables ecclésiaux"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["poste"],
+                condition=models.Q(statut__in=["a_renseigner", "vacant", "actif", "suspendu"]),
+                name="unique_mandat_courant_par_poste",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["poste", "statut"], name="mandat_poste_statut_idx"),
+        ]
+
+    @property
+    def est_courant(self):
+        return self.statut in self.STATUTS_COURANTS
+
+    @property
+    def periode_affichage(self):
+        debut = self.date_debut.strftime("%d/%m/%Y") if self.date_debut else "Début non renseigné"
+        fin = self.date_fin.strftime("%d/%m/%Y") if self.date_fin else "En cours"
+        return f"{debut} — {fin}"
+
+    def clean(self):
+        super().clean()
+        if self.date_debut and self.date_fin and self.date_fin < self.date_debut:
+            raise ValidationError({"date_fin": "La date de fin ne peut pas précéder la date de début."})
+
+        if (
+            self.statut
+            in (
+                StatutMandatResponsableEcclesial.ACTIF,
+                StatutMandatResponsableEcclesial.SUSPENDU,
+            )
+            and not (self.nom_responsable or "").strip()
+        ):
+            raise ValidationError({"nom_responsable": "Le nom est obligatoire pour un mandat actif ou suspendu."})
+
+        if (
+            self.statut
+            in (
+                StatutMandatResponsableEcclesial.A_RENSEIGNER,
+                StatutMandatResponsableEcclesial.VACANT,
+            )
+            and (self.nom_responsable or "").strip()
+        ):
+            raise ValidationError(
+                {"nom_responsable": "Un poste vacant ou à renseigner ne doit pas avoir de titulaire."}
+            )
+
+        if (
+            self.statut
+            in (
+                StatutMandatResponsableEcclesial.TERMINE,
+                StatutMandatResponsableEcclesial.REMPLACE,
+            )
+            and not self.date_fin
+        ):
+            raise ValidationError({"date_fin": "La date de fin est obligatoire pour clôturer un mandat."})
+
+        if self.est_courant and self.date_fin:
+            raise ValidationError({"date_fin": "Un mandat en cours ne doit pas avoir de date de fin."})
+
+    def save(self, *args, **kwargs):
+        self.nom_responsable = (self.nom_responsable or "").strip()
+        self.contact_responsable = (self.contact_responsable or "").strip()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        nom = self.nom_responsable or self.get_statut_display()
+        return f"{self.poste.titre_officiel} — {nom}"
+
+
+class HistoriqueResponsabiliteHierarchique(models.Model):
+    class Action(models.TextChoices):
+        MISE_A_JOUR_RESPONSABLE = "mise_a_jour_responsable", "Ancienne mise à jour du responsable"
+        CREATION_POSTE = "creation_poste", "Création du poste"
+        MODIFICATION_POSTE = "modification_poste", "Modification du poste"
+        OUVERTURE_MANDAT = "ouverture_mandat", "Ouverture du mandat"
+        MODIFICATION_MANDAT = "modification_mandat", "Modification du mandat"
+        CLOTURE_MANDAT = "cloture_mandat", "Clôture du mandat"
+        REMPLACEMENT = "remplacement", "Remplacement du responsable"
+        MIGRATION_LEGACY = "migration_legacy", "Migration d'une ancienne responsabilité"
+        CORRECTION_REFERENCE = "correction_reference", "Correction officielle"
+
+    responsabilite = models.ForeignKey(
+        ResponsabiliteHierarchique,
+        on_delete=models.PROTECT,
+        related_name="historique",
+    )
+    mandat = models.ForeignKey(
+        MandatResponsableEcclesial,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historique",
+    )
+    action = models.CharField(max_length=40, choices=Action.choices)
+    effectue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historiques_responsabilites_hierarchiques",
+    )
+    motif = models.TextField(blank=True)
+    donnees_avant = models.JSONField(default=dict, blank=True)
+    donnees_apres = models.JSONField(default=dict, blank=True)
+    date_action = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_action", "-id"]
+        verbose_name = "Historique de responsabilité ecclésiale"
+        verbose_name_plural = "Historiques des responsabilités ecclésiales"
+
+    def __str__(self):
+        return f"{self.get_action_display()} — {self.responsabilite.titre_officiel}"
+
+
+class SiteParticulier(models.Model):
+    """Site officiel géré entièrement hors du recensement ordinaire.
+
+    Aucun rattachement vers ``Region``, ``Province``, ``District``, ``Zone``
+    ou ``Village`` n'est autorisé. Les informations de localisation propres
+    au site sont portées directement par ``pays`` et ``localite``.
+    """
+
+    CHAMPS_REFERENCE = (
+        "nom",
+        "type_site",
+        "pays",
+        "localite",
+        "titre_responsable",
+        "description",
+        "informations_historiques",
+        "details_officiels",
+    )
 
     nom = models.CharField(max_length=200)
     type_site = models.CharField(
@@ -1491,25 +1973,37 @@ class SiteParticulier(models.Model):
     titre_responsable = models.CharField(
         max_length=200,
         blank=True,
-        verbose_name="Titre officiel du responsable",
-        help_text=("Titre officiel connu du responsable du site, renseigné par le seed ou à la création."),
+        editable=False,
+        verbose_name="Ancien titre du responsable (compatibilité)",
+        help_text="Champ historique migré vers les postes ecclésiaux.",
     )
     description = models.TextField(blank=True)
-    responsable = models.CharField(max_length=200, blank=True, verbose_name="Responsable de référence")
-    contact_responsable = models.CharField(max_length=50, blank=True, verbose_name="Contact du responsable")
+    responsable = models.CharField(
+        max_length=200,
+        blank=True,
+        editable=False,
+        verbose_name="Ancien responsable (compatibilité)",
+    )
+    contact_responsable = models.CharField(
+        max_length=50,
+        blank=True,
+        editable=False,
+        verbose_name="Ancien contact du responsable (compatibilité)",
+    )
     statut = models.CharField(
         max_length=50,
         blank=True,
         help_text="État actuel du site (ouvert, en travaux, fermé…).",
     )
     observations = models.TextField(blank=True)
-    informations_historiques = models.TextField(blank=True, verbose_name="Informations historiques ou liturgiques")
+    informations_historiques = models.TextField(
+        blank=True,
+        verbose_name="Informations historiques ou liturgiques",
+    )
     details_officiels = models.TextField(
         blank=True,
         verbose_name="Détails officiels du site",
-        help_text=("Détails officiels ou description institutionnelle du caractère particulier du site."),
     )
-    # --- Géolocalisation (facultative) ---
     latitude = models.DecimalField(
         max_digits=10,
         decimal_places=7,
@@ -1531,8 +2025,14 @@ class SiteParticulier(models.Model):
         blank=True,
         validators=[MinValueValidator(0)],
     )
-
-    # --- Traçabilité ---
+    date_definition_gps = models.DateTimeField(null=True, blank=True)
+    gps_defini_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="positions_gps_sites_particuliers_definies",
+    )
     cree_par = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -1554,6 +2054,27 @@ class SiteParticulier(models.Model):
         ordering = ["nom"]
         verbose_name = "Site particulier"
         verbose_name_plural = "Sites particuliers"
+
+    @property
+    def gps_est_defini(self):
+        return self.latitude is not None and self.longitude is not None
+
+    def clean(self):
+        super().clean()
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValidationError("La latitude et la longitude doivent être renseignées ensemble.")
+
+    def save(self, *args, autoriser_correction_officielle=False, **kwargs):
+        if self.pk:
+            precedent = type(self).objects.filter(pk=self.pk).first()
+            if precedent:
+                champs_modifies = [
+                    champ for champ in self.CHAMPS_REFERENCE if getattr(precedent, champ) != getattr(self, champ)
+                ]
+                if champs_modifies and not autoriser_correction_officielle:
+                    raise ValidationError("Les informations officielles de ce site sont protégées.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nom

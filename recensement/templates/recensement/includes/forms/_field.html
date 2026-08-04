@@ -1,0 +1,21 @@
+{% comment %}
+Champ de formulaire standard : label + widget + aide facultative + erreurs.
+
+Variables attendues :
+  field (BoundField, obligatoire)
+  aide  (str, optionnel) : texte d'aide affiché SOUS le widget et AVANT les
+                           erreurs, comme dans les templates d'origine.
+
+Ce composant NE REND PAS le <div> englobant : chaque page conserve son propre
+conteneur avec ses classes de grille (sm:col-span-2, hidden, id spécifique...)
+et peut y ajouter des éléments supplémentaires (avertissement doublon, champ
+caché, etc.). C'est volontaire : cela évite de multiplier les paramètres de
+classe et garantit un rendu identique page par page.
+
+Note : le "for" du label utilise field.id_for_label, ce qui produit exactement
+les mêmes valeurs (id_region, id_province, ...) que les attributs écrits en dur
+auparavant.
+{% endcomment %}<label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+{{ field }}
+{% if aide %}<p class="text-xs text-slate-400 mt-1">{{ aide }}</p>{% endif %}
+{% include "recensement/includes/forms/_field_errors.html" with field=field %}

@@ -1,11 +1,12 @@
 {% with url_name=request.resolver_match.url_name %}
 {% if is_super_admin %}
-<details class="sidebar-group" {% if url_name == 'dashboard' or url_name == 'suivi_modifications' or url_name == 'historique_affectations' %}open{% endif %}>
+<details class="sidebar-group" {% if url_name == 'dashboard' or url_name == 'suivi_modifications' or url_name == 'historique_affectations' or 'responsable_ecclesial' in url_name or 'mandat_responsable' in url_name %}open{% endif %}>
   <summary class="sidebar-summary"><span>Administration</span><span aria-hidden="true">›</span></summary>
   <div class="sidebar-submenu">
     <a href="{% url 'recensement:dashboard' %}" class="sidebar-link {% if url_name == 'dashboard' %}is-active{% endif %}">Tableau de bord</a>
     <a href="{% url 'recensement:suivi_modifications' %}" class="sidebar-link {% if url_name == 'suivi_modifications' %}is-active{% endif %}">Suivi des fiches</a>
     <a href="{% url 'recensement:historique_affectations' %}" class="sidebar-link {% if url_name == 'historique_affectations' %}is-active{% endif %}">Historique des accès</a>
+    <a href="{% url 'recensement:responsable_ecclesial_list' %}" class="sidebar-link {% if 'responsable_ecclesial' in url_name or 'mandat_responsable' in url_name %}is-active{% endif %}">Responsables ecclésiaux</a>
   </div>
 </details>
 {% endif %}

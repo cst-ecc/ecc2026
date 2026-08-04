@@ -1,0 +1,20 @@
+{% comment %}
+Champ téléphone complet : label + indicatif pays + saisie + aide + erreurs.
+
+Variables attendues :
+  field (BoundField, obligatoire) : contact_responsable ou contact_informateur.
+  aide  (str, obligatoire)        : texte d'aide (il diffère d'un champ à l'autre,
+                                    il est donc passé par l'appelant pour ne rien
+                                    modifier au rendu existant).
+
+data-phone-target est déduit de field.id_for_label, ce qui reproduit exactement
+les valeurs codées en dur auparavant.
+{% endcomment %}<div class="phone-field" data-phone-field>
+  <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+  <div class="grid grid-cols-[120px_1fr] gap-2">
+    {% include "recensement/includes/forms/_phone_prefix_select.html" with cible=field.id_for_label %}
+    {{ field }}
+  </div>
+  <p class="text-xs text-slate-400 mt-1">{{ aide }}</p>
+  {% include "recensement/includes/forms/_field_errors.html" with field=field %}
+</div>

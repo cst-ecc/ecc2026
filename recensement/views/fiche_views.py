@@ -5,6 +5,7 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -30,7 +31,13 @@ from ..permissions import (
     peut_valider_fiche,
     role_required,
 )
+from ..services.services_responsables_ecclesiaux import (
+    construire_index_responsables,
+    responsables_pour_fiche,
+)
 from .helpers import _fiches_visibles_pour, _premiere_etape_en_erreur, _snapshot_fiche
+
+FICHES_PAR_PAGE = 20
 
 
 @login_required
@@ -44,68 +51,52 @@ def fiche_create(request):
         photos_form = PhotosParoisseForm(request.POST, request.FILES)
         if form.is_valid() and photos_form.is_valid():
             role_createur = get_role(request.user)
+            try:
+                with transaction.atomic():
+                    fiche = form.save(commit=False)
+                    fiche.cree_par = request.user
 
-        try:
-            with transaction.atomic():
-                fiche = form.save(commit=False)
-                fiche.cree_par = request.user
+                    if role_createur == Profil.Role.SUPER_ADMIN:
+                        maintenant = timezone.now()
+                        fiche.statut_validation = FicheParoisse.StatutValidation.VALIDEE
+                        fiche.valide_par_superviseur = request.user
+                        fiche.date_validation_superviseur = maintenant
+                        fiche.valide_par_manager = request.user
+                        fiche.date_validation_manager = maintenant
 
-                if role_createur == Profil.Role.SUPER_ADMIN:
-                    maintenant = timezone.now()
-
-                    fiche.statut_validation = FicheParoisse.StatutValidation.VALIDEE
-
-                    # Traçabilité des deux paliers existants :
-                    # le Super administrateur valide directement la fiche.
-                    fiche.valide_par_superviseur = request.user
-                    fiche.date_validation_superviseur = maintenant
-                    fiche.valide_par_manager = request.user
-                    fiche.date_validation_manager = maintenant
-
-                fiche.save()
-
-                journaliser_alerte_doublon(
-                    fiche=fiche,
-                    utilisateur=request.user,
-                    alerte=getattr(form, "alerte_doublon", None),
-                    action="creation",
-                )
-
-                for photo in photos_form.cleaned_data["photos"]:
-                    PhotoParoisse.objects.create(
+                    fiche.save()
+                    journaliser_alerte_doublon(
                         fiche=fiche,
-                        image=photo,
+                        utilisateur=request.user,
+                        alerte=getattr(form, "alerte_doublon", None),
+                        action="creation",
                     )
+                    for photo in photos_form.cleaned_data["photos"]:
+                        PhotoParoisse.objects.create(fiche=fiche, image=photo)
 
-                code_officiel = None
-
-                if role_createur == Profil.Role.SUPER_ADMIN:
-                    code_officiel = generer_code_paroisse(
-                        fiche,
-                        genere_par=request.user,
-                    )
-
-        except ValueError as exc:
-            messages.error(
-                request,
-                "La fiche du Super administrateur n'a pas été enregistrée, "
-                f"car sa codification officielle a échoué : {exc}",
-            )
-        else:
-            if role_createur == Profil.Role.SUPER_ADMIN:
-                messages.success(
+                    code_officiel = None
+                    if role_createur == Profil.Role.SUPER_ADMIN:
+                        code_officiel = generer_code_paroisse(fiche, genere_par=request.user)
+            except ValueError as exc:
+                messages.error(
                     request,
-                    "Fiche enregistrée et validée directement par le Super administrateur. "
-                    f"Code officiel généré : {code_officiel}.",
+                    "La fiche du Super administrateur n'a pas été enregistrée, "
+                    f"car sa codification officielle a échoué : {exc}",
                 )
             else:
-                messages.success(
-                    request,
-                    "Fiche enregistrée avec succès, en attente de validation par l'OP DISTRICT. "
-                    "Vous pouvez recenser une autre paroisse.",
-                )
-
-            return redirect("recensement:fiche_create")
+                if role_createur == Profil.Role.SUPER_ADMIN:
+                    messages.success(
+                        request,
+                        "Fiche enregistrée et validée directement par le Super administrateur. "
+                        f"Code officiel généré : {code_officiel}.",
+                    )
+                else:
+                    messages.success(
+                        request,
+                        "Fiche enregistrée avec succès, en attente de validation par l'OP DISTRICT. "
+                        "Vous pouvez recenser une autre paroisse.",
+                    )
+                return redirect("recensement:fiche_create")
 
         if getattr(form, "alerte_doublon", None) and form.alerte_doublon.get("gravite") == "bloquant":
             journaliser_alerte_doublon(
@@ -137,7 +128,6 @@ def fiche_create(request):
         "zone": form["zone"].value(),
         "village": form["village"].value(),
     }
-
     return render(
         request,
         "recensement/fiche_form.html",
@@ -314,13 +304,21 @@ def fiche_list(request):
         if region_id:
             provinces = provinces.filter(region_id=region_id)
 
-        districts = District.objects.all().order_by("nom")
+        districts = (
+            District.objects.filter(est_sites_particuliers=False)
+            .exclude(nom__icontains="sites particuliers")
+            .order_by("nom")
+        )
         if province_id:
             districts = districts.filter(province_id=province_id)
         elif region_id:
             districts = districts.filter(province__region_id=region_id)
 
-        zones = Zone.objects.all().order_by("nom")
+        zones = (
+            Zone.objects.filter(district__est_sites_particuliers=False)
+            .exclude(district__nom__icontains="sites particuliers")
+            .order_by("nom")
+        )
         if district_id:
             zones = zones.filter(district_id=district_id)
         elif province_id:
@@ -328,29 +326,67 @@ def fiche_list(request):
         elif region_id:
             zones = zones.filter(district__province__region_id=region_id)
 
-        paroisses_qs = _fiches_visibles_pour(request.user)
-        if statut_filtre == "attente_superviseur":
-            paroisses_qs = paroisses_qs.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR)
-        elif statut_filtre == "attente_manager":
-            paroisses_qs = paroisses_qs.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER)
-        elif statut_filtre == "tous":
-            pass
-        else:
-            paroisses_qs = paroisses_qs.filter(statut_validation=FicheParoisse.StatutValidation.VALIDEE)
-
+        # Le sélecteur des paroisses n'est utilisable qu'après le choix
+        # d'une zone. On évite donc de charger les noms de toutes les
+        # paroisses d'une région, d'une province ou d'un district.
         if zone_id:
-            paroisses_qs = paroisses_qs.filter(zone_id=zone_id)
-        elif district_id:
-            paroisses_qs = paroisses_qs.filter(district_id=district_id)
-        elif province_id:
-            paroisses_qs = paroisses_qs.filter(province_id=province_id)
-        elif region_id:
-            paroisses_qs = paroisses_qs.filter(region_id=region_id)
+            paroisses_qs = _fiches_visibles_pour(request.user).filter(
+                zone_id=zone_id,
+            )
 
-        paroisses = paroisses_qs.order_by("nom_paroisse").values_list("nom_paroisse", flat=True).distinct()
+            if statut_filtre == "attente_superviseur":
+                paroisses_qs = paroisses_qs.filter(
+                    statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR,
+                )
+            elif statut_filtre == "attente_manager":
+                paroisses_qs = paroisses_qs.filter(
+                    statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER,
+                )
+            elif statut_filtre == "tous":
+                pass
+            else:
+                paroisses_qs = paroisses_qs.filter(
+                    statut_validation=FicheParoisse.StatutValidation.VALIDEE,
+                )
+
+            paroisses = paroisses_qs.order_by("nom_paroisse").values_list("nom_paroisse", flat=True).distinct()
+        elif paroisse:
+            # Préserve une valeur reçue dans l'URL sans lancer une requête
+            # globale pour recharger tous les noms de paroisses.
+            paroisses = [paroisse]
+
+    # Charge en une seule requête toutes les relations utilisées dans
+    # chaque ligne du tableau. L'ajout de "village" évite une requête SQL
+    # supplémentaire lors de l'accès à fiche.localite.
+    fiches = fiches.select_related(
+        "region",
+        "province",
+        "district",
+        "zone",
+        "village",
+        "cree_par",
+    ).order_by("-date_recensement", "-pk")
+
+    # La pagination est appliquée sur le QuerySet. Django génère donc une
+    # requête SQL limitée à la page demandée au lieu de charger 500 fiches.
+    paginator = Paginator(fiches, FICHES_PAR_PAGE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    # Conserve les filtres dans les liens de pagination sans dupliquer
+    # l'ancien numéro de page.
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
 
     context = {
-        "fiches": fiches.select_related("region", "province", "district", "zone", "cree_par")[:500],
+        "fiches": page_obj.object_list,
+        "page_obj": page_obj,
+        "page_range": paginator.get_elided_page_range(
+            number=page_obj.number,
+            on_each_side=1,
+            on_ends=1,
+        ),
+        "pagination_ellipsis": paginator.ELLIPSIS,
+        "pagination_query": pagination_params.urlencode(),
         "regions": regions,
         "provinces": provinces,
         "districts": districts,
@@ -361,7 +397,7 @@ def fiche_list(request):
         "district_id": district_id,
         "zone_id": zone_id,
         "paroisse": paroisse,
-        "total": fiches.count(),
+        "total": paginator.count,
         "statut_filtre": statut_filtre,
     }
 
@@ -375,11 +411,13 @@ def fiche_detail(request, pk):
     fiche = get_object_or_404(_fiches_visibles_pour(request.user), pk=pk)
     role = get_role(request.user)
 
+    _, index_responsables = construire_index_responsables([fiche])
     context = {
         "fiche": fiche,
         "peut_modifier": peut_modifier_fiche(request.user, fiche),
         "peut_valider": peut_valider_fiche(request.user, fiche),
         "is_super_admin": role == Profil.Role.SUPER_ADMIN,
+        "responsables_ecclesiaux": responsables_pour_fiche(fiche, index_responsables),
     }
 
     if role == Profil.Role.SUPER_ADMIN:

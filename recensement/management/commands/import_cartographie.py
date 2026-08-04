@@ -1,5 +1,5 @@
 """
-Commande de gestion Django : import du référentiel géo-ecclésial du Bénin
+Commande de gestion Django : import du référentiel de recensement ordinaire du Bénin
 (Région > Province > District > Zone > Village) à partir du fichier Excel
 de cartographie fourni par le diocèse.
 
@@ -34,7 +34,10 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from recensement.models import District, Province, Region, Village, Zone
-from recensement.sites_particuliers import corriger_nom_site
+from recensement.sites_particuliers import (
+    NOM_DISTRICT_SITES_PARTICULIERS,
+    normaliser,
+)
 
 DEFAULT_SHEET = "Cartographie avec villes "
 DEFAULT_FILE = settings.BASE_DIR / "recensement" / "data" / "cartographie_benin.xlsx"
@@ -81,8 +84,7 @@ def clean_district(text):
 
 def clean_zone(text):
     """'• Zone ecclésiale de Banikoara' -> 'Banikoara'
-    '• Site de la nativité de SÈMÈ PLAGE' -> 'Site de la nativité de SÈMÈ PLAGE'
-    (les 'Sites particuliers' gardent leur nom complet, seul le puce est retiré)."""
+    Les lignes du district des Sites particuliers sont ignorées avant ce niveau."""
     text = text.strip().lstrip("•").strip()
     text = _strip_prefix(text, ["Zone ecclésiale de ", "Zone ecclésiale d'", "Zone ecclésiale "])
     return text
@@ -235,6 +237,7 @@ class Command(BaseCommand):
             "zones": 0,
             "villages": 0,
             "lignes_ignorees": 0,
+            "sites_particuliers_ignores": 0,
         }
 
         current_region = None
@@ -290,7 +293,19 @@ class Command(BaseCommand):
                         if not nom:
                             stats["lignes_ignorees"] += 1
                             continue
-                        district_obj, created = District.objects.get_or_create(province=current_province, nom=nom)
+                        # Les sites particuliers sont totalement séparés du
+                        # référentiel territorial du recensement. Le district
+                        # spécial et toutes les lignes qui le suivent ne sont
+                        # donc jamais créés dans District/Zone/Village.
+                        if NOM_DISTRICT_SITES_PARTICULIERS in normaliser(nom):
+                            current_district = None
+                            stats["sites_particuliers_ignores"] += 1
+                            continue
+
+                        district_obj, created = District.objects.get_or_create(
+                            province=current_province,
+                            nom=nom,
+                        )
                         if created:
                             stats["districts"] += 1
                         current_district = district_obj
@@ -310,7 +325,6 @@ class Command(BaseCommand):
                             stats["zones"] += 1
 
                         for village_nom in split_villages(e):
-                            village_nom = corriger_nom_site(village_nom, current_district.nom)
                             village_nom = village_nom[:200]
                             _, v_created = Village.objects.get_or_create(zone=zone_obj, nom=village_nom)
                             if v_created:
@@ -335,7 +349,8 @@ class Command(BaseCommand):
                 f"  Districts ajoutés  : {stats['districts']}\n"
                 f"  Zones ajoutées     : {stats['zones']}\n"
                 f"  Villages ajoutés   : {stats['villages']}\n"
-                f"  Lignes ignorées    : {stats['lignes_ignorees']}"
+                f"  Lignes ignorées    : {stats['lignes_ignorees']}\n"
+                f"  Sites particuliers : {stats['sites_particuliers_ignores']} district(s) ignoré(s)"
             )
         )
 

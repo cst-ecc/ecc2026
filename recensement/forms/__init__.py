@@ -31,6 +31,12 @@ from .fiche_forms import (
     MotifModificationForm,
     PhotosParoisseForm,
 )
+from .responsables_ecclesiaux_forms import (
+    ClotureMandatResponsableForm,
+    MandatResponsableEcclesialForm,
+    PosteEcclesialForm,
+    RemplacementResponsableEcclesialForm,
+)
 from .user_forms import (
     ProfilForm,
     TailwindSetPasswordForm,
@@ -65,6 +71,11 @@ __all__ = [
     "FicheParoisseForm",
     "MotifModificationForm",
     "PhotosParoisseForm",
+    # responsables_ecclesiaux_forms.py
+    "PosteEcclesialForm",
+    "MandatResponsableEcclesialForm",
+    "RemplacementResponsableEcclesialForm",
+    "ClotureMandatResponsableForm",
     # user_forms.py
     "ProfilForm",
     "TailwindSetPasswordForm",

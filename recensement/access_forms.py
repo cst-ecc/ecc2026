@@ -130,8 +130,16 @@ class ProfilTerritorialForm(forms.ModelForm):
         if role_responsable == Profil.Role.SUPER_ADMIN:
             self.fields["region"].queryset = Region.objects.all()
             self.fields["province"].queryset = Province.objects.select_related("region").all()
-            self.fields["district"].queryset = District.objects.select_related("province__region").all()
-            self.fields["zone"].queryset = Zone.objects.select_related("district__province__region").all()
+            self.fields["district"].queryset = (
+                District.objects.select_related("province__region")
+                .filter(est_sites_particuliers=False)
+                .exclude(nom__icontains="sites particuliers")
+            )
+            self.fields["zone"].queryset = (
+                Zone.objects.select_related("district__province__region")
+                .filter(district__est_sites_particuliers=False)
+                .exclude(district__nom__icontains="sites particuliers")
+            )
             return
 
         if not profil_responsable:
@@ -364,7 +372,9 @@ class AffectationTerritorialeForm(forms.Form):
             self.niveau = AffectationTerritoriale.Niveau.DISTRICT
 
             if role_responsable == Profil.Role.SUPER_ADMIN:
-                districts_qs = District.objects.all()
+                districts_qs = District.objects.filter(est_sites_particuliers=False).exclude(
+                    nom__icontains="sites particuliers"
+                )
 
             elif role_responsable == Profil.Role.OP_PROVINCE and profil_responsable and profil_responsable.province_id:
                 districts_qs = District.objects.filter(province_id=profil_responsable.province_id)
@@ -392,7 +402,9 @@ class AffectationTerritorialeForm(forms.Form):
             self.niveau = AffectationTerritoriale.Niveau.ZONE
 
             if role_responsable == Profil.Role.SUPER_ADMIN:
-                zones_qs = Zone.objects.all()
+                zones_qs = Zone.objects.filter(district__est_sites_particuliers=False).exclude(
+                    district__nom__icontains="sites particuliers"
+                )
 
             elif role_responsable == Profil.Role.OP_PROVINCE and profil_responsable and profil_responsable.province_id:
                 zones_qs = Zone.objects.filter(district__province_id=profil_responsable.province_id)
@@ -421,6 +433,11 @@ class AffectationTerritorialeForm(forms.Form):
             provinces_qs = Province.objects.filter(districts__in=districts_qs).distinct()
 
             regions_qs = Region.objects.filter(provinces__in=provinces_qs).distinct()
+
+        districts_qs = districts_qs.filter(est_sites_particuliers=False).exclude(nom__icontains="sites particuliers")
+        zones_qs = zones_qs.filter(district__est_sites_particuliers=False).exclude(
+            district__nom__icontains="sites particuliers"
+        )
 
         self.fields["region"].queryset = regions_qs.order_by(
             "ordre",

@@ -42,10 +42,6 @@
       <dd class="mt-1 text-slate-900">{{ site.localite|default:"—" }}</dd>
     </div>
     <div class="md:col-span-2">
-      <dt class="text-xs font-medium text-slate-500">Titre officiel du responsable</dt>
-      <dd class="mt-1 text-slate-900">{{ site.titre_responsable|default:"—" }}</dd>
-    </div>
-    <div class="md:col-span-2">
       <dt class="text-xs font-medium text-slate-500">Description officielle</dt>
       <dd class="mt-1 text-slate-900 whitespace-pre-line">{{ site.description|default:"—" }}</dd>
     </div>
@@ -99,10 +95,6 @@
         {{ form.localite }}
       </div>
       <div class="md:col-span-2">
-        <label for="id_titre_responsable" class="block text-xs font-medium text-slate-600 mb-1">Titre officiel du responsable</label>
-        {{ form.titre_responsable }}
-      </div>
-      <div class="md:col-span-2">
         <label for="id_description" class="block text-xs font-medium text-slate-600 mb-1">Description officielle</label>
         {{ form.description }}
       </div>
@@ -119,20 +111,11 @@
   {% endif %}
 
   <fieldset>
-    <legend class="text-sm font-semibold text-slate-800 mb-3">Informations à compléter ou variables</legend>
+    <legend class="text-sm font-semibold text-slate-800 mb-3">Informations variables du site</legend>
+    <p class="text-xs text-slate-500 mb-3">Le responsable et son mandat se gèrent exclusivement dans le module « Responsables ecclésiaux ».</p>
     <div class="grid md:grid-cols-2 gap-4">
       <div>
-        <label for="id_responsable" class="block text-xs font-medium text-slate-600 mb-1">Nom du responsable</label>
-        {{ form.responsable }}
-        {% if form.responsable.errors %}<p class="text-xs text-red-600 mt-1">{{ form.responsable.errors.0 }}</p>{% endif %}
-      </div>
-      <div>
-        <label for="id_contact_responsable" class="block text-xs font-medium text-slate-600 mb-1">Contact du responsable</label>
-        {{ form.contact_responsable }}
-        {% if form.contact_responsable.errors %}<p class="text-xs text-red-600 mt-1">{{ form.contact_responsable.errors.0 }}</p>{% endif %}
-      </div>
-      <div>
-        <label for="id_statut" class="block text-xs font-medium text-slate-600 mb-1">Statut actuel</label>
+        <label for="id_statut" class="block text-xs font-medium text-slate-600 mb-1">Statut actuel du site</label>
         {{ form.statut }}
         {% if form.statut.errors %}<p class="text-xs text-red-600 mt-1">{{ form.statut.errors.0 }}</p>{% endif %}
       </div>

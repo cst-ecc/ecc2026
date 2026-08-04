@@ -10,14 +10,12 @@ soient gérés séparément :
      Zone > Village), importé depuis le fichier Excel officiel de cartographie
      via la commande existante ``import_cartographie`` (génération des codes
      courts R/P/D/Z incluse).
-  2. **Nettoyage** du district « Sites particuliers » et de toutes ses
-     zones/villages de la hiérarchie géographique. Ces sites n'ont rien à
-     faire dans le circuit de recensement des paroisses — un agent ne doit
-     jamais voir « Sites particuliers » dans un ``<select>`` de district.
-  3. Les **sites particuliers** (cathédrales, basiliques, site de la Nativité,
-     Paroisse Mère…), insérés dans le modèle autonome ``SiteParticulier``,
-     **hors du circuit de recensement ordinaire**.
-  4. Un unique super-administrateur, créé (ou complété) **avec son Profil**
+  2. Le nettoyage de toute ancienne structure « Sites particuliers » dans
+     les modèles territoriaux du recensement.
+  3. Les postes ecclésiaux des Régions, Provinces, Districts, Zones et
+     Sites particuliers, avec un mandat initial vacant ou à renseigner.
+  4. Les **sites particuliers** dans le modèle autonome ``SiteParticulier``.
+  5. Un unique super-administrateur, créé (ou complété) **avec son Profil**
      (rôle ``SUPER_ADMIN``), prénom/nom « Léonard ASSOGBA ».
 
 Ce qu'elle NE fait PAS (volontairement) :
@@ -35,8 +33,10 @@ Sécurité — mot de passe du super-administrateur :
 
 Idempotence :
   - la cartographie utilise ``get_or_create`` (relance sans doublon) ;
-  - le nettoyage des sites particuliers est idempotent (suppression conditionnelle) ;
-  - les sites particuliers utilisent ``get_or_create`` sur le ``nom`` ;
+  - les anciennes structures territoriales des sites sont nettoyées de façon idempotente ;
+  - les postes ecclésiaux utilisent un code stable et unique ;
+  - les mandats existants ne sont jamais écrasés ;
+  - les sites sont retrouvés par leurs noms officiels ou anciens alias ;
   - le super-administrateur est créé si absent, sinon simplement complété
     (son mot de passe existant n'est PAS réinitialisé si aucun n'est fourni).
 
@@ -63,10 +63,14 @@ from django.db import connection, transaction
 
 from recensement.models import (
     District,
+    FicheParoisse,
+    MandatResponsableEcclesial,
     Profil,
     Province,
     Region,
+    ResponsabiliteHierarchique,
     SiteParticulier,
+    StatutMandatResponsableEcclesial,
     Village,
     Zone,
 )
@@ -92,7 +96,6 @@ CHAMPS_OFFICIELS_SITES_PARTICULIERS = (
     "type_site",
     "pays",
     "localite",
-    "titre_responsable",
     "description",
     "informations_historiques",
     "details_officiels",
@@ -111,21 +114,23 @@ DETAILS_GENERAUX_SITE_PARTICULIER = (
 SITES_PARTICULIERS = [
     {
         "nom": "Paroisse Mère",
+        "aliases": ("Paroisse Mère",),
         "type_site": "paroisse_mere",
         "pays": "Bénin",
         "localite": "Porto-Novo",
-        "titre_responsable": "Pasteur de l'Église du Christianisme Céleste",
+        "titre_poste": "Pasteur de l'Église du Christianisme Céleste",
         "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
         "informations_historiques": "",
         "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
         "statut": "Ouvert",
     },
     {
-        "nom": "Cathédrale de Tchakou",
+        "nom": "Site de Tchakou",
+        "aliases": "Site de Tchakou",
         "type_site": "cathedrale",
         "pays": "Bénin",
         "localite": "Tchakou",
-        "titre_responsable": "Responsable du Département Chargé du Patrimoine",
+        "titre_poste": "Chef du District écclésial des site particuliers zone Bénin",
         "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
         "informations_historiques": "",
         "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
@@ -133,10 +138,11 @@ SITES_PARTICULIERS = [
     },
     {
         "nom": "Site d'Agonguè",
-        "type_site": "site",
+        "aliases": ("Site d'Agonguè", "Site de Agonguè"),
+        "type_site": "cathedrale",
         "pays": "Bénin",
         "localite": "Agonguè",
-        "titre_responsable": "Responsable du Département Chargé du Patrimoine",
+        "titre_poste": "Chef du District écclésial des site particuliers zone Bénin",
         "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
         "informations_historiques": "",
         "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
@@ -144,10 +150,14 @@ SITES_PARTICULIERS = [
     },
     {
         "nom": "Site de la Nativité de Sèmè-Plage",
+        "aliases": (
+            "Site de la Nativité de Sèmè-Plage",
+            "Site de Nativité de Sèmè Plage",
+        ),
         "type_site": "site_nativite",
         "pays": "Bénin",
         "localite": "Sèmè-Plage",
-        "titre_responsable": "Responsable du Département Chargé du Patrimoine",
+        "titre_poste": "Chef du District écclésial des site particuliers zone Bénin",
         "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
         "informations_historiques": "",
         "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
@@ -155,32 +165,35 @@ SITES_PARTICULIERS = [
     },
     {
         "nom": "La Cité Céleste d'Imèko",
+        "aliases": "La Cité Céleste d'Imèko",
         "type_site": "basilique",
         "pays": "Nigéria",
         "localite": "Imèko",
-        "titre_responsable": "Responsable du Département Chargé du Patrimoine",
+        "titre_poste": "Chef du District écclésial des site particuliers zone Nigéria",
         "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
         "informations_historiques": "",
         "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
         "statut": "Ouvert",
     },
     {
-        "nom": "Saint SBJ Oshoffa Cathedral",
+        "nom": "Site de Ketu",
+        "aliases": "Site de Ketu",
         "type_site": "cathedrale",
         "pays": "Nigéria",
         "localite": "Ketu",
-        "titre_responsable": "Responsable du Département Chargé du Patrimoine",
+        "titre_poste": "Chef du District écclésial des site particuliers zone Nigéria",
         "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
         "informations_historiques": "",
         "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
         "statut": "Ouvert",
     },
     {
-        "nom": "Cathédrale de Makoko",
+        "nom": "Site de Makoko",
+        "aliases": "Site de Makoko",
         "type_site": "cathedrale",
         "pays": "Nigéria",
         "localite": "Makoko",
-        "titre_responsable": "Responsable officiel désigné par l’Église",
+        "titre_poste": "Chef du District écclésial des site particuliers zone Nigéria",
         "description": DESCRIPTION_GENERALE_SITE_PARTICULIER,
         "informations_historiques": "",
         "details_officiels": DETAILS_GENERAUX_SITE_PARTICULIER,
@@ -189,11 +202,18 @@ SITES_PARTICULIERS = [
 ]
 
 
+LEGACY_TITRES_GENERIQUES = {
+    normaliser("Pasteur de l'Église du Christianisme Céleste"),
+    normaliser("Responsable du Département Chargé du Patrimoine"),
+    normaliser("Responsable officiel désigné par l'Église"),
+}
+
+
 class Command(BaseCommand):
     help = (
         "Initialise une base de PRODUCTION vierge : import du référentiel "
-        "géo-ecclésial réel (SANS les sites particuliers), seed des sites "
-        "particuliers dans leur modèle autonome, et création d'un "
+        "géo-ecclésial ordinaire sans sites particuliers, seed des "
+        "postes, mandats et sites particuliers, et création d'un "
         "super-administrateur avec Profil. Aucune donnée de démonstration."
     )
 
@@ -273,14 +293,18 @@ class Command(BaseCommand):
         # Étape 1 : cartographie géo-ecclésiale
         if not options["skip_cartographie"]:
             self._importer_cartographie(options["file"], options["sheet"])
-            # Étape 1b : retirer le district « Sites particuliers » de la hiérarchie géo
-            self._nettoyer_sites_particuliers_geo()
         else:
             self.stdout.write("→ Cartographie ignorée (--skip-cartographie).")
 
-        # Étape 2 : sites particuliers (modèle autonome)
+        # Les anciennes lignes « Sites particuliers » éventuellement présentes
+        # dans Region/Province/District/Zone/Village sont supprimées. Ces
+        # modèles sont réservés au recensement des paroisses ordinaires.
+        self._nettoyer_sites_particuliers_geo()
+
+        # Étape 2 : responsabilités et sites particuliers autonomes
         if not options["skip_sites_particuliers"]:
             self._seeder_sites_particuliers()
+            self._seeder_postes_responsables_ecclesiaux()
         else:
             self.stdout.write("→ Sites particuliers ignorés (--skip-sites-particuliers).")
 
@@ -369,105 +393,348 @@ class Command(BaseCommand):
                 "(recensement/data/cartographie_benin.xlsx) ou passez --file /chemin/fichier.xlsx."
             ) from exc
 
-    # --------------------------------------------- nettoyage sites géo
+    # ------------------------------------- structure de la Région Mère
+    @staticmethod
+    def _trouver_par_aliases(queryset, aliases):
+        alias_normalises = {normaliser(alias) for alias in aliases}
+        for objet in queryset:
+            if normaliser(objet.nom) in alias_normalises:
+                return objet
+        return None
+
+    # ----------------------------------------- nettoyage du référentiel ordinaire
     def _nettoyer_sites_particuliers_geo(self):
-        """Supprime le district « Sites particuliers » et toutes ses zones et
-        villages de la hiérarchie géographique.
+        """Retire définitivement les sites particuliers du référentiel territorial.
 
-        ``import_cartographie`` importe **tout** le fichier Excel, y compris
-        ce district spécial. Or les sites particuliers :
-        - ne sont PAS des paroisses à recenser ;
-        - sont gérés dans le modèle autonome ``SiteParticulier`` ;
-        - ne doivent JAMAIS apparaître dans les ``<select>`` de district.
-
-        La comparaison utilise la même logique de normalisation que
-        ``sites_particuliers.py`` (inclusion insensible à la casse et aux
-        accents) pour gérer le préfixe résiduel « des » laissé par
-        ``clean_district()`` dans ``import_cartographie.py``.
-
-        Idempotent : si le district n'existe pas, rien ne se passe.
+        L'import les ignore désormais. Ce nettoyage traite les anciennes bases
+        dans lesquelles un district spécial, ses zones et ses villages avaient
+        déjà été importés.
         """
-        self.stdout.write("\n── Étape 1b : Nettoyage « Sites particuliers » de la hiérarchie géo ──")
+        self.stdout.write("\n── Étape 1b : Séparation du recensement et des sites particuliers ──")
 
-        districts_a_supprimer = [
-            d for d in District.objects.all() if NOM_DISTRICT_SITES_PARTICULIERS in normaliser(d.nom)
+        districts = [
+            district
+            for district in District.objects.select_related("province", "province__region")
+            if (district.est_sites_particuliers or NOM_DISTRICT_SITES_PARTICULIERS in normaliser(district.nom))
         ]
 
-        if not districts_a_supprimer:
-            self.stdout.write("  Aucun district « Sites particuliers » trouvé (déjà nettoyé ou absent).")
+        if not districts:
+            self.stdout.write("  Aucun site particulier présent dans le référentiel de recensement.")
             return
 
-        for district in districts_a_supprimer:
+        for district in districts:
+            nb_fiches = FicheParoisse.objects.filter(district=district).count()
+            if nb_fiches:
+                raise CommandError(
+                    f"Impossible de retirer le district « {district.nom} » : "
+                    f"{nb_fiches} fiche(s) de recensement y sont rattachées. "
+                    "Ces fiches doivent être vérifiées et retirées ou réaffectées "
+                    "avant de relancer le seed."
+                )
+
             nb_zones = district.zones.count()
             nb_villages = Village.objects.filter(zone__district=district).count()
 
-            # CASCADE Django : supprime zones et villages rattachés.
-            district.delete()
+            try:
+                district.delete()
+            except Exception as exc:
+                raise CommandError(
+                    f"Le district « {district.nom} » n'a pas pu être supprimé. "
+                    "Vérifiez les profils ou affectations qui le référencent : "
+                    f"{exc}"
+                ) from exc
 
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"  ✓ District « {district.nom} » supprimé "
-                    f"({nb_zones} zone(s), {nb_villages} village(s) associé(s))."
+                    f"  ✓ « {district.nom} » retiré du recensement ({nb_zones} zone(s), {nb_villages} village(s))."
                 )
             )
 
-    # ------------------------------------------------- sites particuliers
-    def _seeder_sites_particuliers(self):
-        """Insère ou complète prudemment les sites particuliers.
+    def _creer_poste_seed(
+        self,
+        *,
+        code,
+        niveau,
+        titre,
+        verrouille=False,
+        ordre=0,
+        region=None,
+        province=None,
+        district=None,
+        zone=None,
+        site_particulier=None,
+        structure_nom="",
+        parent_code="",
+        nom_legacy="",
+        observations_legacy="",
+        contact_legacy="",
+    ):
+        defaults = {
+            "niveau": niveau,
+            "region": region,
+            "province": province,
+            "district": district,
+            "zone": zone,
+            "site_particulier": site_particulier,
+            "structure_nom": structure_nom,
+            "parent_code": parent_code,
+            "ordre": ordre,
+            "titre_officiel": titre,
+            "titre_verrouille": verrouille,
+            "est_actif": True,
+        }
+        poste, created = ResponsabiliteHierarchique.objects.get_or_create(
+            code=code,
+            defaults=defaults,
+        )
+        ancien_nom = (poste.nom_responsable or nom_legacy or "").strip()
+        anciennes_observations = (poste.observations or observations_legacy or "").strip()
 
-        La commande ne remplace pas brutalement les valeurs existantes en
-        production. Elle complète seulement les champs officiels vides. Les
-        corrections de valeurs non vides doivent passer par une procédure
-        contrôlée.
-        """
-        self.stdout.write("\n── Étape 2 : Sites particuliers (modèle autonome) ──")
-
-        nb_crees = 0
-        nb_existants = 0
-        nb_completes = 0
-
-        for donnees in SITES_PARTICULIERS:
-            site, created = SiteParticulier.objects.get_or_create(
-                nom=donnees["nom"],
-                defaults=donnees,
+        if not created:
+            for champ, valeur in defaults.items():
+                setattr(poste, champ, valeur)
+            poste.save(
+                autoriser_correction_reference=True,
+                update_fields=[
+                    "niveau",
+                    "region",
+                    "province",
+                    "district",
+                    "zone",
+                    "site_particulier",
+                    "structure_nom",
+                    "parent_code",
+                    "ordre",
+                    "titre_officiel",
+                    "titre_verrouille",
+                    "est_actif",
+                    "date_modification",
+                ],
             )
 
-            if created:
-                nb_crees += 1
-                self.stdout.write(f"  ✓ « {donnees['nom']} » créé ({donnees['type_site']})")
+        if not poste.mandats.exists():
+            statut = (
+                StatutMandatResponsableEcclesial.ACTIF if ancien_nom else StatutMandatResponsableEcclesial.A_RENSEIGNER
+            )
+            MandatResponsableEcclesial.objects.create(
+                poste=poste,
+                nom_responsable=ancien_nom,
+                contact_responsable=(contact_legacy or "").strip(),
+                statut=statut,
+                observations=anciennes_observations,
+            )
+
+        if poste.nom_responsable or poste.observations:
+            poste.nom_responsable = ""
+            poste.observations = ""
+            poste.save(update_fields=["nom_responsable", "observations", "date_modification"])
+        return poste
+
+    def _seeder_postes_responsables_ecclesiaux(self):
+        """Crée les postes sans écraser les mandats déjà renseignés."""
+        self.stdout.write("\n── Étape 2b : Postes et mandats des responsables ecclésiaux ──")
+        total = 0
+
+        region_mere = self._trouver_par_aliases(
+            Region.objects.all(),
+            ("PORTO-NOVO", "Région ecclésiale Mère de Porto-Novo", "Région Mère de Porto-Novo"),
+        )
+        province_mere = None
+        if region_mere:
+            province_mere = self._trouver_par_aliases(
+                Province.objects.filter(region=region_mere),
+                ("Mère", "Province ecclésiale Mère de Porto-Novo", "Province Mère de Porto-Novo"),
+            )
+        district_mere = None
+        if province_mere:
+            district_mere = self._trouver_par_aliases(
+                District.objects.filter(province=province_mere),
+                ("Mère", "Porto-Novo", "Mère de Porto-Novo", "District ecclésial Mère de Porto-Novo"),
+            )
+
+        for region in Region.objects.all().order_by("ordre", "nom"):
+            est_mere = bool(region_mere and region.pk == region_mere.pk)
+            self._creer_poste_seed(
+                code="region_mere_porto_novo" if est_mere else f"region-{region.pk}",
+                niveau="region",
+                region=region,
+                titre="Pasteur de l’Église" if est_mere else "Chef de Région",
+                verrouille=est_mere,
+                ordre=region.ordre,
+            )
+            total += 1
+
+        for province in Province.objects.select_related("region").all():
+            est_mere = bool(province_mere and province.pk == province_mere.pk)
+            self._creer_poste_seed(
+                code="province_mere_porto_novo" if est_mere else f"province-{province.pk}",
+                niveau="province",
+                province=province,
+                titre="Doyen de l’Église" if est_mere else "Chef de Province",
+                verrouille=est_mere,
+                ordre=2 if est_mere else 0,
+            )
+            total += 1
+
+        for district in District.objects.select_related("province__region").all():
+            est_mere = bool(district_mere and district.pk == district_mere.pk)
+            self._creer_poste_seed(
+                code="district_mere_porto_novo" if est_mere else f"district-{district.pk}",
+                niveau="district",
+                district=district,
+                titre="Chef de Région de l’Ouémé-Plateau" if est_mere else "Chef de District",
+                verrouille=est_mere,
+                ordre=3 if est_mere else 0,
+            )
+            total += 1
+
+        for zone in Zone.objects.select_related("district__province__region").all():
+            self._creer_poste_seed(
+                code=f"zone-{zone.pk}",
+                niveau="zone",
+                zone=zone,
+                titre="Chef de Zone",
+            )
+            total += 1
+
+        # La structure des sites particuliers n'est jamais créée dans Region,
+        # Province, District ou Zone : elle reste autonome.
+        self._creer_poste_seed(
+            code="district_sites_particuliers",
+            niveau="structure_speciale",
+            structure_nom="District ecclésial des Sites particuliers",
+            parent_code="province_mere_porto_novo",
+            titre="Responsable du département chargé du patrimoine de l’Église",
+            verrouille=True,
+            ordre=4,
+        )
+        total += 1
+
+        definitions = {}
+        for definition in SITES_PARTICULIERS:
+            aliases = definition.get("aliases") or ()
+            if isinstance(aliases, str):
+                aliases = (aliases,)
+            for nom in (definition["nom"], *aliases):
+                definitions[normaliser(nom)] = definition
+
+        for site in SiteParticulier.objects.all():
+            definition = definitions.get(normaliser(site.nom), {})
+            titre = definition.get("titre_poste") or site.titre_responsable or "Responsable du site particulier"
+            self._creer_poste_seed(
+                code=f"site-particulier-{site.pk}",
+                niveau="site_particulier",
+                site_particulier=site,
+                titre=titre,
+                verrouille=True,
+                nom_legacy=site.responsable,
+                contact_legacy=site.contact_responsable,
+                observations_legacy=site.observations,
+            )
+            total += 1
+
+            champs_legacy = []
+            for champ in ("titre_responsable", "responsable", "contact_responsable"):
+                if getattr(site, champ):
+                    setattr(site, champ, "")
+                    champs_legacy.append(champ)
+            if champs_legacy:
+                site.save(
+                    autoriser_correction_officielle=True,
+                    update_fields=[*champs_legacy, "date_modification"],
+                )
+
+        # Les anciennes références autonomes qui ne correspondent plus à une
+        # entité ordinaire sont conservées comme structures spéciales plutôt
+        # que supprimées sans trace.
+        legacy_specs = (
+            ("region_mere_porto_novo", "Région ecclésiale Mère de Porto-Novo", "Pasteur de l’Église", 1),
+            ("province_mere_porto_novo", "Province ecclésiale Mère de Porto-Novo", "Doyen de l’Église", 2),
+            (
+                "district_mere_porto_novo",
+                "District ecclésial Mère de Porto-Novo",
+                "Chef de Région de l’Ouémé-Plateau",
+                3,
+            ),
+        )
+        for code, structure_nom, titre, ordre in legacy_specs:
+            if ResponsabiliteHierarchique.objects.filter(code=code).exists():
                 continue
-
-            nb_existants += 1
-            champs_a_mettre_a_jour = []
-
-            for champ in CHAMPS_OFFICIELS_SITES_PARTICULIERS:
-                valeur_actuelle = getattr(site, champ, None)
-                valeur_seed = donnees.get(champ)
-
-                if not valeur_actuelle and valeur_seed:
-                    setattr(site, champ, valeur_seed)
-                    champs_a_mettre_a_jour.append(champ)
-
-            # Le statut est une information variable. On le complète si vide,
-            # mais on n'écrase pas une valeur déjà renseignée en production.
-            if not site.statut and donnees.get("statut"):
-                site.statut = donnees["statut"]
-                champs_a_mettre_a_jour.append("statut")
-
-            if champs_a_mettre_a_jour:
-                site.save(update_fields=champs_a_mettre_a_jour)
-                nb_completes += 1
-                self.stdout.write(f"  ↳ « {site.nom} » complété : {', '.join(champs_a_mettre_a_jour)}")
+            self._creer_poste_seed(
+                code=code,
+                niveau="structure_speciale",
+                structure_nom=structure_nom,
+                titre=titre,
+                verrouille=True,
+                ordre=ordre,
+            )
+            total += 1
 
         self.stdout.write(
-            self.style.SUCCESS(
-                "Sites particuliers : "
-                f"{nb_crees} créé(s), {nb_existants} déjà existant(s), "
-                f"{nb_completes} complété(s) sans écrasement."
-            )
+            self.style.SUCCESS(f"✓ {total} poste(s) ecclésial(aux) initialisé(s) sans écraser les mandats existants.")
         )
 
-    # ----------------------------------------------------------- super-admin
+    # ------------------------------------------------- sites particuliers
+    def _seeder_sites_particuliers(self):
+        """Crée et harmonise les sites dans leur modèle autonome."""
+        self.stdout.write("\n── Étape 2 : Sites particuliers autonomes ──")
+
+        nb_crees = 0
+        nb_mis_a_jour = 0
+        sites_existants = list(SiteParticulier.objects.all())
+
+        for definition in SITES_PARTICULIERS:
+            donnees = definition.copy()
+            aliases = donnees.pop("aliases")
+            donnees.pop("titre_poste", None)
+            if isinstance(aliases, str):
+                aliases = (aliases,)
+
+            noms_normalises = {normaliser(nom) for nom in (donnees["nom"], *aliases)}
+            site = next(
+                (item for item in sites_existants if normaliser(item.nom) in noms_normalises),
+                None,
+            )
+
+            if site is None:
+                site = SiteParticulier.objects.create(**donnees)
+                sites_existants.append(site)
+                nb_crees += 1
+                self.stdout.write(f"  ✓ « {site.nom} » créé")
+                continue
+
+            champs_modifies = []
+
+            for champ in ("nom", "type_site", "pays", "localite"):
+                valeur_cible = donnees.get(champ)
+                if getattr(site, champ) != valeur_cible:
+                    setattr(site, champ, valeur_cible)
+                    champs_modifies.append(champ)
+
+            for champ in (
+                "description",
+                "informations_historiques",
+                "details_officiels",
+            ):
+                valeur_cible = donnees.get(champ)
+                if not getattr(site, champ) and valeur_cible:
+                    setattr(site, champ, valeur_cible)
+                    champs_modifies.append(champ)
+
+            if not site.statut and donnees.get("statut"):
+                site.statut = donnees["statut"]
+                champs_modifies.append("statut")
+
+            if champs_modifies:
+                site.save(
+                    autoriser_correction_officielle=True,
+                    update_fields=[*champs_modifies, "date_modification"],
+                )
+                nb_mis_a_jour += 1
+                self.stdout.write(f"  ↳ « {site.nom} » harmonisé : {', '.join(champs_modifies)}")
+
+        self.stdout.write(self.style.SUCCESS(f"Sites particuliers : {nb_crees} créé(s), {nb_mis_a_jour} harmonisé(s)."))
+
     def _creer_super_admin(self, options, *, no_input):
         username = (options["username"] or "").strip()
         email = (options["email"] or "").strip()
@@ -544,14 +811,17 @@ class Command(BaseCommand):
 
     # --------------------------------------------------------------- résumé
     def _resume(self):
-        # Vérification : aucun district "Sites particuliers" dans la hiérarchie géo
-        districts_sp = [d for d in District.objects.all() if NOM_DISTRICT_SITES_PARTICULIERS in normaliser(d.nom)]
-        if districts_sp:
+        districts_sites = [
+            district
+            for district in District.objects.all()
+            if (district.est_sites_particuliers or NOM_DISTRICT_SITES_PARTICULIERS in normaliser(district.nom))
+        ]
+        if districts_sites:
             self.stdout.write(
                 self.style.WARNING(
-                    f"\n⚠  ATTENTION : {len(districts_sp)} district(s) « Sites particuliers » "
-                    "encore présent(s) dans la hiérarchie géo. Ils apparaîtront dans les "
-                    "formulaires de recensement. Relancez sans --skip-cartographie pour corriger."
+                    "\n⚠ Des sites particuliers figurent encore dans le "
+                    "référentiel de recensement. Relancez le seed après avoir "
+                    "traité les références protégées signalées."
                 )
             )
 
@@ -560,13 +830,15 @@ class Command(BaseCommand):
                 "\n╔══════════════════════════════════════════════════════════════╗\n"
                 "║   SEED PRODUCTION — BASE INITIALISÉE                       ║\n"
                 "╚══════════════════════════════════════════════════════════════╝\n\n"
-                "Référentiel géo-ecclésial (SANS sites particuliers)\n"
+                "Référentiel géo-ecclésial du recensement ordinaire uniquement\n"
                 f"  Régions    : {Region.objects.count()}\n"
                 f"  Provinces  : {Province.objects.count()}\n"
                 f"  Districts  : {District.objects.count()}\n"
                 f"  Zones      : {Zone.objects.count()}\n"
                 f"  Villages   : {Village.objects.count()}\n\n"
-                f"Sites particuliers (modèle autonome) : {SiteParticulier.objects.count()}\n\n"
+                f"Sites particuliers (modèle autonome) : {SiteParticulier.objects.count()}\n"
+                f"Postes ecclésiaux : {ResponsabiliteHierarchique.objects.count()}\n"
+                f"Mandats ecclésiaux : {MandatResponsableEcclesial.objects.count()}\n\n"
                 f"Super-administrateurs : {User.objects.filter(is_superuser=True).count()}\n"
                 f"Comptes au total      : {User.objects.count()}\n"
             )

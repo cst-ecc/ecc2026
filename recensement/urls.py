@@ -3,7 +3,12 @@ from django.urls import path
 from recensement.healthcheck import healthcheck
 
 from . import access_views, views
-from .views import doublon_views, notifications_views, qrcode_views
+from .views import (
+    doublon_views,
+    notifications_views,
+    qrcode_views,
+    responsables_ecclesiaux_views,
+)
 
 app_name = "recensement"
 
@@ -62,11 +67,57 @@ urlpatterns = [
         views.relance_intervention_super_admin,
         name="relance_intervention_super_admin",
     ),
+    # Responsables ecclésiaux (postes et mandats, Super administrateur)
+    path(
+        "responsables-ecclesiaux/",
+        responsables_ecclesiaux_views.responsable_ecclesial_list,
+        name="responsable_ecclesial_list",
+    ),
+    path(
+        "responsables-ecclesiaux/nouveau/",
+        responsables_ecclesiaux_views.responsable_ecclesial_create,
+        name="responsable_ecclesial_create",
+    ),
+    path(
+        "responsables-ecclesiaux/<int:pk>/",
+        responsables_ecclesiaux_views.responsable_ecclesial_detail,
+        name="responsable_ecclesial_detail",
+    ),
+    path(
+        "responsables-ecclesiaux/<int:pk>/modifier/",
+        responsables_ecclesiaux_views.responsable_ecclesial_update,
+        name="responsable_ecclesial_update",
+    ),
+    path(
+        "responsables-ecclesiaux/<int:poste_pk>/mandat/ouvrir/",
+        responsables_ecclesiaux_views.mandat_responsable_create,
+        name="mandat_responsable_create",
+    ),
+    path(
+        "responsables-ecclesiaux/mandats/<int:pk>/modifier/",
+        responsables_ecclesiaux_views.mandat_responsable_update,
+        name="mandat_responsable_update",
+    ),
+    path(
+        "responsables-ecclesiaux/mandats/<int:pk>/cloturer/",
+        responsables_ecclesiaux_views.mandat_responsable_cloture,
+        name="mandat_responsable_cloture",
+    ),
+    path(
+        "responsables-ecclesiaux/<int:poste_pk>/remplacer/",
+        responsables_ecclesiaux_views.responsable_ecclesial_remplacer,
+        name="responsable_ecclesial_remplacer",
+    ),
     # Sites particuliers (gestion séparée du recensement ordinaire)
     path("sites-particuliers/", views.site_particulier_list, name="site_particulier_list"),
     path("sites-particuliers/ajouter/", views.site_particulier_create, name="site_particulier_create"),
     path("sites-particuliers/<int:pk>/", views.site_particulier_detail, name="site_particulier_detail"),
     path("sites-particuliers/<int:pk>/modifier/", views.site_particulier_update, name="site_particulier_update"),
+    path(
+        "sites-particuliers/organisation/<int:pk>/responsable/",
+        responsables_ecclesiaux_views.responsable_ecclesial_update,
+        name="responsabilite_hierarchique_update",
+    ),
     path("notifications/", notifications_views.notifications_liste, name="notifications_liste"),
     path(
         "notifications/<int:pk>/lue/",

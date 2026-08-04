@@ -1,0 +1,22 @@
+{% comment %}
+Trio de boutons de capture GPS + conteneur de statut piloté par geolocation.js.
+
+Variables attendues :
+  label_recherche (str, optionnel) : libellé du bouton principal.
+      Défaut : "Rechercher ma position (précision ≤ 5 m)" (page de création).
+      Passer "Mettre à jour la position GPS" sur la page de modification.
+
+Les identifiants (btn-gps, btn-gps-accept, btn-gps-cancel, gps-status) sont
+inchangés : geolocation.js continue de fonctionner sans aucune adaptation.
+{% endcomment %}<div class="flex flex-wrap gap-2">
+  <button type="button" id="btn-gps" class="border border-brand-600 text-brand-700 hover:bg-brand-50 font-medium px-4 py-2.5 rounded-lg min-h-[44px]">
+    {{ label_recherche|default:"Rechercher ma position (précision ≤ 5 m)" }}
+  </button>
+  <button type="button" id="btn-gps-accept" class="hidden border border-green-600 text-green-700 hover:bg-green-50 font-medium px-4 py-2.5 rounded-lg min-h-[44px]">
+    Utiliser cette position quand même
+  </button>
+  <button type="button" id="btn-gps-cancel" class="hidden border border-red-600 text-red-700 hover:bg-red-50 font-medium px-4 py-2.5 rounded-lg min-h-[44px]">
+    Annuler la recherche
+  </button>
+</div>
+<div id="gps-status" class="gps-status text-sm" aria-live="polite" data-state="idle"></div>

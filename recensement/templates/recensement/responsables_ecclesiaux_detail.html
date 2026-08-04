@@ -1,0 +1,96 @@
+{% extends "recensement/base.html" %}
+{% block title %}{{ poste.titre_officiel }}{% endblock %}
+{% block content %}
+<div class="flex items-start justify-between gap-3 mb-5 flex-wrap">
+  <div>
+    <a href="{% url 'recensement:responsable_ecclesial_list' %}" class="text-sm text-slate-500">← Retour aux responsables</a>
+    <h1 class="text-xl font-semibold text-slate-900 mt-2">{{ poste.titre_officiel }}</h1>
+    <p class="text-sm text-slate-500 mt-1">{{ poste.rattachement_hierarchique }}</p>
+  </div>
+  <div class="flex gap-2 flex-wrap">
+    <a href="{% url 'recensement:responsable_ecclesial_update' poste.pk %}" class="border border-slate-300 rounded-lg px-4 py-2.5 text-sm">Modifier le poste</a>
+    {% if poste.mandat_courant %}
+      <a href="{% url 'recensement:mandat_responsable_update' poste.mandat_courant.pk %}" class="border border-brand-600 text-brand-700 rounded-lg px-4 py-2.5 text-sm">Modifier le mandat</a>
+      <a href="{% url 'recensement:responsable_ecclesial_remplacer' poste.pk %}" class="bg-brand-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold">Remplacer</a>
+    {% else %}
+      <a href="{% url 'recensement:mandat_responsable_create' poste.pk %}" class="bg-brand-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold">Ouvrir un mandat</a>
+    {% endif %}
+  </div>
+</div>
+
+<section class="app-card p-5 mb-5">
+  <h2 class="text-sm font-semibold text-brand-900 mb-3">Poste ecclésial</h2>
+  <dl class="grid md:grid-cols-2 gap-4 text-sm">
+    <div><dt class="text-xs text-slate-500">Niveau</dt><dd class="mt-1">{{ poste.get_niveau_display }}</dd></div>
+    <div><dt class="text-xs text-slate-500">Structure</dt><dd class="mt-1">{{ poste.libelle_structure }}</dd></div>
+    <div><dt class="text-xs text-slate-500">Titre</dt><dd class="mt-1 font-semibold">{{ poste.titre_officiel }}</dd></div>
+    <div><dt class="text-xs text-slate-500">Protection</dt><dd class="mt-1">{% if poste.titre_verrouille %}Titre officiel verrouillé{% else %}Titre modifiable par le Super administrateur{% endif %}</dd></div>
+  </dl>
+</section>
+
+<section class="app-card p-5 mb-5">
+  <div class="flex justify-between gap-2 items-start flex-wrap">
+    <h2 class="text-sm font-semibold text-brand-900">Mandat courant</h2>
+    {% if poste.mandat_courant %}<a href="{% url 'recensement:mandat_responsable_cloture' poste.mandat_courant.pk %}" class="text-red-600 text-sm hover:underline">Clôturer le mandat</a>{% endif %}
+  </div>
+  {% with mandat=poste.mandat_courant %}
+    {% if mandat %}
+      <dl class="grid md:grid-cols-2 gap-4 text-sm mt-4">
+        <div><dt class="text-xs text-slate-500">Responsable</dt><dd class="mt-1 font-semibold">{{ mandat.nom_responsable|default:"Non renseigné" }}</dd></div>
+        <div><dt class="text-xs text-slate-500">Statut</dt><dd class="mt-1">{{ mandat.get_statut_display }}</dd></div>
+        <div><dt class="text-xs text-slate-500">Période</dt><dd class="mt-1">{{ mandat.periode_affichage }}</dd></div>
+        <div><dt class="text-xs text-slate-500">Contact</dt><dd class="mt-1">{{ mandat.contact_responsable|default:"—" }}</dd></div>
+        <div class="md:col-span-2"><dt class="text-xs text-slate-500">Observations</dt><dd class="mt-1 whitespace-pre-line">{{ mandat.observations|default:"—" }}</dd></div>
+      </dl>
+    {% else %}<p class="mt-3 text-sm text-amber-700">Aucun mandat n'est actuellement ouvert pour ce poste.</p>{% endif %}
+  {% endwith %}
+</section>
+
+<section class="app-card mb-5">
+  <div class="px-5 py-3 border-b border-slate-100"><h2 class="text-sm font-semibold text-slate-800">Historique des mandats</h2></div>
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm app-table">
+      <thead class="bg-slate-100 text-left"><tr><th class="px-4 py-3">Responsable</th><th class="px-4 py-3">Période</th><th class="px-4 py-3">Statut</th><th class="px-4 py-3">Créé/Modifié par</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for mandat in mandats %}
+        <tr>
+          <td class="px-4 py-3">{{ mandat.nom_responsable|default:"Non renseigné" }}</td>
+          <td class="px-4 py-3">{{ mandat.periode_affichage }}</td>
+          <td class="px-4 py-3">{{ mandat.get_statut_display }}</td>
+          <td class="px-4 py-3">
+            {% if mandat.modifie_par %}
+              {{ mandat.modifie_par.get_full_name|default:mandat.modifie_par.get_username }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}<tr><td colspan="4" class="px-4 py-6 text-center text-slate-400">Aucun mandat enregistré.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="app-card p-5">
+  <h2 class="text-sm font-semibold text-slate-800 mb-3">Journal des opérations</h2>
+  <div class="divide-y divide-slate-100">
+    {% for entree in historique %}
+      <div class="py-3 text-sm">
+        <div class="flex justify-between gap-3">
+          <strong>{{ entree.get_action_display }}</strong>
+          <span class="text-xs text-slate-400">{{ entree.date_action|date:"d/m/Y H:i" }}</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-1">
+          Par
+          {% if entree.effectue_par %}
+            {{ entree.effectue_par.get_full_name|default:entree.effectue_par.get_username }}
+          {% else %}
+            Compte supprimé ou opération système
+          {% endif %}
+        </p>
+        {% if entree.motif %}<p class="mt-1">{{ entree.motif }}</p>{% endif %}
+      </div>
+    {% empty %}<p class="text-sm text-slate-400">Aucune opération journalisée.</p>{% endfor %}
+  </div>
+</section>
+{% endblock %}

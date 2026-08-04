@@ -1,0 +1,25 @@
+{% extends "recensement/base.html" %}
+{% block title %}Responsable hiérarchique{% endblock %}
+{% block content %}
+<div class="mb-5">
+  <h1 class="text-xl font-semibold text-slate-900">Compléter le responsable hiérarchique</h1>
+  <p class="text-sm text-slate-500 mt-1">Le titre et la structure sont des données officielles en lecture seule.</p>
+</div>
+<section class="app-card p-5 mb-5">
+  <dl class="grid md:grid-cols-2 gap-4 text-sm">
+    <div><dt class="text-xs text-slate-500">Niveau</dt><dd class="mt-1">{{ responsabilite.get_niveau_display }}</dd></div>
+    <div><dt class="text-xs text-slate-500">Structure</dt><dd class="mt-1">{{ responsabilite.structure_nom }}</dd></div>
+    <div class="md:col-span-2"><dt class="text-xs text-slate-500">Titre officiel</dt><dd class="mt-1 font-semibold text-brand-900">{{ responsabilite.titre_officiel }}</dd></div>
+  </dl>
+</section>
+<form method="post" class="app-card p-5 space-y-5">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+  <div><label for="{{ form.nom_responsable.id_for_label }}" class="block text-xs font-medium text-slate-600 mb-1">Nom du responsable</label>{{ form.nom_responsable }}{{ form.nom_responsable.errors }}</div>
+  <div><label for="{{ form.observations.id_for_label }}" class="block text-xs font-medium text-slate-600 mb-1">Observations</label>{{ form.observations }}{{ form.observations.errors }}</div>
+  <div class="flex justify-between gap-2 border-t border-slate-100 pt-4">
+    <a href="{% url 'recensement:site_particulier_list' %}" class="border border-slate-300 rounded-lg px-4 py-2.5 text-sm">Annuler</a>
+    <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white rounded-lg px-5 py-2.5 text-sm font-semibold">Enregistrer</button>
+  </div>
+</form>
+{% endblock %}

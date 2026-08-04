@@ -7,7 +7,7 @@
   <div>
     <h1 class="text-xl font-semibold text-slate-900">Sites particuliers ({{ total }})</h1>
     <p class="text-sm text-slate-500 mt-0.5">
-      Sites ecclésiaux sous l'autorité directe du Siège mondial, gérés hors du circuit de recensement ordinaire.
+      Module autonome, entièrement séparé du recensement des paroisses ordinaires.
     </p>
   </div>
   <a href="{% url 'recensement:site_particulier_create' %}"
@@ -16,8 +16,19 @@
   </a>
 </div>
 
+<div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 mb-5">
+  Les sites particuliers ne font partie d'aucune Région, Province, District ou Zone du module Recensement. Ils ne peuvent donc jamais apparaître dans les filtres, listes, cartes ou formulaires de recensement.
+</div>
+
+<section class="app-card p-5 mb-6">
+  <div class="flex items-start justify-between gap-3 flex-wrap">
+    <div><h2 class="text-sm font-semibold text-brand-900">Responsables des sites</h2><p class="text-xs text-slate-500 mt-1">Les postes, titulaires et historiques sont gérés dans le module transversal des responsables ecclésiaux.</p></div>
+    <a href="{% url 'recensement:responsable_ecclesial_list' %}?niveau=site_particulier" class="border border-brand-600 text-brand-700 rounded-lg px-4 py-2.5 text-sm">Gérer les responsables</a>
+  </div>
+</section>
+
 <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 mb-4">
-  Les noms, localisations, titres officiels et informations de référence sont fixés par le seed ou par décision pastorale lors de la création. Après création, ils sont protégés contre les modifications ordinaires.
+  Les noms, localisations, titres propres et informations officielles sont protégés après création.
 </div>
 
 <div class="overflow-x-auto app-card">
@@ -28,8 +39,7 @@
         <th class="px-4 py-3 font-medium">Type</th>
         <th class="px-4 py-3 font-medium">Pays</th>
         <th class="px-4 py-3 font-medium">Localité</th>
-        <th class="px-4 py-3 font-medium">Titre responsable</th>
-        <th class="px-4 py-3 font-medium">Responsable</th>
+        <th class="px-4 py-3 font-medium">Responsable ecclésial</th>
         <th class="px-4 py-3 font-medium">GPS</th>
         <th class="px-4 py-3 font-medium">Dernière modification</th>
         <th class="px-4 py-3 font-medium">Actions</th>
@@ -44,14 +54,14 @@
         <td class="px-4 py-3">{{ site.get_type_site_display }}</td>
         <td class="px-4 py-3">{{ site.pays|default:"—" }}</td>
         <td class="px-4 py-3">{{ site.localite|default:"—" }}</td>
-        <td class="px-4 py-3">{{ site.titre_responsable|default:"—" }}</td>
-        <td class="px-4 py-3">{{ site.responsable|default:"—" }}</td>
         <td class="px-4 py-3">
-          {% if site.gps_est_defini %}
-            <span class="inline-block rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Défini</span>
-          {% else %}
-            <span class="inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">À définir</span>
-          {% endif %}
+          {% for poste in site.postes_responsables %}
+            <div><span class="font-medium">{{ poste.titre_officiel }}</span> : {{ poste.nom_responsable_actuel }}</div>
+          {% empty %}<span class="text-amber-700">Non renseigné</span>{% endfor %}
+        </td>
+        <td class="px-4 py-3">
+          {% if site.gps_est_defini %}<span class="inline-block rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Défini</span>
+          {% else %}<span class="inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">À définir</span>{% endif %}
         </td>
         <td class="px-4 py-3 whitespace-nowrap text-slate-500">{{ site.date_modification|date:"d/m/Y H:i" }}</td>
         <td class="px-4 py-3 whitespace-nowrap">
@@ -61,11 +71,7 @@
         </td>
       </tr>
       {% empty %}
-      <tr>
-        <td colspan="9" class="text-center text-slate-400 py-8">
-          Aucun site particulier enregistré.
-        </td>
-      </tr>
+      <tr><td colspan="8" class="text-center text-slate-400 py-8">Aucun site particulier enregistré.</td></tr>
       {% endfor %}
     </tbody>
   </table>

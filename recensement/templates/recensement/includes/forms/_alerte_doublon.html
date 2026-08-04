@@ -1,0 +1,64 @@
+{% comment %}
+Alerte de doublon affichée avant l'enregistrement d'une fiche.
+
+Variables attendues :
+  form     (Form, obligatoire) : formulaire exposant l'attribut alerte_doublon.
+  variante (str, optionnel)    : "edition" pour la page de modification,
+                                 sinon variante "creation" (défaut).
+
+Les deux pages affichaient déjà ce bloc, avec de PETITES différences qui sont
+toutes conservées à l'identique :
+  - marge externe mb-4               : création uniquement
+  - titre dynamique selon la gravité : création ; "Alerte de doublon" en édition
+  - marge de la liste                : mt-3 (création) / mt-2 (édition)
+  - score de similarité + lien vers la fiche existante : création uniquement
+  - marge du bloc de confirmation    : mt-4 (création) / mt-3 (édition)
+
+Le garde-fou d'affichage (alerte présente ET gravité différente de "aucun")
+est intégré ici : l'appelant n'a plus qu'une ligne à écrire.
+{% endcomment %}{% if form.alerte_doublon and form.alerte_doublon.gravite != "aucun" %}
+  <div class="{% if variante != "edition" %}mb-4 {% endif %}rounded-xl border {% if form.alerte_doublon.gravite == 'bloquant' %}border-red-200 bg-red-50 text-red-800{% else %}border-amber-200 bg-amber-50 text-amber-800{% endif %} px-4 py-3 text-sm">
+    <div class="font-semibold">
+      {% if variante == "edition" %}
+        Alerte de doublon
+      {% elif form.alerte_doublon.gravite == "bloquant" %}
+        Doublon probable détecté
+      {% else %}
+        Une fiche similaire existe déjà
+      {% endif %}
+    </div>
+    <p class="mt-1">{{ form.alerte_doublon.motif_principal }}</p>
+
+    <ul class="{% if variante == "edition" %}mt-2{% else %}mt-3{% endif %} space-y-2">
+      {% for item in form.alerte_doublon.correspondances %}
+        <li class="rounded-lg bg-white/70 px-3 py-2">
+          <div class="font-semibold">{{ item.nom }}</div>
+          <div class="text-xs opacity-80">
+            {{ item.zone }} · {{ item.statut }}
+            {% if item.distance_metres %} · GPS : {{ item.distance_metres|floatformat:0 }} m{% endif %}
+            {% if variante != "edition" %} · Similarité : {{ item.score_nom|floatformat:2 }}{% endif %}
+          </div>
+          {% if variante != "edition" and item.url %}
+            <a href="{{ item.url }}" class="mt-1 inline-block text-xs font-semibold underline">Ouvrir la fiche existante</a>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+
+    {% if form.alerte_doublon.peut_confirmer %}
+      <div class="{% if variante == "edition" %}mt-3{% else %}mt-4{% endif %} border-t border-amber-200 pt-3">
+        <label class="flex items-start gap-2 text-sm font-medium">
+          {{ form.confirmer_doublon_possible }}
+          <span>{{ form.confirmer_doublon_possible.label }}</span>
+        </label>
+        {% include "recensement/includes/forms/_field_errors.html" with field=form.confirmer_doublon_possible classe="text-red-600 text-xs mt-1" %}
+
+        <div class="mt-3">
+          <label for="{{ form.motif_doublon_possible.id_for_label }}" class="block text-xs font-medium mb-1">{{ form.motif_doublon_possible.label }}</label>
+          {{ form.motif_doublon_possible }}
+          {% include "recensement/includes/forms/_field_errors.html" with field=form.motif_doublon_possible classe="text-red-600 text-xs mt-1" %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endif %}

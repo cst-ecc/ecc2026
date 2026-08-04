@@ -59,19 +59,7 @@
           <td class="px-4 py-3">{{ fiche.zone.nom }}</td>
 
           <td class="px-4 py-3">
-            {% if fiche.statut_validation == "attente_superviseur" %}
-              <span class="inline-flex px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
-                En attente OP DISTRICT / OP ZONE
-              </span>
-            {% elif fiche.statut_validation == "attente_manager" %}
-              <span class="inline-flex px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
-                En attente OP PROVINCE
-              </span>
-            {% else %}
-              <span class="inline-flex px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
-                {{ fiche.get_statut_validation_display }}
-              </span>
-            {% endif %}
+            {% include "recensement/includes/components/_statut_badge.html" with fiche=fiche variante="validation" %}
           </td>
 
           <td class="px-4 py-3">
@@ -89,18 +77,7 @@
           <td class="px-4 py-3">
             <div class="flex gap-2 flex-wrap">
               {% if fiche.peut_valider_par_utilisateur %}
-                <form method="post" action="{% url 'recensement:fiche_valider' fiche.pk %}"
-                      data-confirm-title="Confirmer la validation"
-                      data-confirm-message="Valider « {{ fiche.nom_paroisse }} » ?"
-                      data-confirm-details="Cette action appliquera la validation selon votre rôle."
-                      data-confirm-label="Valider la fiche"
-                      data-confirm-variant="success">
-                  {% csrf_token %}
-                  <button type="submit"
-                          class="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
-                    Valider
-                  </button>
-                </form>
+                {% include "recensement/includes/components/_bouton_valider.html" with fiche=fiche variante="liste" %}
               {% endif %}
 
               {% if fiche.peut_modifier_par_utilisateur %}
@@ -119,11 +96,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr>
-          <td colspan="10" class="text-center text-slate-400 py-8">
-            Aucune fiche en attente.
-          </td>
-        </tr>
+        {% include "recensement/includes/components/_table_empty_row.html" with colspan=10 message="Aucune fiche en attente." %}
       {% endfor %}
     </tbody>
   </table>

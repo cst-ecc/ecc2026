@@ -1,40 +1,26 @@
-"""Formulaires dédiés aux sites particuliers.
-
-Les sites particuliers sont seedés avec des données officielles. En modification
-ordinaire, le formulaire n'expose que les champs variables et la position GPS si
-elle n'a pas encore été définie.
-"""
+"""Formulaires des sites particuliers, sans duplication des responsables."""
 
 from django import forms
 
 from ..models import SiteParticulier
 from .base import INPUT_CSS, SELECT_CSS, GPSDecimalField
-from .validators import valider_telephone_international
 
 CHAMPS_OFFICIELS_SITE = (
     "nom",
     "type_site",
     "pays",
     "localite",
-    "titre_responsable",
     "description",
     "informations_historiques",
     "details_officiels",
 )
 
 CHAMPS_VARIABLES_SITE = (
-    "responsable",
-    "contact_responsable",
     "statut",
     "observations",
 )
 
-CHAMPS_GPS_SITE = (
-    "latitude",
-    "longitude",
-    "precision_gps",
-)
-
+CHAMPS_GPS_SITE = ("latitude", "longitude", "precision_gps")
 PRECISION_GPS_MAX_SITE = 50
 
 
@@ -43,57 +29,27 @@ class _SiteParticulierBaseForm(forms.ModelForm):
         required=False,
         max_digits=10,
         decimal_places=7,
-        widget=forms.NumberInput(
-            attrs={
-                "class": INPUT_CSS,
-                "step": "0.0000001",
-                "placeholder": "Latitude",
-                "inputmode": "decimal",
-            }
-        ),
+        widget=forms.NumberInput(attrs={"class": INPUT_CSS, "step": "0.0000001", "placeholder": "Latitude"}),
     )
     longitude = GPSDecimalField(
         required=False,
         max_digits=10,
         decimal_places=7,
-        widget=forms.NumberInput(
-            attrs={
-                "class": INPUT_CSS,
-                "step": "0.0000001",
-                "placeholder": "Longitude",
-                "inputmode": "decimal",
-            }
-        ),
+        widget=forms.NumberInput(attrs={"class": INPUT_CSS, "step": "0.0000001", "placeholder": "Longitude"}),
     )
     precision_gps = forms.DecimalField(
         required=False,
         max_digits=8,
         decimal_places=2,
         min_value=0,
-        widget=forms.NumberInput(
-            attrs={
-                "class": INPUT_CSS,
-                "step": "0.01",
-                "placeholder": "Précision (m)",
-                "inputmode": "decimal",
-            }
-        ),
+        widget=forms.NumberInput(attrs={"class": INPUT_CSS, "step": "0.01", "placeholder": "Précision (m)"}),
     )
-
-    def clean_contact_responsable(self):
-        value = (self.cleaned_data.get("contact_responsable") or "").strip()
-        if value:
-            valider_telephone_international(value)
-        return value
 
     def clean(self):
         cleaned = super().clean()
-        latitude = cleaned.get("latitude")
-        longitude = cleaned.get("longitude")
-
+        latitude, longitude = cleaned.get("latitude"), cleaned.get("longitude")
         if (latitude is None) ^ (longitude is None):
             raise forms.ValidationError("La latitude et la longitude doivent être renseignées ensemble.")
-
         return cleaned
 
     @property
@@ -102,12 +58,7 @@ class _SiteParticulierBaseForm(forms.ModelForm):
 
 
 class SiteParticulierCreationForm(_SiteParticulierBaseForm):
-    """Formulaire de création d'un site particulier par décision pastorale.
-
-    À la création, les champs officiels sont renseignés. Une fois le site créé,
-    ces données deviennent protégées dans le formulaire ordinaire de
-    modification.
-    """
+    """Création du site uniquement. Le poste responsable est créé séparément."""
 
     class Meta:
         model = SiteParticulier
@@ -116,12 +67,9 @@ class SiteParticulierCreationForm(_SiteParticulierBaseForm):
             "type_site",
             "pays",
             "localite",
-            "titre_responsable",
             "description",
             "informations_historiques",
             "details_officiels",
-            "responsable",
-            "contact_responsable",
             "statut",
             "observations",
             "latitude",
@@ -131,57 +79,30 @@ class SiteParticulierCreationForm(_SiteParticulierBaseForm):
         widgets = {
             "nom": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Nom officiel du site"}),
             "type_site": forms.Select(attrs={"class": SELECT_CSS}),
-            "pays": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : Bénin, Nigéria…"}),
-            "localite": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ville ou localité"}),
-            "titre_responsable": forms.TextInput(
-                attrs={"class": INPUT_CSS, "placeholder": "Ex : Pasteur mondial de l’Église"}
-            ),
+            "pays": forms.TextInput(attrs={"class": INPUT_CSS}),
+            "localite": forms.TextInput(attrs={"class": INPUT_CSS}),
             "description": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 3}),
             "informations_historiques": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 4}),
             "details_officiels": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 4}),
-            "responsable": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Nom du responsable"}),
-            "contact_responsable": forms.TextInput(
-                attrs={"class": INPUT_CSS, "placeholder": "Téléphone du responsable"}
-            ),
-            "statut": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : Ouvert, En travaux, Fermé…"}),
+            "statut": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : Ouvert, En travaux…"}),
             "observations": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 3}),
         }
 
 
 class SiteParticulierUpdateForm(_SiteParticulierBaseForm):
-    """Formulaire ordinaire de modification.
-
-    Les champs officiels n'apparaissent pas dans ``fields`` : une requête
-    falsifiée ne peut donc pas les modifier via ce formulaire.
-    """
-
     class Meta:
         model = SiteParticulier
-        fields = [
-            "responsable",
-            "contact_responsable",
-            "statut",
-            "observations",
-            "latitude",
-            "longitude",
-            "precision_gps",
-        ]
+        fields = ["statut", "observations", "latitude", "longitude", "precision_gps"]
         widgets = {
-            "responsable": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Nom du responsable"}),
-            "contact_responsable": forms.TextInput(
-                attrs={"class": INPUT_CSS, "placeholder": "Téléphone du responsable"}
-            ),
-            "statut": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : Ouvert, En travaux, Fermé…"}),
+            "statut": forms.TextInput(attrs={"class": INPUT_CSS}),
             "observations": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         if self.instance and self.instance.pk and self.instance.gps_est_defini:
             for champ in CHAMPS_GPS_SITE:
                 self.fields.pop(champ, None)
 
 
-# Alias conservé pour les imports existants éventuels.
 SiteParticulierForm = SiteParticulierCreationForm

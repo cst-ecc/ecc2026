@@ -1,9 +1,4 @@
-"""Vues d'export des fiches (prévisualisation hiérarchique + fichier Excel).
-
-Le helper ``_fiches_export_filtrees`` est co-localisé ici car il n'est utilisé
-que par les deux vues d'export. Il applique exactement les mêmes filtres et le
-même tri qu'auparavant.
-"""
+"""Prévisualisation et export Excel avec responsables ecclésiaux dynamiques."""
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
@@ -12,34 +7,32 @@ from django.views.decorators.http import require_GET
 
 from ..models import District, FicheParoisse, Profil, Province, Region, Zone
 from ..permissions import get_role, role_required
+from ..services.services_responsables_ecclesiaux import (
+    construire_index_responsables,
+    responsables_pour_fiche,
+)
 from .helpers import _fiches_visibles_pour
 
 
 def _fiches_export_filtrees(request):
     fiches = _fiches_visibles_pour(request.user)
     role = get_role(request.user)
-
     statut_filtre = request.GET.get("statut", "")
     if role == Profil.Role.SUPER_ADMIN:
         if statut_filtre == "attente_superviseur":
             fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_SUPERVISEUR)
         elif statut_filtre == "attente_manager":
             fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.ATTENTE_MANAGER)
-        elif statut_filtre == "tous":
-            pass
-        else:
+        elif statut_filtre != "tous":
             fiches = fiches.filter(statut_validation=FicheParoisse.StatutValidation.VALIDEE)
 
-    def valid_id(param_name):
-        value = (request.GET.get(param_name) or "").strip()
+    def valid_id(name):
+        value = (request.GET.get(name) or "").strip()
         return int(value) if value.isdigit() else None
 
-    region_id = valid_id("region")
-    province_id = valid_id("province")
-    district_id = valid_id("district")
-    zone_id = valid_id("zone")
+    region_id, province_id = valid_id("region"), valid_id("province")
+    district_id, zone_id = valid_id("district"), valid_id("zone")
     paroisse = (request.GET.get("paroisse") or "").strip()[:100]
-
     if region_id:
         fiches = fiches.filter(region_id=region_id)
     if province_id:
@@ -52,63 +45,50 @@ def _fiches_export_filtrees(request):
         fiches = fiches.filter(nom_paroisse__icontains=paroisse)
 
     return fiches.select_related("region", "province", "district", "zone", "village").order_by(
-        "region__nom",
-        "province__nom",
-        "district__nom",
-        "zone__nom",
-        "nom_paroisse",
+        "region__nom", "province__nom", "district__nom", "zone__nom", "nom_paroisse"
     )
+
+
+def _fiches_avec_responsables(request):
+    fiches, index = construire_index_responsables(_fiches_export_filtrees(request))
+    for fiche in fiches:
+        fiche.responsables_ecclesiaux = responsables_pour_fiche(fiche, index)
+    return fiches
 
 
 @login_required
 @role_required(Profil.Role.SUPER_ADMIN)
 @require_GET
 def fiche_export_preview(request):
-    fiches = _fiches_export_filtrees(request)
-    total = fiches.count()
+    fiches = _fiches_avec_responsables(request)
     hierarchy = {}
     for fiche in fiches:
-        region_nom = fiche.region.nom if fiche.region else "—"
-        province_nom = fiche.province.nom if fiche.province else "—"
-        district_nom = fiche.district.nom if fiche.district else "—"
-        zone_nom = fiche.zone.nom if fiche.zone else "—"
-        hierarchy.setdefault(region_nom, {})
-        hierarchy[region_nom].setdefault(province_nom, {})
-        hierarchy[region_nom][province_nom].setdefault(district_nom, {})
-        hierarchy[region_nom][province_nom][district_nom].setdefault(zone_nom, [])
-        hierarchy[region_nom][province_nom][district_nom][zone_nom].append(fiche)
+        hierarchy.setdefault(fiche.region.nom, {}).setdefault(fiche.province.nom, {}).setdefault(
+            fiche.district.nom, {}
+        ).setdefault(fiche.zone.nom, []).append(fiche)
 
-    region = (
-        Region.objects.filter(pk=request.GET.get("region")).first() if request.GET.get("region", "").isdigit() else None
-    )
-    province = (
-        Province.objects.filter(pk=request.GET.get("province")).first()
-        if request.GET.get("province", "").isdigit()
-        else None
-    )
-    district = (
-        District.objects.filter(pk=request.GET.get("district")).first()
-        if request.GET.get("district", "").isdigit()
-        else None
-    )
-    zone = Zone.objects.filter(pk=request.GET.get("zone")).first() if request.GET.get("zone", "").isdigit() else None
+    def selected(model, name):
+        value = request.GET.get(name, "")
+        return model.objects.filter(pk=value).first() if value.isdigit() else None
 
-    filters = {
-        "statut": request.GET.get("statut", ""),
-        "region": region.nom if region else "",
-        "province": province.nom if province else "",
-        "district": district.nom if district else "",
-        "zone": zone.nom if zone else "",
-        "paroisse": request.GET.get("paroisse", ""),
-    }
-
+    region = selected(Region, "region")
+    province = selected(Province, "province")
+    district = selected(District, "district")
+    zone = selected(Zone, "zone")
     return render(
         request,
         "recensement/fiche_export_preview.html",
         {
             "hierarchy": hierarchy,
-            "total": total,
-            "filters": filters,
+            "total": len(fiches),
+            "filters": {
+                "statut": request.GET.get("statut", ""),
+                "region": region.nom if region else "",
+                "province": province.nom if province else "",
+                "district": district.nom if district else "",
+                "zone": zone.nom if zone else "",
+                "paroisse": request.GET.get("paroisse", ""),
+            },
             "query_string": request.GET.urlencode(),
         },
     )
@@ -123,76 +103,80 @@ def fiche_export_excel(request):
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
-    fiches = _fiches_export_filtrees(request)
+    fiches = _fiches_avec_responsables(request)
     wb = Workbook()
     ws = wb.active
     ws.title = "Paroisses"
-
-    headers = ["Code officiel", "Région", "Province", "District", "Zone", "Paroisse"]
+    headers = [
+        "Code officiel",
+        "Région",
+        "Titre responsable région",
+        "Nom responsable région",
+        "Province",
+        "Titre responsable province",
+        "Nom responsable province",
+        "District",
+        "Titre responsable district",
+        "Nom responsable district",
+        "Zone",
+        "Titre responsable zone",
+        "Nom responsable zone",
+        "Paroisse",
+    ]
     ws.append(headers)
-
     header_fill = PatternFill("solid", fgColor="1F2937")
     header_font = Font(color="FFFFFF", bold=True)
-    border = Border(
-        left=Side(style="thin", color="E5E7EB"),
-        right=Side(style="thin", color="E5E7EB"),
-        top=Side(style="thin", color="E5E7EB"),
-        bottom=Side(style="thin", color="E5E7EB"),
-    )
-
+    border = Border(*[Side(style="thin", color="E5E7EB")] * 4)
     for cell in ws[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.border = border
+        cell.fill, cell.font, cell.border = header_fill, header_font, border
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
     for fiche in fiches:
+        r = fiche.responsables_ecclesiaux
         ws.append(
             [
                 fiche.code_officiel or "Code officiel en attente",
-                fiche.region.nom if fiche.region else "",
-                fiche.province.nom if fiche.province else "",
-                fiche.district.nom if fiche.district else "",
-                fiche.zone.nom if fiche.zone else "",
+                fiche.region.nom,
+                r["region"]["titre"],
+                r["region"]["nom"],
+                fiche.province.nom,
+                r["province"]["titre"],
+                r["province"]["nom"],
+                fiche.district.nom,
+                r["district"]["titre"],
+                r["district"]["nom"],
+                fiche.zone.nom,
+                r["zone"]["titre"],
+                r["zone"]["nom"],
                 fiche.nom_paroisse or "",
             ]
         )
-
     for row in ws.iter_rows(min_row=2):
         for cell in row:
             cell.border = border
             cell.alignment = Alignment(vertical="top", wrap_text=True)
-
-    widths = {"A": 34, "B": 24, "C": 28, "D": 30, "E": 32, "F": 40}
-    for col, width in widths.items():
-        ws.column_dimensions[col].width = width
-
+    widths = [34, 24, 30, 28, 28, 30, 28, 30, 30, 28, 32, 30, 28, 40]
+    for index, width in enumerate(widths, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=index).column_letter].width = width
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
 
     recap = wb.create_sheet("Synthèse")
-    recap["A1"] = "Prévisualisation de l'export"
+    recap["A1"] = "Export hiérarchique des paroisses et responsables ecclésiaux"
     recap["A1"].font = Font(bold=True, size=14)
-    recap["A3"] = "Nombre de paroisses concernées"
-    recap["B3"] = fiches.count()
-    recap["A5"] = "Organisation des colonnes"
-    recap["B5"] = "Code officiel → Région → Province → District → Zone → Paroisse"
-    recap["A7"] = "Colonnes exclues"
-    recap["B7"] = "Statut du bâtiment, GPS, Agent, Statut, Date, Actions"
-    recap.column_dimensions["A"].width = 32
-    recap.column_dimensions["B"].width = 80
-
+    recap["A3"], recap["B3"] = "Nombre de paroisses concernées", len(fiches)
+    recap["A5"], recap["B5"] = "Source des responsables", "Module autonome des postes et mandats ecclésiaux"
+    recap["A7"], recap["B7"] = "Valeur en cas d'absence", "Non renseigné"
+    recap.column_dimensions["A"].width, recap.column_dimensions["B"].width = 34, 90
     for row in recap.iter_rows():
         for cell in row:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
 
     output = BytesIO()
     wb.save(output)
-    output.seek(0)
-
     response = HttpResponse(
         output.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    response["Content-Disposition"] = 'attachment; filename="paroisses_hierarchie.xlsx"'
+    response["Content-Disposition"] = 'attachment; filename="paroisses_responsables_ecclesiaux.xlsx"'
     return response

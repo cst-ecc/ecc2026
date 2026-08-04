@@ -49,10 +49,6 @@
       <dd class="mt-1 text-slate-900">{{ site.localite|default:"—" }}</dd>
     </div>
     <div class="md:col-span-2">
-      <dt class="text-xs font-medium text-slate-500">Titre officiel du responsable</dt>
-      <dd class="mt-1 text-slate-900">{{ site.titre_responsable|default:"—" }}</dd>
-    </div>
-    <div class="md:col-span-2">
       <dt class="text-xs font-medium text-slate-500">Description officielle</dt>
       <dd class="mt-1 text-slate-900 whitespace-pre-line">{{ site.description|default:"—" }}</dd>
     </div>
@@ -67,14 +63,33 @@
   </dl>
 </section>
 
+<section class="app-card p-5 mb-6">
+  <div class="flex justify-between gap-3 flex-wrap">
+    <div>
+      <h2 class="text-sm font-semibold text-brand-900">Responsables ecclésiaux du site</h2>
+      <p class="text-xs text-slate-500 mt-1">Les titres et mandats sont gérés dans le module dédié, sans duplication dans le site.</p>
+    </div>
+    <a href="{% url 'recensement:responsable_ecclesial_list' %}?niveau=site_particulier&q={{ site.nom|urlencode }}" class="text-sm text-brand-600 hover:underline">Ouvrir le module</a>
+  </div>
+  <div class="mt-4 space-y-3">
+    {% for poste in postes_responsables %}
+      {% with mandat=poste.mandat_courant %}
+      <div class="rounded-lg border border-slate-200 p-4">
+        <p class="font-semibold text-slate-900">{{ poste.titre_officiel }}</p>
+        <p class="mt-1 text-sm text-slate-700">{% if mandat and mandat.nom_responsable %}{{ mandat.nom_responsable }}{% else %}Nom non renseigné{% endif %}</p>
+        <p class="mt-1 text-xs text-slate-500">{% if mandat %}{{ mandat.get_statut_display }} · {{ mandat.periode_affichage }}{% else %}Aucun mandat ouvert{% endif %}</p>
+      </div>
+      {% endwith %}
+    {% empty %}
+      <p class="text-sm text-amber-700">Aucun poste responsable n'est encore rattaché à ce site.</p>
+    {% endfor %}
+  </div>
+</section>
+
 <div class="grid lg:grid-cols-2 gap-6">
   <section class="app-card p-5 space-y-4">
     <h2 class="text-sm font-semibold text-slate-800 border-b border-slate-100 pb-2">Informations à compléter ou variables</h2>
     <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-      <dt class="text-slate-500">Nom du responsable</dt>
-      <dd class="text-slate-900">{{ site.responsable|default:"—" }}</dd>
-      <dt class="text-slate-500">Contact</dt>
-      <dd class="text-slate-900">{{ site.contact_responsable|default:"—" }}</dd>
       <dt class="text-slate-500">Statut actuel</dt>
       <dd class="text-slate-900">{{ site.statut|default:"—" }}</dd>
       <dt class="text-slate-500">Observations</dt>
@@ -120,7 +135,12 @@
           <p class="text-xs text-slate-400">{{ entree.date_action|date:"d/m/Y H:i" }}</p>
         </div>
         <p class="mt-1 text-xs text-slate-500">
-          Par {{ entree.effectue_par.get_full_name|default:entree.effectue_par.get_username|default:"Compte supprimé" }}
+          Par
+          {% if entree.effectue_par %}
+            {{ entree.effectue_par.get_full_name|default:entree.effectue_par.get_username }}
+          {% else %}
+            Compte supprimé ou opération système
+          {% endif %}
         </p>
       </div>
     {% endfor %}

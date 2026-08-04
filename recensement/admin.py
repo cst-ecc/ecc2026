@@ -6,10 +6,14 @@ from .models import (
     FicheParoisse,
     HistoriqueAffectationTerritoriale,
     HistoriqueModification,
+    HistoriqueResponsabiliteHierarchique,
+    MandatResponsableEcclesial,
     PhotoParoisse,
     Profil,
     Province,
     Region,
+    ResponsabiliteHierarchique,
+    SiteParticulier,
     Village,
     Zone,
 )
@@ -358,3 +362,112 @@ class HistoriqueAffectationTerritorialeAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# ---------------------------------------------------------------------------
+# Responsables ecclésiaux
+# ---------------------------------------------------------------------------
+
+
+class MandatResponsableEcclesialInline(admin.TabularInline):
+    model = MandatResponsableEcclesial
+    extra = 0
+    readonly_fields = (
+        "nom_responsable",
+        "contact_responsable",
+        "date_debut",
+        "date_fin",
+        "statut",
+        "observations",
+        "motif_cloture",
+        "cree_par",
+        "modifie_par",
+        "date_creation",
+        "date_modification",
+    )
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ResponsabiliteHierarchique)
+class ResponsabiliteHierarchiqueAdmin(admin.ModelAdmin):
+    list_display = (
+        "titre_officiel",
+        "niveau",
+        "structure_admin",
+        "nom_responsable_admin",
+        "statut_mandat_admin",
+        "titre_verrouille",
+        "est_actif",
+    )
+    list_filter = ("niveau", "titre_verrouille", "est_actif")
+    search_fields = (
+        "titre_officiel",
+        "structure_nom",
+        "region__nom",
+        "province__nom",
+        "district__nom",
+        "zone__nom",
+        "site_particulier__nom",
+        "mandats__nom_responsable",
+    )
+    autocomplete_fields = ("region", "province", "district", "zone", "site_particulier")
+    readonly_fields = ("code", "date_creation", "date_modification", "cree_par", "modifie_par")
+    inlines = (MandatResponsableEcclesialInline,)
+
+    @admin.display(description="Structure")
+    def structure_admin(self, obj):
+        return obj.libelle_structure
+
+    @admin.display(description="Responsable actuel")
+    def nom_responsable_admin(self, obj):
+        return obj.nom_responsable_actuel
+
+    @admin.display(description="Statut du mandat")
+    def statut_mandat_admin(self, obj):
+        mandat = obj.mandat_courant
+        return mandat.get_statut_display() if mandat else "Sans mandat"
+
+
+@admin.register(MandatResponsableEcclesial)
+class MandatResponsableEcclesialAdmin(admin.ModelAdmin):
+    list_display = ("poste", "nom_responsable", "statut", "date_debut", "date_fin", "modifie_par")
+    list_filter = ("statut", "poste__niveau")
+    search_fields = ("poste__titre_officiel", "nom_responsable", "poste__structure_nom")
+    readonly_fields = ("date_creation", "date_modification")
+
+
+@admin.register(HistoriqueResponsabiliteHierarchique)
+class HistoriqueResponsabiliteHierarchiqueAdmin(admin.ModelAdmin):
+    list_display = ("responsabilite", "action", "effectue_par", "date_action")
+    list_filter = ("action", "date_action")
+    search_fields = ("responsabilite__titre_officiel", "effectue_par__username", "motif")
+    readonly_fields = (
+        "responsabilite",
+        "mandat",
+        "action",
+        "effectue_par",
+        "motif",
+        "donnees_avant",
+        "donnees_apres",
+        "date_action",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(SiteParticulier)
+class SiteParticulierAdmin(admin.ModelAdmin):
+    list_display = ("nom", "type_site", "pays", "localite", "statut", "date_modification")
+    list_filter = ("type_site", "pays")
+    search_fields = ("nom", "localite", "description")
+    readonly_fields = ("titre_responsable", "responsable", "contact_responsable", "date_creation", "date_modification")

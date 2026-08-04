@@ -1,0 +1,23 @@
+{% comment %}
+Sélecteur d'indicatif téléphonique international.
+
+Variables attendues :
+  cible (str, obligatoire) : id du champ texte piloté par phone_country.js
+                             (data-phone-target), par ex. "id_contact_responsable".
+
+La liste des pays est désormais maintenue à un seul endroit.
+{% endcomment %}<select class="js-phone-prefix rounded-lg border-slate-300 text-sm" aria-label="Indicatif du pays" data-phone-target="{{ cible }}">
+  <option value="+229" selected>Bénin +229</option>
+  <option value="+234">Nigeria +234</option>
+  <option value="+228">Togo +228</option>
+  <option value="+225">Côte d’Ivoire +225</option>
+  <option value="+33">France +33</option>
+  <option value="+1">États-Unis/Canada +1</option>
+  <option value="+44">Royaume-Uni +44</option>
+  <option value="+237">Cameroun +237</option>
+  <option value="+242">Congo +242</option>
+  <option value="+243">RDC +243</option>
+  <option value="+241">Gabon +241</option>
+  <option value="+221">Sénégal +221</option>
+  <option value="+233">Ghana +233</option>
+</select>

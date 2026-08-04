@@ -1,0 +1,12 @@
+{% comment %}
+Ligne "aucune donnée" d'un tableau.
+
+Variables attendues :
+  colspan (int, obligatoire) : nombre de colonnes du tableau appelant.
+  message (str, obligatoire) : texte affiché.
+  classe  (str, optionnel)   : classes de la cellule (défaut : mise en forme actuelle).
+{% endcomment %}<tr>
+  <td colspan="{{ colspan }}" class="{{ classe|default:'text-center text-slate-400 py-8' }}">
+    {{ message }}
+  </td>
+</tr>

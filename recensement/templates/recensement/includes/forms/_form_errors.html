@@ -1,0 +1,39 @@
+{% comment %}
+Résumé des erreurs d'un formulaire, affiché en tête de page.
+
+Variables attendues :
+  form   (Form, obligatoire) : le formulaire à inspecter.
+  titre  (str, optionnel)    : titre du bloc.
+                               Défaut : "Certaines informations doivent être corrigées :"
+  simple (bool, optionnel)   : True pour n'afficher que les erreurs de champs,
+                               sans les erreurs globales ni les champs masqués.
+                               Utilisé pour motif_form, dont le bloc d'origine
+                               ne listait que les erreurs de champs.
+
+Le bloc entier n'est rendu que si le formulaire porte au moins une erreur,
+comme auparavant.
+{% endcomment %}{% if form.errors %}
+  <div class="rounded-lg bg-red-50 text-red-800 border border-red-200 px-4 py-3 text-sm">
+    <p class="font-semibold mb-2">{{ titre|default:"Certaines informations doivent être corrigées :" }}</p>
+
+    <ul class="list-disc pl-5 space-y-1">
+      {% if not simple %}
+        {% for error in form.non_field_errors %}
+          <li>Erreur générale : {{ error }}</li>
+        {% endfor %}
+      {% endif %}
+
+      {% for champ in form %}
+        {% for error in champ.errors %}
+          <li>{{ champ.label|default:champ.name }} : {{ error }}</li>
+        {% endfor %}
+      {% endfor %}
+
+      {% if not simple %}
+        {% for error in form.hidden_field_errors %}
+          <li>Champ masqué : {{ error }}</li>
+        {% endfor %}
+      {% endif %}
+    </ul>
+  </div>
+{% endif %}

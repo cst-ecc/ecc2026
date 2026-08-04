@@ -5,6 +5,7 @@ from .permissions import (
     districts_autorises,
     get_role,
     peut_creer_utilisateur,
+    peut_gerer_responsables_ecclesiaux,
     peut_gerer_sites_particuliers,
     peut_rechercher_paroisses,
     zones_autorisees,
@@ -74,6 +75,7 @@ def role_context(request):
         "nb_notifications_non_lues": nb_notifications_non_lues(user),
         # Sites particuliers.
         "peut_gerer_sites_particuliers": peut_gerer_sites_particuliers(user),
+        "peut_gerer_responsables_ecclesiaux": peut_gerer_responsables_ecclesiaux(user),
         "peut_rechercher_paroisses": peut_rechercher_paroisses(user),
         # Périmètre utilisateur pour l'affichage dans les templates.
         "user_scope": _build_user_scope(user, role),
@@ -160,7 +162,13 @@ def _build_user_scope(user, role):
     elif role == Profil.Role.OP_PROVINCE:
         from .models import District as DistrictModel
 
-        nb = DistrictModel.objects.filter(province_id=profil.province_id).count() if profil.province_id else 0
+        nb = (
+            DistrictModel.objects.filter(province_id=profil.province_id, est_sites_particuliers=False)
+            .exclude(nom__icontains="sites particuliers")
+            .count()
+            if profil.province_id
+            else 0
+        )
         scope["couverture_label"] = f"{nb} district{'s' if nb > 1 else ''} dans la province"
     elif role == Profil.Role.OP_DISTRICT:
         d_ids = districts_autorises(user) or set()

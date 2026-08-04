@@ -1,0 +1,37 @@
+{% comment %}
+Formulaire POST de validation d'une fiche (bouton "Valider" + garde-fous
+data-confirm-* consommés par le script de confirmation existant).
+
+Variables attendues :
+  fiche    (FicheParoisse, obligatoire)
+  variante (str, optionnel) : "liste" pour la version compacte de
+                              fiche_a_valider.html ; sinon version "detail".
+
+IMPORTANT : ce composant ne contrôle AUCUNE permission. L'appelant reste
+responsable du test de droit (peut_valider dans fiche_detail.html,
+fiche.peut_valider_par_utilisateur dans fiche_a_valider.html), exactement
+comme avant la factorisation.
+{% endcomment %}<form method="post" action="{% url 'recensement:fiche_valider' fiche.pk %}"
+      data-confirm-title="Confirmer la validation"
+      {% if variante == "liste" %}
+      data-confirm-message="Valider « {{ fiche.nom_paroisse }} » ?"
+      data-confirm-details="Cette action appliquera la validation selon votre rôle."
+      {% else %}
+      data-confirm-message="Valider cette fiche ? Elle sera transmise au palier suivant."
+      data-confirm-details="Après validation, vous ne pourrez plus la modifier vous-même."
+      {% endif %}
+      data-confirm-label="Valider la fiche"
+      data-confirm-variant="success">
+  {% csrf_token %}
+  {% if variante == "liste" %}
+    <button type="submit"
+            class="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+      Valider
+    </button>
+  {% else %}
+    <button type="submit"
+            class="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-3.5 py-2 rounded-lg">
+      Valider
+    </button>
+  {% endif %}
+</form>

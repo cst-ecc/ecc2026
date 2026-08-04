@@ -1,0 +1,10 @@
+{% comment %}
+Liste des erreurs d'un champ de formulaire.
+
+Variables attendues :
+  field  (BoundField, obligatoire)
+  classe (str, optionnel) : classes du paragraphe d'erreur.
+                            Défaut : "text-red-600 text-sm mt-1".
+                            Utiliser "text-red-600 text-xs mt-1" pour les champs
+                            du bloc "alerte de doublon" (rendu inchangé).
+{% endcomment %}{% for error in field.errors %}<p class="{{ classe|default:'text-red-600 text-sm mt-1' }}">{{ error }}</p>{% endfor %}
