@@ -34,8 +34,8 @@ SITES_INITIAUX = [
         "localite": "Sèmè-Plage",
     },
     {
-        "nom": "La Basilique d'Imèko",
-        "type_site": "basilique",
+        "nom": "La Cité Céleste d'Imèko",
+        "type_site": "site_pelerinage",
         "pays": "Nigéria",
         "localite": "Imèko",
     },

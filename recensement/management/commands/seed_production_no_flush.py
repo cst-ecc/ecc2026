@@ -102,10 +102,7 @@ SITES_PARTICULIERS = (
     },
     {
         "nom": "Site de Tchakou",
-        "aliases": (
-            "Site de Tchakou",
-            "Cathédrale de Tchakou",
-        ),
+        "aliases": "Site de Tchakou",
         "type_site": "cathedrale",
         "pays": "Bénin",
         "localite": "Tchakou",
@@ -122,7 +119,7 @@ SITES_PARTICULIERS = (
             "Site de Agonguè",
             "Site de AGONGUÈ",
         ),
-        "type_site": "cathedrale",
+        "type_site": "site_pelerinage",
         "pays": "Bénin",
         "localite": "Agonguè",
         "titre_poste": "Chef du District ecclésial des sites particuliers – Zone Bénin",
@@ -152,9 +149,8 @@ SITES_PARTICULIERS = (
         "aliases": (
             "La Cité Céleste d'Imèko",
             "Cité Céleste d'Imèko",
-            "Site Céleste d'Imèko",
         ),
-        "type_site": "basilique",
+        "type_site": "site_pelerinage",
         "pays": "Nigéria",
         "localite": "Imèko",
         "titre_poste": "Chef du District ecclésial des sites particuliers – Zone Nigéria",
@@ -165,11 +161,7 @@ SITES_PARTICULIERS = (
     },
     {
         "nom": "Site de Ketu",
-        "aliases": (
-            "Site de Ketu",
-            "Saint SBJ Oshoffa Cathedral",
-            "SAINT SBJ OSHOFFA CATHEDRAL",
-        ),
+        "aliases": "Site de Ketu",
         "type_site": "cathedrale",
         "pays": "Nigéria",
         "localite": "Ketu",

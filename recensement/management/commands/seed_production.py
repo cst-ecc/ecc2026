@@ -166,7 +166,7 @@ SITES_PARTICULIERS = [
     {
         "nom": "La Cité Céleste d'Imèko",
         "aliases": "La Cité Céleste d'Imèko",
-        "type_site": "basilique",
+        "type_site": "site_pelerinage",
         "pays": "Nigéria",
         "localite": "Imèko",
         "titre_poste": "Chef du District écclésial des site particuliers zone Nigéria",

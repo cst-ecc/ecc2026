@@ -38,8 +38,8 @@ SITES_INITIAUX = [
         "localite": "Sèmè-Plage",
     },
     {
-        "nom": "La Basilique d'Imèko",
-        "type_site": "basilique",
+        "nom": "La Cité Céleste d'Imèko",
+        "type_site": "site_pelerinage",
         "pays": "Nigéria",
         "localite": "Imèko",
     },
@@ -118,7 +118,7 @@ class Migration(migrations.Migration):
                     models.CharField(
                         choices=[
                             ("cathedrale", "Cathédrale"),
-                            ("basilique", "Basilique"),
+                            ("site_pelerinage", "Site de Pèlerinage"),
                             ("site_nativite", "Site de la Nativité"),
                             ("paroisse_mere", "Paroisse Mère"),
                             ("autre", "Autre"),

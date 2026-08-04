@@ -1525,9 +1525,9 @@ class HistoriqueRelance(models.Model):
 
 class TypeSiteParticulier(models.TextChoices):
     CATHEDRALE = "cathedrale", "Cathédrale"
-    BASILIQUE = "basilique", "Basilique"
     SITE_NATIVITE = "site_nativite", "Site de la Nativité"
     PAROISSE_MERE = "paroisse_mere", "Paroisse Mère"
+    SITE_PELERINAGE = "site_pelerinage", "Site de Pèlerinage"
     AUTRE = "autre", "Autre"
 
 
