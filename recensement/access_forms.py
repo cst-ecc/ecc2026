@@ -143,13 +143,11 @@ class ProfilTerritorialForm(forms.ModelForm):
 
         if role_responsable == Profil.Role.SUPER_ADMIN:
             provinces_autorisees_qs = Province.objects.all()
-            districts_autorisees_qs = (
-                District.objects.filter(est_sites_particuliers=False)
-                .exclude(nom__icontains="sites particuliers")
+            districts_autorisees_qs = District.objects.filter(est_sites_particuliers=False).exclude(
+                nom__icontains="sites particuliers"
             )
-            zones_autorisees_qs = (
-                Zone.objects.filter(district__est_sites_particuliers=False)
-                .exclude(district__nom__icontains="sites particuliers")
+            zones_autorisees_qs = Zone.objects.filter(district__est_sites_particuliers=False).exclude(
+                district__nom__icontains="sites particuliers"
             )
             regions_autorisees_qs = Region.objects.all()
 
@@ -159,66 +157,41 @@ class ProfilTerritorialForm(forms.ModelForm):
         elif role_responsable == Profil.Role.OP_PROVINCE:
             province_ids = provinces_autorisees(responsable) or set()
             provinces_autorisees_qs = Province.objects.filter(pk__in=province_ids)
-            districts_autorisees_qs = (
-                District.objects.filter(
-                    province_id__in=province_ids,
-                    est_sites_particuliers=False,
-                )
-                .exclude(nom__icontains="sites particuliers")
-            )
-            zones_autorisees_qs = (
-                Zone.objects.filter(
-                    district__province_id__in=province_ids,
-                    district__est_sites_particuliers=False,
-                )
-                .exclude(district__nom__icontains="sites particuliers")
-            )
-            regions_autorisees_qs = Region.objects.filter(
-                provinces__in=provinces_autorisees_qs
-            ).distinct()
+            districts_autorisees_qs = District.objects.filter(
+                province_id__in=province_ids,
+                est_sites_particuliers=False,
+            ).exclude(nom__icontains="sites particuliers")
+            zones_autorisees_qs = Zone.objects.filter(
+                district__province_id__in=province_ids,
+                district__est_sites_particuliers=False,
+            ).exclude(district__nom__icontains="sites particuliers")
+            regions_autorisees_qs = Region.objects.filter(provinces__in=provinces_autorisees_qs).distinct()
 
         elif role_responsable == Profil.Role.OP_DISTRICT:
             district_ids = districts_autorises(responsable) or set()
-            districts_autorisees_qs = (
-                District.objects.filter(
-                    pk__in=district_ids,
-                    est_sites_particuliers=False,
-                )
-                .exclude(nom__icontains="sites particuliers")
-            )
-            provinces_autorisees_qs = Province.objects.filter(
-                districts__in=districts_autorisees_qs
-            ).distinct()
-            zones_autorisees_qs = (
-                Zone.objects.filter(
-                    district_id__in=district_ids,
-                    district__est_sites_particuliers=False,
-                )
-                .exclude(district__nom__icontains="sites particuliers")
-            )
-            regions_autorisees_qs = Region.objects.filter(
-                provinces__in=provinces_autorisees_qs
-            ).distinct()
+            districts_autorisees_qs = District.objects.filter(
+                pk__in=district_ids,
+                est_sites_particuliers=False,
+            ).exclude(nom__icontains="sites particuliers")
+            provinces_autorisees_qs = Province.objects.filter(districts__in=districts_autorisees_qs).distinct()
+            zones_autorisees_qs = Zone.objects.filter(
+                district_id__in=district_ids,
+                district__est_sites_particuliers=False,
+            ).exclude(district__nom__icontains="sites particuliers")
+            regions_autorisees_qs = Region.objects.filter(provinces__in=provinces_autorisees_qs).distinct()
 
         elif role_responsable == Profil.Role.OP_ZONE:
             zone_ids = zones_autorisees(responsable) or set()
-            zones_autorisees_qs = (
-                Zone.objects.filter(
-                    pk__in=zone_ids,
-                    district__est_sites_particuliers=False,
-                )
-                .exclude(district__nom__icontains="sites particuliers")
-            )
+            zones_autorisees_qs = Zone.objects.filter(
+                pk__in=zone_ids,
+                district__est_sites_particuliers=False,
+            ).exclude(district__nom__icontains="sites particuliers")
             districts_autorisees_qs = District.objects.filter(
                 zones__in=zones_autorisees_qs,
                 est_sites_particuliers=False,
             ).distinct()
-            provinces_autorisees_qs = Province.objects.filter(
-                districts__in=districts_autorisees_qs
-            ).distinct()
-            regions_autorisees_qs = Region.objects.filter(
-                provinces__in=provinces_autorisees_qs
-            ).distinct()
+            provinces_autorisees_qs = Province.objects.filter(districts__in=districts_autorisees_qs).distinct()
+            regions_autorisees_qs = Region.objects.filter(provinces__in=provinces_autorisees_qs).distinct()
 
         else:
             regions_autorisees_qs = Region.objects.none()
@@ -247,9 +220,7 @@ class ProfilTerritorialForm(forms.ModelForm):
         # HTML alors que utilisateur_cascade.js les recharge déjà par AJAX.
         if region_id:
             self.fields["province"].queryset = (
-                provinces_autorisees_qs.filter(region_id=region_id)
-                .select_related("region")
-                .order_by("nom")
+                provinces_autorisees_qs.filter(region_id=region_id).select_related("region").order_by("nom")
             )
 
         if province_id:
@@ -431,9 +402,13 @@ def queryset_affectations_autorisees(responsable, role_cible):
         return champ, qs.order_by("region__ordre", "region__nom", "nom")
 
     if champ == "districts":
-        qs = District.objects.select_related("province__region").filter(
-            est_sites_particuliers=False,
-        ).exclude(nom__icontains="sites particuliers")
+        qs = (
+            District.objects.select_related("province__region")
+            .filter(
+                est_sites_particuliers=False,
+            )
+            .exclude(nom__icontains="sites particuliers")
+        )
 
         if role_responsable == Profil.Role.SUPER_ADMIN:
             pass
@@ -445,9 +420,13 @@ def queryset_affectations_autorisees(responsable, role_cible):
 
         return champ, qs.order_by("province__region__ordre", "province__nom", "nom")
 
-    qs = Zone.objects.select_related("district__province__region").filter(
-        district__est_sites_particuliers=False,
-    ).exclude(district__nom__icontains="sites particuliers")
+    qs = (
+        Zone.objects.select_related("district__province__region")
+        .filter(
+            district__est_sites_particuliers=False,
+        )
+        .exclude(district__nom__icontains="sites particuliers")
+    )
 
     if role_responsable == Profil.Role.SUPER_ADMIN:
         pass
