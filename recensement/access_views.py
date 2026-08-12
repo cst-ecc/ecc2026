@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, OuterRef, Q, Subquery
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -27,6 +27,7 @@ from .models import (
     District,
     HistoriqueAffectationTerritoriale,
     HistoriqueContactUtilisateur,
+    HistoriqueCreationUtilisateurEmail,
     Profil,
     Province,
     Region,
@@ -48,6 +49,8 @@ from .services.services_affectations import (
     synchroniser_affectations_multiples,
 )
 from .services.services_utilisateurs_mailing import envoyer_email_creation_utilisateur
+
+UTILISATEURS_PAR_PAGE = 25
 
 
 def _exiger_gestionnaire(user):
@@ -233,12 +236,54 @@ def utilisateur_list(request):
         if filtre_province.isdigit():
             utilisateurs = utilisateurs.filter(profil__province_id=int(filtre_province))
 
-    utilisateurs = utilisateurs.distinct()
+    # La liste n'affiche pas les objets AffectationTerritoriale eux-mêmes :
+    # elle n'utilise que leur nombre. On annule donc le prefetch générique
+    # ajouté par utilisateurs_visibles_pour() afin de ne pas matérialiser
+    # toutes les affectations de tous les comptes affichés.
+    utilisateurs = utilisateurs.prefetch_related(None).distinct()
+
+    # Sous-requêtes corrélées : le navigateur n'a besoin que du nombre
+    # d'affectations et du dernier statut d'e-mail. Ces valeurs sont calculées
+    # dans la requête SQL principale, sans requête supplémentaire par ligne.
+    compteur_affectations = (
+        AffectationTerritoriale.objects.filter(utilisateur_id=OuterRef("pk"))
+        .order_by()
+        .values("utilisateur_id")
+        .annotate(total=Count("pk"))
+        .values("total")[:1]
+    )
+    dernier_email = HistoriqueCreationUtilisateurEmail.objects.filter(utilisateur_id=OuterRef("pk")).order_by(
+        "-date_action", "-id"
+    )
+
+    utilisateurs = utilisateurs.annotate(
+        total_acces=Subquery(compteur_affectations),
+        dernier_email_statut=Subquery(dernier_email.values("statut")[:1]),
+        dernier_email_date=Subquery(dernier_email.values("date_action")[:1]),
+    ).order_by("username")
+
+    # Pagination serveur : Django ne matérialise que la page demandée.
+    paginator = Paginator(utilisateurs, UTILISATEURS_PAR_PAGE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    # Conserver tous les filtres dans les liens de pagination.
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
+
     return render(
         request,
         "recensement/utilisateur_list.html",
         {
-            "utilisateurs": utilisateurs,
+            "utilisateurs": page_obj.object_list,
+            "page_obj": page_obj,
+            "page_range": paginator.get_elided_page_range(
+                number=page_obj.number,
+                on_each_side=1,
+                on_ends=1,
+            ),
+            "pagination_ellipsis": paginator.ELLIPSIS,
+            "pagination_query": pagination_params.urlencode(),
+            "total": paginator.count,
             "roles": Profil.Role.choices,
             "regions": Region.objects.all() if role == Profil.Role.SUPER_ADMIN else [],
             "provinces": Province.objects.all() if role == Profil.Role.SUPER_ADMIN else [],
