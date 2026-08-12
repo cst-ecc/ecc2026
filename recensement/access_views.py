@@ -51,6 +51,7 @@ from .services.services_affectations import (
 from .services.services_utilisateurs_mailing import envoyer_email_creation_utilisateur
 
 UTILISATEURS_PAR_PAGE = 25
+HISTORIQUE_AFFECTATIONS_PAR_PAGE = 50
 
 
 def _exiger_gestionnaire(user):
@@ -784,13 +785,28 @@ def historique_affectations(request):
     if get_role(request.user) != Profil.Role.SUPER_ADMIN:
         raise PermissionDenied("Seul le super administrateur peut consulter l'historique global.")
 
-    historique = HistoriqueAffectationTerritoriale.objects.select_related("utilisateur", "effectue_par", "affectation")[
-        :1000
-    ]
+    historique = HistoriqueAffectationTerritoriale.objects.select_related(
+        "utilisateur",
+        "effectue_par",
+    ).order_by("-date_action", "-id")
+
+    paginator = Paginator(historique, HISTORIQUE_AFFECTATIONS_PAR_PAGE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
     return render(
         request,
         "recensement/historique_affectations.html",
-        {"historique_affectations": historique},
+        {
+            "historique_affectations": page_obj.object_list,
+            "page_obj": page_obj,
+            "page_range": paginator.get_elided_page_range(
+                number=page_obj.number,
+                on_each_side=1,
+                on_ends=1,
+            ),
+            "pagination_ellipsis": paginator.ELLIPSIS,
+            "total": paginator.count,
+        },
     )
 
 
