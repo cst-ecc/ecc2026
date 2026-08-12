@@ -1,0 +1,7 @@
+{% extends "errors/base_error.html" %}
+{% block title %}503 — Service indisponible{% endblock %}
+{% block code %}Erreur 503{% endblock %}
+{% block heading %}Service temporairement indisponible{% endblock %}
+{% block message %}La plateforme n’est momentanément pas en mesure de traiter votre demande.{% endblock %}
+{% block note %}<div class="note">Réessayez dans quelques instants.</div>{% endblock %}
+{% block actions %}<button class="btn btn-primary" type="button" onclick="window.location.reload()">Réessayer</button><a class="btn btn-secondary" href="/">Retour à l’accueil</a>{% endblock %}

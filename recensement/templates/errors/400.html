@@ -1,0 +1,7 @@
+{% extends "errors/base_error.html" %}
+{% block title %}400 — Requête incorrecte{% endblock %}
+{% block code %}Erreur 400{% endblock %}
+{% block heading %}Requête incorrecte{% endblock %}
+{% block message %}La requête envoyée ne peut pas être traitée dans son état actuel.{% endblock %}
+{% block note %}<div class="note">Vérifiez les informations saisies puis recommencez.</div>{% endblock %}
+{% block actions %}<a class="btn btn-primary" href="/">Retour à l’accueil</a><button class="btn btn-secondary" type="button" onclick="history.back()">Page précédente</button>{% endblock %}

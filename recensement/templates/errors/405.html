@@ -1,0 +1,7 @@
+{% extends "errors/base_error.html" %}
+{% block title %}405 — Action non autorisée{% endblock %}
+{% block code %}Erreur 405{% endblock %}
+{% block heading %}Action non autorisée{% endblock %}
+{% block message %}Cette méthode d’accès n’est pas acceptée pour cette page.{% endblock %}
+{% block note %}<div class="note">Revenez à la page précédente et utilisez les boutons prévus par l’application.</div>{% endblock %}
+{% block actions %}<a class="btn btn-primary" href="/">Retour à l’accueil</a><button class="btn btn-secondary" type="button" onclick="history.back()">Page précédente</button>{% endblock %}

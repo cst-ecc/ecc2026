@@ -26,3 +26,10 @@ urlpatterns = [
 # Phase 3 du projet de séparation frontend/backend.
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Gestionnaires globaux d'erreurs Django (actifs avec DEBUG=False).
+# Les vues ciblées rendent des templates autonomes, sans base.html ni accès DB.
+handler400 = "recensement.error_views.bad_request"
+handler403 = "recensement.error_views.permission_denied"
+handler404 = "recensement.error_views.page_not_found"
+handler500 = "recensement.error_views.server_error"

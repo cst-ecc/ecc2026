@@ -1,0 +1,7 @@
+{% extends "errors/base_error.html" %}
+{% block title %}504 — Délai dépassé{% endblock %}
+{% block code %}Erreur 504{% endblock %}
+{% block heading %}Le traitement prend trop de temps{% endblock %}
+{% block message %}Le serveur applicatif n’a pas répondu dans le délai prévu.{% endblock %}
+{% block note %}<div class="note">Réessayez. Si le problème persiste, l’administrateur doit vérifier les traitements longs et les journaux serveur.</div>{% endblock %}
+{% block actions %}<button class="btn btn-primary" type="button" onclick="window.location.reload()">Réessayer</button><a class="btn btn-secondary" href="/">Retour à l’accueil</a>{% endblock %}

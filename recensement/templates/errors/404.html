@@ -1,0 +1,7 @@
+{% extends "errors/base_error.html" %}
+{% block title %}404 — Page introuvable{% endblock %}
+{% block code %}Erreur 404{% endblock %}
+{% block heading %}Page introuvable{% endblock %}
+{% block message %}La page demandée n’existe pas, a été déplacée ou n’est plus disponible.{% endblock %}
+{% block note %}<div class="note">Vérifiez l’adresse ou revenez à l’accueil de la plateforme.</div>{% endblock %}
+{% block actions %}<a class="btn btn-primary" href="/">Retour à l’accueil</a><button class="btn btn-secondary" type="button" onclick="history.back()">Page précédente</button>{% endblock %}

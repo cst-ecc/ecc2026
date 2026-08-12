@@ -1,0 +1,7 @@
+{% extends "errors/base_error.html" %}
+{% block title %}429 — Trop de requêtes{% endblock %}
+{% block code %}Erreur 429{% endblock %}
+{% block heading %}Trop de requêtes{% endblock %}
+{% block message %}Trop de demandes ont été envoyées en peu de temps.{% endblock %}
+{% block note %}<div class="note">Attendez quelques instants avant de réessayer. Cette protection limite les abus et tentatives automatisées.</div>{% endblock %}
+{% block actions %}<button class="btn btn-primary" type="button" onclick="window.location.reload()">Réessayer</button><a class="btn btn-secondary" href="/">Retour à l’accueil</a>{% endblock %}

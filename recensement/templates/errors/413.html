@@ -1,0 +1,7 @@
+{% extends "errors/base_error.html" %}
+{% block title %}413 — Fichier trop volumineux{% endblock %}
+{% block code %}Erreur 413{% endblock %}
+{% block heading %}Fichier trop volumineux{% endblock %}
+{% block message %}Le contenu envoyé dépasse la taille maximale acceptée par le serveur.{% endblock %}
+{% block note %}<div class="note">Réduisez la taille des fichiers puis recommencez.</div>{% endblock %}
+{% block actions %}<a class="btn btn-primary" href="/">Retour à l’accueil</a><button class="btn btn-secondary" type="button" onclick="history.back()">Page précédente</button>{% endblock %}

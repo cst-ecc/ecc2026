@@ -1,0 +1,7 @@
+{% extends "errors/base_error.html" %}
+{% block title %}403 — Accès refusé{% endblock %}
+{% block code %}Erreur 403{% endblock %}
+{% block heading %}Accès refusé{% endblock %}
+{% block message %}Vous ne disposez pas des droits nécessaires pour accéder à cette ressource.{% endblock %}
+{% block note %}<div class="note">Si vous pensez devoir avoir cet accès, reconnectez-vous ou contactez votre responsable.</div>{% endblock %}
+{% block actions %}<a class="btn btn-primary" href="/">Retour à l’accueil</a><button class="btn btn-secondary" type="button" onclick="history.back()">Page précédente</button>{% endblock %}

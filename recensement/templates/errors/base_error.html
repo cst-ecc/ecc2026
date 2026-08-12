@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="color-scheme" content="light">
+  <title>{% block title %}Erreur{% endblock %} — Recensement ECC</title>
+  <style>
+    :root{--brand-950:#022238;--brand-900:#043653;--brand-800:#06456d;--brand-600:#0b6eae;--brand-500:#188bd5;--accent:#f5c800;--line:#dbe5ec}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#0f172a;background:#f8fafc}
+    body{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 20% 15%,rgba(24,139,213,.13),transparent 35%),#f8fafc}
+    .shell{width:min(680px,100%)}.brand{display:inline-flex;align-items:center;gap:10px;color:var(--brand-900);font-weight:800;margin-bottom:16px}.mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,var(--brand-700),var(--brand-950));color:#fff;box-shadow:inset 0 -3px 0 var(--accent);font-size:13px}
+    .card{background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 18px 55px rgba(2,34,56,.09);overflow:hidden}.bar{height:6px;background:linear-gradient(90deg,var(--brand-600),var(--brand-500),var(--accent))}.content{padding:34px}.code{font-size:.82rem;font-weight:800;letter-spacing:.14em;color:var(--brand-600);text-transform:uppercase}.title{margin:8px 0 10px;font-size:clamp(1.7rem,5vw,2.35rem);line-height:1.15;color:var(--brand-950)}.message{margin:0;color:#475569;font-size:1rem;line-height:1.7}.note{margin-top:18px;padding:13px 15px;border-radius:12px;background:#f0f9ff;border:1px solid #bae6fd;color:#075985;font-size:.9rem;line-height:1.55}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}.btn{appearance:none;border:0;border-radius:11px;padding:11px 16px;font:inherit;font-weight:700;cursor:pointer;text-decoration:none}.btn-primary{background:var(--brand-600);color:#fff}.btn-primary:hover{background:var(--brand-800)}.btn-secondary{border:1px solid #cbd5e1;background:#fff;color:#334155}.btn-secondary:hover{background:#f8fafc}.foot{margin:15px 4px 0;color:#94a3b8;font-size:.75rem;text-align:center}
+    @media(max-width:520px){body{padding:14px}.content{padding:25px 20px}.actions{flex-direction:column}.btn{text-align:center;width:100%}}
+  </style>
+</head>
+<body>
+  <main class="shell" role="main">
+    <div class="brand"><span class="mark">ECC</span><span>Recensement des paroisses</span></div>
+    <section class="card" aria-labelledby="error-title">
+      <div class="bar" aria-hidden="true"></div>
+      <div class="content">
+        <div class="code">{% block code %}Erreur{% endblock %}</div>
+        <h1 class="title" id="error-title">{% block heading %}Une erreur est survenue{% endblock %}</h1>
+        <p class="message">{% block message %}La demande n'a pas pu être traitée.{% endblock %}</p>
+        {% block note %}{% endblock %}
+        <div class="actions">{% block actions %}<a class="btn btn-primary" href="/">Retour à l'accueil</a>{% endblock %}</div>
+      </div>
+    </section>
+    <p class="foot">Église du Christianisme Céleste · Plateforme de recensement</p>
+  </main>
+</body>
+</html>

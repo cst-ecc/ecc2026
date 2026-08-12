@@ -51,6 +51,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Remplace les réponses d'erreur HTML (405/413/429/5xx explicites)
+    # par des pages autonomes sans toucher aux réponses AJAX/JSON.
+    "recensement.error_middleware.ErrorPageMiddleware",
 ]
 
 ROOT_URLCONF = "racine.urls"
@@ -215,3 +218,7 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_SAMESITE = "Lax"
 # CSRF_COOKIE_HTTPONLY = False  # Django recommande souvent accessible aux formulaires JS ; garder selon usage existant.
 CSRF_COOKIE_SAMESITE = "Lax"
+
+# Page dédiée en cas d'échec CSRF (session/formulaire expiré, token invalide).
+# La vue d'erreur est autonome et n'utilise aucun context processor métier.
+CSRF_FAILURE_VIEW = "recensement.error_views.csrf_failure"

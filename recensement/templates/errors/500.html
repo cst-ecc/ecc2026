@@ -1,0 +1,7 @@
+{% extends "errors/base_error.html" %}
+{% block title %}500 — Erreur interne{% endblock %}
+{% block code %}Erreur 500{% endblock %}
+{% block heading %}Une erreur interne est survenue{% endblock %}
+{% block message %}Votre action n’a pas pu être traitée en raison d’un incident technique.{% endblock %}
+{% block note %}<div class="note">Aucune information technique sensible n’est affichée. Réessayez ; si le problème persiste, signalez-le à l’administrateur.</div>{% endblock %}
+{% block actions %}<button class="btn btn-primary" type="button" onclick="window.location.reload()">Réessayer</button><a class="btn btn-secondary" href="/">Retour à l’accueil</a>{% endblock %}
