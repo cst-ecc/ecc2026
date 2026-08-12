@@ -204,12 +204,16 @@ def fiche_update(request, pk):
         form = FicheParoisseForm(instance=fiche, user=request.user)
         motif_form = MotifModificationForm()
 
+    # Utilise les valeurs réellement portées par le formulaire. Sur un POST
+    # invalide, cela restaure la nouvelle sélection territoriale de l'utilisateur
+    # au lieu de réinjecter silencieusement les anciens IDs de la fiche.
+    # Sur un GET, ModelForm fournit naturellement les valeurs de l'instance.
     initial_ids = {
-        "region": fiche.region_id,
-        "province": fiche.province_id,
-        "district": fiche.district_id,
-        "zone": fiche.zone_id,
-        "village": fiche.village_id,
+        "region": form["region"].value(),
+        "province": form["province"].value(),
+        "district": form["district"].value(),
+        "zone": form["zone"].value(),
+        "village": form["village"].value(),
     }
 
     return render(

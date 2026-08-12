@@ -220,7 +220,17 @@
         );
       }
 
-      loadVillages(zoneData.id);
+      loadVillages(zoneData.id).then(function () {
+        // En édition ou après une erreur de validation, le rechargement AJAX
+        // remplace les <option> rendues par Django. On restaure donc explicitement
+        // le village sélectionné (ou la sentinelle "autre") une fois la liste prête.
+        if (initial.village) {
+          preselect(villageSelect, initial.village);
+        } else if (nouvelleLocaliteInput && nouvelleLocaliteInput.value.trim() !== "") {
+          preselect(villageSelect, AUTRE_VALUE);
+          toggleNouvelleLocalite(true);
+        }
+      });
 
       zoneSelect.addEventListener("change", function () {
         var selectedZone = getZoneData(zoneSelect.value);

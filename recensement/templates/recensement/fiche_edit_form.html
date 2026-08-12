@@ -188,18 +188,23 @@
     restricted: {% if is_super_admin %}false{% else %}true{% endif %},
     role: "{{ current_role|default:''|escapejs }}",
     zones: [
-      {% for z in form.fields.zone.queryset %}
-        {
-          id: {{ z.id }},
-          nom: "{{ z.nom|escapejs }}",
-          district_id: {{ z.district_id }},
-          district_nom: "{{ z.district.nom|escapejs }}",
-          province_id: {{ z.district.province_id }},
-          province_nom: "{{ z.district.province.nom|escapejs }}",
-          region_id: {{ z.district.province.region_id }},
-          region_nom: "{{ z.district.province.region.libelle_selection|escapejs }}"
-        }{% if not forloop.last %},{% endif %}
-      {% endfor %}
+      {# Cette structure complète n'est utile qu'au mode restreint. #}
+      {# Le Super administrateur utilise directement la cascade AJAX et ne doit #}
+      {# surtout pas sérialiser toutes les zones et leurs relations au chargement. #}
+      {% if not is_super_admin %}
+        {% for z in form.fields.zone.queryset %}
+          {
+            id: {{ z.id }},
+            nom: "{{ z.nom|escapejs }}",
+            district_id: {{ z.district_id }},
+            district_nom: "{{ z.district.nom|escapejs }}",
+            province_id: {{ z.district.province_id }},
+            province_nom: "{{ z.district.province.nom|escapejs }}",
+            region_id: {{ z.district.province.region_id }},
+            region_nom: "{{ z.district.province.region.libelle_selection|escapejs }}"
+          }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      {% endif %}
     ]
   };
 </script>

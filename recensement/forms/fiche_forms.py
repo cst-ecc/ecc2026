@@ -37,28 +37,44 @@ from .validators import MAX_ANNEE_FONDATION, valider_image, valider_telephone_in
 
 
 class FicheParoisseForm(forms.ModelForm):
+    """Formulaire métier avec chargement paresseux de la cascade territoriale.
+
+    Les listes dépendantes ne doivent pas charger tout le référentiel au rendu
+    initial. ``cascade.js`` et les endpoints AJAX existants alimentent ensuite
+    Province -> District -> Zone -> Village selon le choix de l'utilisateur.
+
+    Côté serveur, les querysets nécessaires sont néanmoins reconstruits à partir
+    du POST ou de l'instance en modification afin que ``ModelChoiceField`` puisse
+    valider les valeurs soumises sans affaiblir les contrôles de périmètre.
+    """
+
+    _NOM_SITES_PARTICULIERS = "sites particuliers"
+
+    # Seule la première marche de la cascade est chargée initialement. Les
+    # autres querysets sont volontairement vides : cela évite notamment de
+    # rendre les 5 000+ villages dans le HTML avant que cascade.js ne les remplace.
     region = RegionModelChoiceField(
-        queryset=Region.objects.all(),
+        queryset=Region.objects.all().order_by("ordre", "nom"),
         label="Région ecclésiale",
         widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_region"}),
     )
     province = forms.ModelChoiceField(
-        queryset=Province.objects.all(),
+        queryset=Province.objects.none(),
         label="Province ecclésiale",
         widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_province"}),
     )
     district = forms.ModelChoiceField(
-        queryset=District.objects.filter(est_sites_particuliers=False),
+        queryset=District.objects.none(),
         label="District ecclésial",
         widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_district"}),
     )
     zone = forms.ModelChoiceField(
-        queryset=Zone.objects.filter(district__est_sites_particuliers=False),
+        queryset=Zone.objects.none(),
         label="Zone ecclésiale",
         widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_zone"}),
     )
     village = forms.ModelChoiceField(
-        queryset=Village.objects.filter(zone__district__est_sites_particuliers=False),
+        queryset=Village.objects.none(),
         required=False,
         label="Village / quartier",
         widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_village"}),
@@ -111,6 +127,77 @@ class FicheParoisseForm(forms.ModelForm):
         "observations",
     )
 
+    @staticmethod
+    def _coerce_pk(value):
+        """Normalise une valeur de select en identifiant entier exploitable."""
+        if hasattr(value, "pk"):
+            value = value.pk
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            return None
+        return value if value > 0 else None
+
+    def _cascade_id(self, field_name):
+        """Valeur courante d'une marche de cascade (POST puis initial/instance)."""
+        if self.is_bound:
+            return self._coerce_pk(self.data.get(self.add_prefix(field_name)))
+
+        value = self.initial.get(field_name)
+        if value in (None, "") and self.instance and self.instance.pk:
+            value = getattr(self.instance, f"{field_name}_id", None)
+        if value in (None, "") and field_name in self.fields:
+            value = self.fields[field_name].initial
+        return self._coerce_pk(value)
+
+    def _configurer_cascade_globale(self):
+        """Querysets minimaux pour le Super administrateur (ou sans ``user``).
+
+        Au GET de création, seule la région est rendue. En POST ou en édition,
+        chaque queryset est reconstruit uniquement à partir du parent courant,
+        ce qui permet la validation Django et le préremplissage sans charger le
+        référentiel territorial complet.
+        """
+        self.fields["region"].queryset = Region.objects.all().order_by("ordre", "nom")
+
+        region_id = self._cascade_id("region")
+        province_id = self._cascade_id("province")
+        district_id = self._cascade_id("district")
+        zone_id = self._cascade_id("zone")
+
+        if region_id:
+            self.fields["province"].queryset = Province.objects.filter(region_id=region_id).order_by("nom")
+
+        if province_id:
+            self.fields["district"].queryset = (
+                District.objects.filter(
+                    province_id=province_id,
+                    est_sites_particuliers=False,
+                )
+                .exclude(nom__icontains=self._NOM_SITES_PARTICULIERS)
+                .order_by("nom")
+            )
+
+        if district_id:
+            self.fields["zone"].queryset = (
+                Zone.objects.filter(
+                    district_id=district_id,
+                    district__est_sites_particuliers=False,
+                )
+                .exclude(district__nom__icontains=self._NOM_SITES_PARTICULIERS)
+                .order_by("nom")
+            )
+
+        if zone_id:
+            self.fields["village"].queryset = (
+                Village.objects.filter(
+                    zone_id=zone_id,
+                    zone__district__est_sites_particuliers=False,
+                )
+                .exclude(zone__district__nom__icontains=self._NOM_SITES_PARTICULIERS)
+                .order_by("nom")
+            )
+
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
@@ -123,11 +210,9 @@ class FicheParoisseForm(forms.ModelForm):
                 if field_name in self.fields:
                     self.fields[field_name].initial = getattr(self.instance, field_name, None)
 
-        if user is None:
-            return
-
-        role = get_role(user)
-        if role == Profil.Role.SUPER_ADMIN:
+        role = get_role(user) if user is not None else None
+        if user is None or role == Profil.Role.SUPER_ADMIN:
+            self._configurer_cascade_globale()
             return
 
         zone_ids = zones_autorisees(user) or set()
@@ -136,22 +221,26 @@ class FicheParoisseForm(forms.ModelForm):
                 pk__in=zone_ids,
                 district__est_sites_particuliers=False,
             )
+            .exclude(district__nom__icontains=self._NOM_SITES_PARTICULIERS)
             .select_related("district__province__region")
             .order_by("nom")
         )
 
+        # Ces quatre querysets représentent le périmètre autorisé et restent
+        # nécessaires à RECENSEMENT_TERRITOIRE pour les comptes restreints.
         self.fields["zone"].queryset = zones_qs
-        self.fields["district"].queryset = District.objects.filter(zones__in=zones_qs).distinct().order_by("nom")
+        self.fields["district"].queryset = (
+            District.objects.filter(zones__in=zones_qs, est_sites_particuliers=False)
+            .exclude(nom__icontains=self._NOM_SITES_PARTICULIERS)
+            .distinct()
+            .order_by("nom")
+        )
         self.fields["province"].queryset = (
             Province.objects.filter(districts__zones__in=zones_qs).distinct().order_by("nom")
         )
         self.fields["region"].queryset = (
             Region.objects.filter(provinces__districts__zones__in=zones_qs).distinct().order_by("ordre", "nom")
         )
-        self.fields["village"].queryset = Village.objects.filter(
-            zone_id__in=zone_ids,
-            zone__district__est_sites_particuliers=False,
-        ).order_by("nom")
 
         # Une seule zone effective : préremplissage complet. Le verrouillage
         # visuel est appliqué dans cascade.js, tandis que la validation serveur
@@ -163,6 +252,20 @@ class FicheParoisseForm(forms.ModelForm):
                 self.fields["district"].initial = zone.district_id
                 self.fields["province"].initial = zone.district.province_id
                 self.fields["region"].initial = zone.district.province.region_id
+
+        # Le village est la liste la plus volumineuse du référentiel. On ne
+        # charge donc que ceux de la zone effectivement sélectionnée (POST,
+        # édition ou zone unique), jamais ceux de toutes les zones autorisées.
+        selected_zone_id = self._cascade_id("zone")
+        if selected_zone_id and selected_zone_id in zone_ids:
+            self.fields["village"].queryset = (
+                Village.objects.filter(
+                    zone_id=selected_zone_id,
+                    zone__district__est_sites_particuliers=False,
+                )
+                .exclude(zone__district__nom__icontains=self._NOM_SITES_PARTICULIERS)
+                .order_by("nom")
+            )
 
     contact_responsable = forms.CharField(
         required=False,
