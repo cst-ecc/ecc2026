@@ -31,8 +31,35 @@
         <td class="px-3 py-3">{{ entree.niveau|default:'—' }}</td>
         <td class="px-3 py-3">{{ entree.effectue_par.get_username|default:'Compte supprimé' }}<br><span class="text-xs text-slate-400">{{ entree.role_effecteur }}</span></td>
         <td class="px-3 py-3 max-w-xs">{{ entree.motif|default:'—' }}</td>
-        <td class="px-3 py-3"><details><summary class="cursor-pointer text-brand-600">Voir</summary><pre class="mt-2 min-w-[360px] whitespace-pre-wrap rounded bg-slate-50 p-3 text-xs">Avant : {{ entree.ancien_perimetre }}
-Après : {{ entree.nouveau_perimetre }}</pre></details></td>
+        <td class="px-3 py-3">
+          <details>
+            <summary class="cursor-pointer font-medium text-brand-600 hover:underline">
+              Voir
+            </summary>
+
+            <div class="mt-3 grid gap-3 lg:grid-cols-2">
+
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div class="mb-3 flex items-center gap-2">
+                  <span class="inline-block h-2.5 w-2.5 rounded-full bg-slate-400"></span>
+                  <h4 class="font-semibold text-slate-700">Avant</h4>
+                </div>
+
+                {% include "recensement/includes/_perimetre_historique.html" with perimetre=entree.ancien_perimetre %}
+              </div>
+
+              <div class="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <div class="mb-3 flex items-center gap-2">
+                  <span class="inline-block h-2.5 w-2.5 rounded-full bg-blue-500"></span>
+                  <h4 class="font-semibold text-blue-800">Après</h4>
+                </div>
+
+                {% include "recensement/includes/_perimetre_historique.html" with perimetre=entree.nouveau_perimetre %}
+              </div>
+
+            </div>
+          </details>
+        </td>
       </tr>
       {% empty %}<tr><td colspan="7" class="text-center text-slate-400 py-8">Aucune action territoriale enregistrée.</td></tr>{% endfor %}
     </tbody>

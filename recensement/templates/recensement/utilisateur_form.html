@@ -236,8 +236,31 @@
         <div class="flex justify-between gap-4"><strong>{{ entree.get_action_display }}</strong><span class="text-xs text-slate-400">{{ entree.date_action|date:'d/m/Y H:i' }}</span></div>
         <p class="text-slate-600 mt-1">Par {% if entree.effectue_par %}{{ entree.effectue_par.get_username }}{% else %}Compte supprimé{% endif %} ({{ entree.role_effecteur|default:'—' }})</p>
         {% if entree.motif %}<p class="mt-1"><span class="text-slate-400">Motif :</span> {{ entree.motif }}</p>{% endif %}
-        <details class="mt-2 text-xs"><summary class="cursor-pointer text-brand-600">Voir avant / après</summary><pre class="mt-2 overflow-auto rounded bg-slate-50 p-3">Avant : {{ entree.ancien_perimetre }}
-Après : {{ entree.nouveau_perimetre }}</pre></details>
+        <details class="mt-3">
+          <summary class="cursor-pointer text-sm font-medium text-brand-600 hover:underline">
+            Voir avant / après
+          </summary>
+
+          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Avant
+              </p>
+
+              {% include "recensement/includes/_perimetre_historique.html" with perimetre=entree.ancien_perimetre %}
+            </div>
+
+            <div class="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-blue-700">
+                Après
+              </p>
+
+              {% include "recensement/includes/_perimetre_historique.html" with perimetre=entree.nouveau_perimetre %}
+            </div>
+
+          </div>
+        </details>
       </div>
       {% empty %}<p class="p-5 text-sm text-slate-400">Aucun historique territorial.</p>{% endfor %}
     </div>

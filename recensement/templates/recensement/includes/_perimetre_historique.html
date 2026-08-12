@@ -1,0 +1,102 @@
+{% if not perimetre %}
+  <p class="text-sm italic text-slate-400">
+    Aucun périmètre enregistré.
+  </p>
+{% else %}
+  <dl class="space-y-2 text-sm">
+
+    {% if perimetre.role %}
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Rôle</dt>
+        <dd class="font-medium text-slate-800 text-right">
+          {% if perimetre.role == "super_admin" %}
+            Super administrateur
+          {% elif perimetre.role == "op_province" %}
+            OP PROVINCE
+          {% elif perimetre.role == "op_district" %}
+            OP DISTRICT
+          {% elif perimetre.role == "op_zone" %}
+            OP ZONE
+          {% elif perimetre.role == "agent" %}
+            Agent recenseur
+          {% else %}
+            {{ perimetre.role }}
+          {% endif %}
+        </dd>
+      </div>
+    {% endif %}
+
+    {% if perimetre.niveau %}
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Niveau</dt>
+        <dd class="font-medium text-slate-800 text-right">
+          {% if perimetre.niveau == "province" %}
+            Province
+          {% elif perimetre.niveau == "district" %}
+            District
+          {% elif perimetre.niveau == "zone" %}
+            Zone
+          {% else %}
+            {{ perimetre.niveau }}
+          {% endif %}
+        </dd>
+      </div>
+    {% endif %}
+
+    {% if perimetre.region %}
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Région</dt>
+        <dd class="font-medium text-slate-800 text-right">
+          {{ perimetre.region }}
+        </dd>
+      </div>
+    {% endif %}
+
+    {% if perimetre.province %}
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Province</dt>
+        <dd class="font-medium text-slate-800 text-right">
+          {{ perimetre.province }}
+        </dd>
+      </div>
+    {% endif %}
+
+    {% if perimetre.district %}
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">District</dt>
+        <dd class="font-medium text-slate-800 text-right">
+          {{ perimetre.district }}
+        </dd>
+      </div>
+    {% endif %}
+
+    {% if perimetre.zone %}
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Zone</dt>
+        <dd class="font-medium text-slate-800 text-right">
+          {{ perimetre.zone }}
+        </dd>
+      </div>
+    {% endif %}
+
+    {% if perimetre.statut %}
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Statut</dt>
+        <dd class="font-medium text-right">
+          {% if perimetre.statut == "active" %}
+            <span class="text-green-700">Active</span>
+          {% elif perimetre.statut == "suspendue" %}
+            <span class="text-amber-700">Suspendue</span>
+          {% elif perimetre.statut == "revoquee" %}
+            <span class="text-red-700">Retirée</span>
+          {% elif perimetre.statut == "expiree" %}
+            <span class="text-slate-500">Expirée</span>
+          {% else %}
+            {{ perimetre.statut }}
+          {% endif %}
+        </dd>
+      </div>
+    {% endif %}
+
+  </dl>
+{% endif %}
