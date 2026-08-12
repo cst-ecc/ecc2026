@@ -144,7 +144,6 @@ def _contexte_formulaire(
     }
 
 
-
 @login_required
 @require_GET
 def ajax_affectations_multiples_options(request):
@@ -174,9 +173,7 @@ def ajax_affectations_multiples_options(request):
             qs = qs.filter(Q(nom__icontains=terme) | Q(region__nom__icontains=terme))
         elif champ == "districts":
             qs = qs.filter(
-                Q(nom__icontains=terme)
-                | Q(province__nom__icontains=terme)
-                | Q(province__region__nom__icontains=terme)
+                Q(nom__icontains=terme) | Q(province__nom__icontains=terme) | Q(province__region__nom__icontains=terme)
             )
         else:
             qs = qs.filter(
@@ -193,10 +190,7 @@ def ajax_affectations_multiples_options(request):
         return JsonResponse(
             {
                 "field": champ,
-                "results": [
-                    {"id": obj.pk, "label": libelle_affectation_multiple(obj, champ)}
-                    for obj in objets
-                ],
+                "results": [{"id": obj.pk, "label": libelle_affectation_multiple(obj, champ)} for obj in objets],
                 "total": len(objets),
                 "has_more": False,
             }
@@ -210,8 +204,7 @@ def ajax_affectations_multiples_options(request):
         {
             "field": champ,
             "results": [
-                {"id": obj.pk, "label": libelle_affectation_multiple(obj, champ)}
-                for obj in page_obj.object_list
+                {"id": obj.pk, "label": libelle_affectation_multiple(obj, champ)} for obj in page_obj.object_list
             ],
             "total": paginator.count,
             "page": page_obj.number,
