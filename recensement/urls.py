@@ -35,6 +35,11 @@ urlpatterns = [
     path("ajax/districts/<int:province_id>/", views.ajax_districts, name="ajax_districts"),
     path("ajax/zones/<int:district_id>/", views.ajax_zones, name="ajax_zones"),
     path("ajax/villages/<int:zone_id>/", views.ajax_villages, name="ajax_villages"),
+    path(
+        "ajax/affectations-multiples/options/",
+        access_views.ajax_affectations_multiples_options,
+        name="ajax_affectations_multiples_options",
+    ),
     path("ajax/doublons-fiche/", doublon_views.ajax_verifier_doublon_fiche, name="ajax_verifier_doublon_fiche"),
     # Gestion hiérarchique des comptes et accès territoriaux
     path("utilisateurs/", access_views.utilisateur_list, name="utilisateur_list"),

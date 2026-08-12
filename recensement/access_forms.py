@@ -138,12 +138,18 @@ class ProfilTerritorialForm(forms.ModelForm):
         # QuerySets autorisés par le responsable connecté. Ils servent de base
         # de sécurité, puis sont encore réduits selon le parent sélectionné.
         provinces_autorisees_qs = Province.objects.none()
+        districts_autorises_qs = District.objects.none()
         zones_autorisees_qs = Zone.objects.none()
 
         if role_responsable == Profil.Role.SUPER_ADMIN:
             provinces_autorisees_qs = Province.objects.all()
-            zones_autorisees_qs = Zone.objects.filter(district__est_sites_particuliers=False).exclude(
-                district__nom__icontains="sites particuliers"
+            districts_autorises_qs = (
+                District.objects.filter(est_sites_particuliers=False)
+                .exclude(nom__icontains="sites particuliers")
+            )
+            zones_autorisees_qs = (
+                Zone.objects.filter(district__est_sites_particuliers=False)
+                .exclude(district__nom__icontains="sites particuliers")
             )
             regions_autorisees_qs = Region.objects.all()
 
@@ -153,41 +159,66 @@ class ProfilTerritorialForm(forms.ModelForm):
         elif role_responsable == Profil.Role.OP_PROVINCE:
             province_ids = provinces_autorisees(responsable) or set()
             provinces_autorisees_qs = Province.objects.filter(pk__in=province_ids)
-            districts_autorisees_qs = District.objects.filter(
-                province_id__in=province_ids,
-                est_sites_particuliers=False,
-            ).exclude(nom__icontains="sites particuliers")
-            zones_autorisees_qs = Zone.objects.filter(
-                district__province_id__in=province_ids,
-                district__est_sites_particuliers=False,
-            ).exclude(district__nom__icontains="sites particuliers")
-            regions_autorisees_qs = Region.objects.filter(provinces__in=provinces_autorisees_qs).distinct()
+            districts_autorisees_qs = (
+                District.objects.filter(
+                    province_id__in=province_ids,
+                    est_sites_particuliers=False,
+                )
+                .exclude(nom__icontains="sites particuliers")
+            )
+            zones_autorisees_qs = (
+                Zone.objects.filter(
+                    district__province_id__in=province_ids,
+                    district__est_sites_particuliers=False,
+                )
+                .exclude(district__nom__icontains="sites particuliers")
+            )
+            regions_autorisees_qs = Region.objects.filter(
+                provinces__in=provinces_autorisees_qs
+            ).distinct()
 
         elif role_responsable == Profil.Role.OP_DISTRICT:
             district_ids = districts_autorises(responsable) or set()
-            districts_autorisees_qs = District.objects.filter(
-                pk__in=district_ids,
-                est_sites_particuliers=False,
-            ).exclude(nom__icontains="sites particuliers")
-            provinces_autorisees_qs = Province.objects.filter(districts__in=districts_autorisees_qs).distinct()
-            zones_autorisees_qs = Zone.objects.filter(
-                district_id__in=district_ids,
-                district__est_sites_particuliers=False,
-            ).exclude(district__nom__icontains="sites particuliers")
-            regions_autorisees_qs = Region.objects.filter(provinces__in=provinces_autorisees_qs).distinct()
+            districts_autorisees_qs = (
+                District.objects.filter(
+                    pk__in=district_ids,
+                    est_sites_particuliers=False,
+                )
+                .exclude(nom__icontains="sites particuliers")
+            )
+            provinces_autorisees_qs = Province.objects.filter(
+                districts__in=districts_autorisees_qs
+            ).distinct()
+            zones_autorisees_qs = (
+                Zone.objects.filter(
+                    district_id__in=district_ids,
+                    district__est_sites_particuliers=False,
+                )
+                .exclude(district__nom__icontains="sites particuliers")
+            )
+            regions_autorisees_qs = Region.objects.filter(
+                provinces__in=provinces_autorisees_qs
+            ).distinct()
 
         elif role_responsable == Profil.Role.OP_ZONE:
             zone_ids = zones_autorisees(responsable) or set()
-            zones_autorisees_qs = Zone.objects.filter(
-                pk__in=zone_ids,
-                district__est_sites_particuliers=False,
-            ).exclude(district__nom__icontains="sites particuliers")
+            zones_autorisees_qs = (
+                Zone.objects.filter(
+                    pk__in=zone_ids,
+                    district__est_sites_particuliers=False,
+                )
+                .exclude(district__nom__icontains="sites particuliers")
+            )
             districts_autorisees_qs = District.objects.filter(
                 zones__in=zones_autorisees_qs,
                 est_sites_particuliers=False,
             ).distinct()
-            provinces_autorisees_qs = Province.objects.filter(districts__in=districts_autorisees_qs).distinct()
-            regions_autorisees_qs = Region.objects.filter(provinces__in=provinces_autorisees_qs).distinct()
+            provinces_autorisees_qs = Province.objects.filter(
+                districts__in=districts_autorisees_qs
+            ).distinct()
+            regions_autorisees_qs = Region.objects.filter(
+                provinces__in=provinces_autorisees_qs
+            ).distinct()
 
         else:
             regions_autorisees_qs = Region.objects.none()
@@ -216,7 +247,9 @@ class ProfilTerritorialForm(forms.ModelForm):
         # HTML alors que utilisateur_cascade.js les recharge déjà par AJAX.
         if region_id:
             self.fields["province"].queryset = (
-                provinces_autorisees_qs.filter(region_id=region_id).select_related("region").order_by("nom")
+                provinces_autorisees_qs.filter(region_id=region_id)
+                .select_related("region")
+                .order_by("nom")
             )
 
         if province_id:
@@ -367,45 +400,120 @@ class ProfilTerritorialForm(forms.ModelForm):
         return cleaned
 
 
+def _champ_affectations_pour_role(role_cible):
+    return {
+        Profil.Role.OP_PROVINCE: "provinces",
+        Profil.Role.OP_DISTRICT: "districts",
+        Profil.Role.OP_ZONE: "zones",
+        Profil.Role.AGENT: "zones",
+    }.get(role_cible)
+
+
+def queryset_affectations_autorisees(responsable, role_cible):
+    """Retourne uniquement le QuerySet autorisé pour le rôle cible.
+
+    Cette fonction centralise le périmètre des affectations supplémentaires.
+    Elle est utilisée à la fois par le formulaire (validation serveur), par le
+    sélecteur AJAX et par l'ancien formulaire unitaire de compatibilité.
+    """
+    champ = _champ_affectations_pour_role(role_cible)
+    if not responsable or not champ:
+        return champ, Province.objects.none() if champ == "provinces" else (
+            District.objects.none() if champ == "districts" else Zone.objects.none()
+        )
+
+    role_responsable = get_role(responsable)
+
+    if champ == "provinces":
+        if role_responsable != Profil.Role.SUPER_ADMIN:
+            return champ, Province.objects.none()
+        qs = Province.objects.select_related("region").all()
+        return champ, qs.order_by("region__ordre", "region__nom", "nom")
+
+    if champ == "districts":
+        qs = District.objects.select_related("province__region").filter(
+            est_sites_particuliers=False,
+        ).exclude(nom__icontains="sites particuliers")
+
+        if role_responsable == Profil.Role.SUPER_ADMIN:
+            pass
+        elif role_responsable == Profil.Role.OP_PROVINCE:
+            province_ids = provinces_autorisees(responsable) or set()
+            qs = qs.filter(province_id__in=province_ids)
+        else:
+            qs = qs.none()
+
+        return champ, qs.order_by("province__region__ordre", "province__nom", "nom")
+
+    qs = Zone.objects.select_related("district__province__region").filter(
+        district__est_sites_particuliers=False,
+    ).exclude(district__nom__icontains="sites particuliers")
+
+    if role_responsable == Profil.Role.SUPER_ADMIN:
+        pass
+    elif role_responsable == Profil.Role.OP_PROVINCE:
+        province_ids = provinces_autorisees(responsable) or set()
+        qs = qs.filter(district__province_id__in=province_ids)
+    elif role_responsable == Profil.Role.OP_DISTRICT:
+        district_ids = districts_autorises(responsable) or set()
+        qs = qs.filter(district_id__in=district_ids)
+    elif role_responsable == Profil.Role.OP_ZONE:
+        zone_ids = zones_autorisees(responsable) or set()
+        qs = qs.filter(pk__in=zone_ids)
+    else:
+        qs = qs.none()
+
+    return champ, qs.order_by("district__province__nom", "district__nom", "nom")
+
+
+def libelle_affectation_multiple(obj, champ):
+    if champ == "provinces":
+        return f"{obj.region.nom} — {obj.nom}"
+    if champ == "districts":
+        return f"{obj.province.region.nom} — {obj.province.nom} — {obj.nom}"
+    return f"{obj.district.province.nom} — {obj.district.nom} — {obj.nom}"
+
+
 class _ProvinceMultipleChoiceField(forms.ModelMultipleChoiceField):
     def label_from_instance(self, obj):
-        return f"{obj.region.nom} — {obj.nom}"
+        return libelle_affectation_multiple(obj, "provinces")
 
 
 class _DistrictMultipleChoiceField(forms.ModelMultipleChoiceField):
     def label_from_instance(self, obj):
-        return f"{obj.province.region.nom} — {obj.province.nom} — {obj.nom}"
+        return libelle_affectation_multiple(obj, "districts")
 
 
 class _ZoneMultipleChoiceField(forms.ModelMultipleChoiceField):
     def label_from_instance(self, obj):
-        return f"{obj.district.province.nom} — {obj.district.nom} — {obj.nom}"
+        return libelle_affectation_multiple(obj, "zones")
 
 
 class AffectationsMultiplesForm(forms.Form):
     """Sélection en lot des affectations supplémentaires autorisées.
 
-    Les trois champs sont présents pour permettre l'affichage dynamique lors
-    de la création d'un compte. La validation n'accepte que le champ adapté au
-    rôle cible et vérifie de nouveau le périmètre côté serveur.
+    Les choix ne sont plus rendus intégralement en cases à cocher. Le navigateur
+    recherche les territoires à la demande. Côté serveur, le formulaire ne
+    charge que les identifiants effectivement soumis (ou déjà actifs en édition)
+    puis les valide contre le périmètre autorisé du responsable connecté.
     """
 
     provinces = _ProvinceMultipleChoiceField(
         queryset=Province.objects.none(),
         required=False,
-        widget=forms.CheckboxSelectMultiple,
+        widget=forms.MultipleHiddenInput,
         label="Provinces supplémentaires",
     )
     districts = _DistrictMultipleChoiceField(
         queryset=District.objects.none(),
         required=False,
-        widget=forms.CheckboxSelectMultiple,
+        widget=forms.MultipleHiddenInput,
         label="Districts supplémentaires",
     )
     zones = _ZoneMultipleChoiceField(
         queryset=Zone.objects.none(),
         required=False,
-        widget=forms.CheckboxSelectMultiple,
+        widget=forms.MultipleHiddenInput,
         label="Zones supplémentaires",
     )
     motif_affectations = forms.CharField(
@@ -436,97 +544,74 @@ class AffectationsMultiplesForm(forms.Form):
         self.role_cible = role_cible or (getattr(getattr(cible, "profil", None), "role", None))
         self.champ_perimetre = self.ROLE_VERS_CHAMP.get(self.role_cible)
 
-        provinces_qs = Province.objects.none()
-        districts_qs = District.objects.none()
-        zones_qs = Zone.objects.none()
+        for champ in ("provinces", "districts", "zones"):
+            self.fields[champ].queryset = self.fields[champ].queryset.none()
 
-        if responsable:
-            role_responsable = get_role(responsable)
+        self._selected_ids = {"provinces": [], "districts": [], "zones": []}
 
-            if role_responsable == Profil.Role.SUPER_ADMIN:
-                provinces_qs = Province.objects.select_related("region").all()
-                districts_qs = (
-                    District.objects.select_related("province__region")
-                    .filter(est_sites_particuliers=False)
-                    .exclude(nom__icontains="sites particuliers")
-                )
-                zones_qs = (
-                    Zone.objects.select_related("district__province__region")
-                    .filter(district__est_sites_particuliers=False)
-                    .exclude(district__nom__icontains="sites particuliers")
-                )
+        if not responsable or not self.champ_perimetre:
+            return
 
-            elif role_responsable == Profil.Role.OP_PROVINCE:
-                province_ids = provinces_autorisees(responsable) or set()
-                districts_qs = (
-                    District.objects.select_related("province__region")
-                    .filter(province_id__in=province_ids, est_sites_particuliers=False)
-                    .exclude(nom__icontains="sites particuliers")
-                )
-                zones_qs = (
-                    Zone.objects.select_related("district__province__region")
-                    .filter(
-                        district__province_id__in=province_ids,
-                        district__est_sites_particuliers=False,
-                    )
-                    .exclude(district__nom__icontains="sites particuliers")
-                )
+        champ, qs_autorise = queryset_affectations_autorisees(responsable, self.role_cible)
+        selected_ids = self._ids_selectionnes(champ)
+        self._selected_ids[champ] = selected_ids
 
-            elif role_responsable == Profil.Role.OP_DISTRICT:
-                district_ids = districts_autorises(responsable) or set()
-                zones_qs = (
-                    Zone.objects.select_related("district__province__region")
-                    .filter(
-                        district_id__in=district_ids,
-                        district__est_sites_particuliers=False,
-                    )
-                    .exclude(district__nom__icontains="sites particuliers")
-                )
+        # Le ModelMultipleChoiceField ne reçoit que les choix réellement
+        # sélectionnés. Tout identifiant soumis mais hors périmètre est donc
+        # rejeté automatiquement comme choix invalide.
+        if selected_ids:
+            self.fields[champ].queryset = qs_autorise.filter(pk__in=selected_ids)
 
-            elif role_responsable == Profil.Role.OP_ZONE:
-                zone_ids = zones_autorisees(responsable) or set()
-                zones_qs = (
-                    Zone.objects.select_related("district__province__region")
-                    .filter(
-                        pk__in=zone_ids,
-                        district__est_sites_particuliers=False,
-                    )
-                    .exclude(district__nom__icontains="sites particuliers")
-                )
+        if not self.is_bound and cible is not None:
+            self.initial.setdefault(champ, selected_ids)
 
-        self.fields["provinces"].queryset = provinces_qs.order_by("region__ordre", "region__nom", "nom")
-        self.fields["districts"].queryset = districts_qs.order_by("province__region__ordre", "province__nom", "nom")
-        self.fields["zones"].queryset = zones_qs.order_by("district__province__nom", "district__nom", "nom")
+    def _ids_selectionnes(self, champ):
+        if self.is_bound:
+            if hasattr(self.data, "getlist"):
+                raw_values = self.data.getlist(champ)
+            else:
+                raw = self.data.get(champ, [])
+                raw_values = raw if isinstance(raw, (list, tuple)) else [raw]
+            return [int(value) for value in raw_values if str(value).isdigit()]
 
-        if cible is not None:
-            actives = AffectationTerritoriale.objects.filter(
-                utilisateur=cible,
+        if self.cible is None:
+            initial = self.initial.get(champ, []) or []
+            return [int(value) for value in initial if str(value).isdigit()]
+
+        niveau = {
+            "provinces": AffectationTerritoriale.Niveau.PROVINCE,
+            "districts": AffectationTerritoriale.Niveau.DISTRICT,
+            "zones": AffectationTerritoriale.Niveau.ZONE,
+        }[champ]
+        fk = "province" if champ == "provinces" else champ[:-1]
+        return list(
+            AffectationTerritoriale.objects.filter(
+                utilisateur=self.cible,
+                niveau=niveau,
                 statut=AffectationTerritoriale.Statut.ACTIVE,
             )
-            self.initial.setdefault(
-                "provinces",
-                list(
-                    actives.filter(niveau=AffectationTerritoriale.Niveau.PROVINCE)
-                    .exclude(province__isnull=True)
-                    .values_list("province_id", flat=True)
-                ),
-            )
-            self.initial.setdefault(
-                "districts",
-                list(
-                    actives.filter(niveau=AffectationTerritoriale.Niveau.DISTRICT)
-                    .exclude(district__isnull=True)
-                    .values_list("district_id", flat=True)
-                ),
-            )
-            self.initial.setdefault(
-                "zones",
-                list(
-                    actives.filter(niveau=AffectationTerritoriale.Niveau.ZONE)
-                    .exclude(zone__isnull=True)
-                    .values_list("zone_id", flat=True)
-                ),
-            )
+            .exclude(**{f"{fk}__isnull": True})
+            .values_list(f"{fk}_id", flat=True)
+        )
+
+    def options_selectionnees(self):
+        """Données légères nécessaires pour restaurer le sélecteur côté JS."""
+        resultat = {"provinces": [], "districts": [], "zones": []}
+        if not self.responsable or not self.champ_perimetre:
+            return resultat
+
+        champ, qs_autorise = queryset_affectations_autorisees(self.responsable, self.role_cible)
+        ids = self._selected_ids.get(champ, [])
+        if not ids:
+            return resultat
+
+        objets = {obj.pk: obj for obj in qs_autorise.filter(pk__in=ids)}
+        resultat[champ] = [
+            {"id": value, "label": libelle_affectation_multiple(objets[value], champ)}
+            for value in ids
+            if value in objets
+        ]
+        return resultat
 
     def _principal_id(self, cleaned):
         if self.cible is not None:
@@ -538,7 +623,6 @@ class AffectationsMultiplesForm(forms.Form):
             if self.champ_perimetre == "zones":
                 return profil.zone_id
 
-        # Création : les sélecteurs principaux sont dans le même POST.
         nom = {"provinces": "province", "districts": "district", "zones": "zone"}.get(self.champ_perimetre)
         raw = (self.data.get(nom) or "").strip() if nom else ""
         return int(raw) if raw.isdigit() else None
@@ -631,11 +715,11 @@ class AffectationTerritorialeForm(forms.Form):
         if not responsable or not cible or not hasattr(cible, "profil"):
             return
 
-        multi = AffectationsMultiplesForm(responsable=responsable, cible=cible)
         role_cible = cible.profil.role
+        champ, qs_autorise = queryset_affectations_autorisees(responsable, role_cible)
         if role_cible == Profil.Role.OP_PROVINCE:
             self.niveau = AffectationTerritoriale.Niveau.PROVINCE
-            self.fields["province"].queryset = multi.fields["provinces"].queryset.exclude(pk=cible.profil.province_id)
+            self.fields["province"].queryset = qs_autorise.exclude(pk=cible.profil.province_id)
             self.fields["region"].queryset = Region.objects.filter(
                 provinces__in=self.fields["province"].queryset
             ).distinct()
@@ -643,7 +727,7 @@ class AffectationTerritorialeForm(forms.Form):
             del self.fields["zone"]
         elif role_cible == Profil.Role.OP_DISTRICT:
             self.niveau = AffectationTerritoriale.Niveau.DISTRICT
-            self.fields["district"].queryset = multi.fields["districts"].queryset.exclude(pk=cible.profil.district_id)
+            self.fields["district"].queryset = qs_autorise.exclude(pk=cible.profil.district_id)
             self.fields["province"].queryset = Province.objects.filter(
                 districts__in=self.fields["district"].queryset
             ).distinct()
@@ -653,7 +737,7 @@ class AffectationTerritorialeForm(forms.Form):
             del self.fields["zone"]
         elif role_cible in (Profil.Role.OP_ZONE, Profil.Role.AGENT):
             self.niveau = AffectationTerritoriale.Niveau.ZONE
-            self.fields["zone"].queryset = multi.fields["zones"].queryset.exclude(pk=cible.profil.zone_id)
+            self.fields["zone"].queryset = qs_autorise.exclude(pk=cible.profil.zone_id)
             self.fields["district"].queryset = District.objects.filter(
                 zones__in=self.fields["zone"].queryset
             ).distinct()

@@ -4,7 +4,10 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
@@ -14,6 +17,8 @@ from .access_forms import (
     AffectationTerritorialeForm,
     ProfilTerritorialForm,
     UtilisateurContactForm,
+    libelle_affectation_multiple,
+    queryset_affectations_autorisees,
 )
 from .forms import TailwindSetPasswordForm
 from .identifiants import generer_identifiant, generer_mot_de_passe_provisoire
@@ -32,6 +37,7 @@ from .permissions import (
     peut_creer_utilisateur,
     peut_gerer_utilisateur,
     peut_modifier_affectation,
+    roles_creables_par,
     utilisateurs_visibles_pour,
 )
 from .services.services_affectations import (
@@ -134,7 +140,84 @@ def _contexte_formulaire(
         "peut_ajouter_affectation": bool(affectations_multiples_form.champ_perimetre or not is_edit),
         "role_connecte": get_role(request.user),
         "role_cible_affectations": role_cible or "",
+        "affectations_multiples_initial": affectations_multiples_form.options_selectionnees(),
     }
+
+
+
+@login_required
+@require_GET
+def ajax_affectations_multiples_options(request):
+    """Recherche paginée des territoires attribuables au rôle cible.
+
+    Le résultat est strictement limité au périmètre du responsable connecté.
+    L'endpoint ne modifie aucune donnée ; la validation finale reste assurée
+    par AffectationsMultiplesForm puis par le service transactionnel.
+    """
+    _exiger_gestionnaire(request.user)
+
+    role_cible = (request.GET.get("role") or "").strip()
+    if role_cible not in roles_creables_par(request.user):
+        return JsonResponse({"results": [], "total": 0, "has_more": False}, status=403)
+
+    champ, qs = queryset_affectations_autorisees(request.user, role_cible)
+    if not champ:
+        return JsonResponse({"results": [], "total": 0, "has_more": False, "field": ""})
+
+    principal_raw = (request.GET.get("principal_id") or "").strip()
+    if principal_raw.isdigit():
+        qs = qs.exclude(pk=int(principal_raw))
+
+    terme = (request.GET.get("q") or "").strip()[:100]
+    if terme:
+        if champ == "provinces":
+            qs = qs.filter(Q(nom__icontains=terme) | Q(region__nom__icontains=terme))
+        elif champ == "districts":
+            qs = qs.filter(
+                Q(nom__icontains=terme)
+                | Q(province__nom__icontains=terme)
+                | Q(province__region__nom__icontains=terme)
+            )
+        else:
+            qs = qs.filter(
+                Q(nom__icontains=terme)
+                | Q(district__nom__icontains=terme)
+                | Q(district__province__nom__icontains=terme)
+            )
+
+    if request.GET.get("all") == "1":
+        # Utilisé uniquement après une action explicite « Tout sélectionner ».
+        # Le référentiel actuel reste modeste (quelques centaines de zones),
+        # mais une borne protège l'endpoint contre une croissance inattendue.
+        objets = list(qs[:2000])
+        return JsonResponse(
+            {
+                "field": champ,
+                "results": [
+                    {"id": obj.pk, "label": libelle_affectation_multiple(obj, champ)}
+                    for obj in objets
+                ],
+                "total": len(objets),
+                "has_more": False,
+            }
+        )
+
+    paginator = Paginator(qs, 40)
+    page_number = request.GET.get("page") or 1
+    page_obj = paginator.get_page(page_number)
+
+    return JsonResponse(
+        {
+            "field": champ,
+            "results": [
+                {"id": obj.pk, "label": libelle_affectation_multiple(obj, champ)}
+                for obj in page_obj.object_list
+            ],
+            "total": paginator.count,
+            "page": page_obj.number,
+            "has_more": page_obj.has_next(),
+        }
+    )
 
 
 @login_required

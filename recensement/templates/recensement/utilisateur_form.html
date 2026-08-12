@@ -268,7 +268,8 @@ Après : {{ entree.nouveau_perimetre }}</pre></details>
   window.UTILISATEUR_AJAX_URLS = {
     provinces: "{% url 'recensement:ajax_provinces' 0 %}",
     districts: "{% url 'recensement:ajax_districts' 0 %}",
-    zones: "{% url 'recensement:ajax_zones' 0 %}"
+    zones: "{% url 'recensement:ajax_zones' 0 %}",
+    affectations: "{% url 'recensement:ajax_affectations_multiples_options' %}"
   };
 
   window.UTILISATEUR_INITIAL = {
