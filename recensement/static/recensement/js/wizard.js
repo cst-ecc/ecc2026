@@ -207,7 +207,9 @@
       var nbPhotos = champPhotos && champPhotos.files ? champPhotos.files.length : 0;
       html += ligneRecap("Photos de la paroisse", nbPhotos + " photo(s) sélectionnée(s)");
 
-      html += ligneRecap("Chargé de paroisse", champTexte("id_parish_shepherd"));
+      html += ligneRecap("Grade du chargé", texteOptionSelectionnee(document.getElementById("id_charge_grade")));
+      html += ligneRecap("Nom du chargé", champTexte("id_charge_nom"));
+      html += ligneRecap("Prénoms du chargé", champTexte("id_charge_prenoms"));
       html += ligneRecap("Contact du chargé", champTexte("id_contact_responsable"));
 
       var champPhotoCharge = document.getElementById("id_photo_charge");
@@ -216,7 +218,9 @@
 
       html += ligneRecap("Position GPS", gpsTexte);
 
-      html += ligneRecap("Nom de l'informateur", champTexte("id_nom_informateur") || "Non renseigné");
+      html += ligneRecap("Grade de l'informateur", texteOptionSelectionnee(document.getElementById("id_informateur_grade")));
+      html += ligneRecap("Nom de l'informateur", champTexte("id_informateur_nom") || "Non renseigné");
+      html += ligneRecap("Prénoms de l'informateur", champTexte("id_informateur_prenoms") || "Non renseigné");
       html += ligneRecap("Contact de l'informateur", champTexte("id_contact_informateur") || "Non renseigné");
 
       html += ligneRecap("Observations", champTexte("id_observations"));

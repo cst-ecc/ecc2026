@@ -451,6 +451,178 @@ class FonctionResponsable(models.TextChoices):
     AUTRE = "autre", "Autre"
 
 
+class GradeEcclesialQuerySet(models.QuerySet):
+    """QuerySet centralisant les règles de sélection du référentiel des grades."""
+
+    CATEGORIES_HOMMES_ACTUELLES = ("general", "visionnaire", "allagba")
+
+    def pour_formulaires_hommes(self, *, grade_courant_id=None):
+        """Grades masculins actifs actuellement proposés dans les formulaires.
+
+        Lors d'une modification, ``grade_courant_id`` permet de conserver un
+        ancien grade déjà enregistré même s'il est devenu inactif ou historique.
+        Cela évite toute perte silencieuse de données lors d'une modification
+        portant sur un autre champ.
+        """
+
+        condition = models.Q(
+            est_actif=True,
+            genre="homme",
+            categorie__in=self.CATEGORIES_HOMMES_ACTUELLES,
+        )
+        if grade_courant_id:
+            condition |= models.Q(pk=grade_courant_id)
+
+        categorie_ordre = models.Case(
+            models.When(categorie="general", then=models.Value(1)),
+            models.When(categorie="visionnaire", then=models.Value(2)),
+            models.When(categorie="allagba", then=models.Value(3)),
+            default=models.Value(99),
+            output_field=models.PositiveSmallIntegerField(),
+        )
+
+        return (
+            self.filter(condition)
+            .annotate(_categorie_ordre=categorie_ordre)
+            .order_by("_categorie_ordre", "ordre", "niveau_onction", "libelle_francophone")
+        )
+
+
+class GradeEcclesial(models.Model):
+    """Grade religieux ou ecclésial ECC.
+
+    Le grade est une donnée de référence distincte du titre du poste occupé.
+    Le référentiel est volontairement extensible : l'application exploite
+    actuellement les grades masculins francophones, tout en conservant des
+    emplacements pour les variantes anglophones, harmonisées et futures.
+    """
+
+    class Categorie(models.TextChoices):
+        GENERAL = "general", "Grades généraux"
+        VISIONNAIRE = "visionnaire", "Corps des visionnaires"
+        ALLAGBA = "allagba", "Corps des Allagba"
+        AUTRE = "autre", "Autre"
+
+    class Genre(models.TextChoices):
+        HOMME = "homme", "Homme"
+        FEMME = "femme", "Femme"
+        MIXTE = "mixte", "Mixte"
+
+    code = models.SlugField(
+        max_length=80,
+        unique=True,
+        help_text="Code technique stable utilisé par les seeds et les exports.",
+    )
+    categorie = models.CharField(
+        max_length=20,
+        choices=Categorie.choices,
+        default=Categorie.AUTRE,
+        db_index=True,
+    )
+    genre = models.CharField(
+        max_length=10,
+        choices=Genre.choices,
+        default=Genre.MIXTE,
+        db_index=True,
+    )
+    ordre = models.PositiveSmallIntegerField(default=0, db_index=True)
+    niveau_onction = models.CharField(
+        max_length=80,
+        blank=True,
+        verbose_name="Niveau / onction",
+    )
+    libelle_francophone = models.CharField(
+        max_length=180,
+        db_index=True,
+        verbose_name="Libellé francophone",
+    )
+    libelle_anglophone = models.CharField(
+        max_length=180,
+        blank=True,
+        verbose_name="Libellé anglophone",
+    )
+    libelle_harmonise = models.CharField(
+        max_length=180,
+        blank=True,
+        verbose_name="Libellé harmonisé",
+    )
+    abreviation = models.CharField(
+        max_length=40,
+        blank=True,
+        verbose_name="Abréviation",
+        help_text="Abréviation officielle lorsqu'elle est connue. Ne pas inventer de valeur définitive.",
+    )
+    est_base_commune = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Indique qu'il s'agit d'un grade appartenant au socle commun (ex. Frère ou Dèhoto).",
+    )
+    est_actif = models.BooleanField(default=True, db_index=True)
+    observations = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = GradeEcclesialQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["ordre", "libelle_francophone"]
+        verbose_name = "Grade ecclésial"
+        verbose_name_plural = "Grades ecclésiaux"
+        indexes = [
+            models.Index(
+                fields=["genre", "categorie", "est_actif", "ordre"],
+                name="grade_gen_cat_act_idx",
+            ),
+        ]
+
+    @property
+    def libelle(self):
+        """Alias Python transitoire pour l'ancien nom de champ."""
+        return self.libelle_francophone
+
+    @libelle.setter
+    def libelle(self, value):
+        self.libelle_francophone = value
+
+    @property
+    def categorie_libelle(self):
+        return self.get_categorie_display()
+
+    def __str__(self):
+        if self.abreviation:
+            return f"{self.abreviation} — {self.libelle_francophone}"
+        return self.libelle_francophone
+
+
+def _identite_structuree_affichage(*, grade=None, nom="", prenoms="", legacy="", utiliser_abreviation=True):
+    """Assemble une identité sans perdre la valeur historique éventuelle."""
+
+    nom = (nom or "").strip()
+    prenoms = (prenoms or "").strip()
+    legacy = (legacy or "").strip()
+
+    identite = " ".join(part for part in (nom, prenoms) if part).strip()
+    if not identite and legacy:
+        identite = legacy
+
+    if not identite:
+        return "Non renseigné"
+
+    if grade:
+        libelle_grade = grade.abreviation if utiliser_abreviation and grade.abreviation else grade.libelle_francophone
+        if libelle_grade:
+            return f"{libelle_grade} — {identite}"
+
+    return identite
+
+
+def _nom_prenoms_affichage(*, nom="", prenoms="", legacy=""):
+    nom = (nom or "").strip()
+    prenoms = (prenoms or "").strip()
+    identite = " ".join(part for part in (nom, prenoms) if part).strip()
+    return identite or (legacy or "").strip()
+
+
 class FicheParoisse(models.Model):
     """Fiche remplie par un agent recenseur sur le terrain pour une paroisse."""
 
@@ -512,7 +684,20 @@ class FicheParoisse(models.Model):
     annee_fondation = models.PositiveIntegerField(null=True, blank=True)
 
     # --- Chargé de paroisse ---
-    parish_shepherd = models.CharField(max_length=200)
+    charge_grade = models.ForeignKey(
+        GradeEcclesial,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fiches_charge_paroisse",
+        verbose_name="Grade du chargé de paroisse",
+    )
+    charge_nom = models.CharField(max_length=120, blank=True, verbose_name="Nom du chargé de paroisse")
+    charge_prenoms = models.CharField(max_length=180, blank=True, verbose_name="Prénoms du chargé de paroisse")
+    parish_shepherd = models.CharField(
+        max_length=200,
+        help_text="Champ historique conservé pour compatibilité. Il est synchronisé depuis nom/prénoms.",
+    )
     contact_responsable = models.CharField(max_length=30, null=True, blank=True)
     photo_charge = models.ImageField(
         upload_to="paroisses/charges/%Y/%m/",
@@ -633,7 +818,21 @@ class FicheParoisse(models.Model):
 
     # --- Informateur (personne ayant renseigné l'agent sur place, si
     #     différente du chargé de paroisse) — entièrement facultatif ---
-    nom_informateur = models.CharField(max_length=200, blank=True)
+    informateur_grade = models.ForeignKey(
+        GradeEcclesial,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fiches_informateur",
+        verbose_name="Grade de l'informateur",
+    )
+    informateur_nom = models.CharField(max_length=120, blank=True, verbose_name="Nom de l'informateur")
+    informateur_prenoms = models.CharField(max_length=180, blank=True, verbose_name="Prénoms de l'informateur")
+    nom_informateur = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Champ historique conservé pour compatibilité. Il est synchronisé depuis nom/prénoms.",
+    )
     contact_informateur = models.CharField(max_length=30, null=True, blank=True)
 
     observations = models.TextField(blank=True)
@@ -692,6 +891,73 @@ class FicheParoisse(models.Model):
             raise ValidationError({"district": "Ce district est exclu du recensement ordinaire."})
         if self.zone_id and self.zone.district.est_sites_particuliers:
             raise ValidationError({"zone": "Cette zone est exclue du recensement ordinaire."})
+
+    @property
+    def charge_nom_prenoms(self):
+        return _nom_prenoms_affichage(
+            nom=self.charge_nom,
+            prenoms=self.charge_prenoms,
+            legacy=self.parish_shepherd,
+        )
+
+    @property
+    def charge_identite_affichage(self):
+        return _identite_structuree_affichage(
+            grade=self.charge_grade,
+            nom=self.charge_nom,
+            prenoms=self.charge_prenoms,
+            legacy=self.parish_shepherd,
+        )
+
+    @property
+    def informateur_nom_prenoms(self):
+        return _nom_prenoms_affichage(
+            nom=self.informateur_nom,
+            prenoms=self.informateur_prenoms,
+            legacy=self.nom_informateur,
+        )
+
+    @property
+    def informateur_identite_affichage(self):
+        valeur = _identite_structuree_affichage(
+            grade=self.informateur_grade,
+            nom=self.informateur_nom,
+            prenoms=self.informateur_prenoms,
+            legacy=self.nom_informateur,
+        )
+        return "" if valeur == "Non renseigné" else valeur
+
+    @property
+    def a_informateur_renseigne(self):
+        return bool(self.informateur_identite_affichage or self.contact_informateur)
+
+    def save(self, *args, **kwargs):
+        self.charge_nom = (self.charge_nom or "").strip().upper()
+        self.charge_prenoms = (self.charge_prenoms or "").strip()
+        self.informateur_nom = (self.informateur_nom or "").strip().upper()
+        self.informateur_prenoms = (self.informateur_prenoms or "").strip()
+
+        charge_nom_prenoms = _nom_prenoms_affichage(
+            nom=self.charge_nom,
+            prenoms=self.charge_prenoms,
+            legacy="",
+        )
+        if self.charge_nom and charge_nom_prenoms:
+            self.parish_shepherd = charge_nom_prenoms
+        else:
+            self.parish_shepherd = (self.parish_shepherd or "").strip()
+
+        informateur_nom_prenoms = _nom_prenoms_affichage(
+            nom=self.informateur_nom,
+            prenoms=self.informateur_prenoms,
+            legacy="",
+        )
+        if self.informateur_nom and informateur_nom_prenoms:
+            self.nom_informateur = informateur_nom_prenoms
+        else:
+            self.nom_informateur = (self.nom_informateur or "").strip()
+
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.nom_paroisse} — {self.localite}"
@@ -755,7 +1021,10 @@ class HistoriqueModification(models.Model):
         ("nouvelle_localite_nom", "Nouvelle localité"),
         ("nom_paroisse", "Nom de la paroisse"),
         ("annee_fondation", "Année de fondation"),
-        ("parish_shepherd", "Chargé de paroisse"),
+        ("charge_grade", "Grade du chargé de paroisse"),
+        ("charge_nom", "Nom du chargé de paroisse"),
+        ("charge_prenoms", "Prénoms du chargé de paroisse"),
+        ("parish_shepherd", "Chargé de paroisse — ancien champ"),
         ("contact_responsable", "Contact du chargé"),
         ("nombre_fideles_estime", "Nombre de fidèles estimé"),
         ("statut_batiment", "Statut du bâtiment"),
@@ -763,7 +1032,10 @@ class HistoriqueModification(models.Model):
         ("latitude", "Latitude"),
         ("longitude", "Longitude"),
         ("precision_gps", "Précision GPS"),
-        ("nom_informateur", "Nom de l’informateur"),
+        ("informateur_grade", "Grade de l’informateur"),
+        ("informateur_nom", "Nom de l’informateur"),
+        ("informateur_prenoms", "Prénoms de l’informateur"),
+        ("nom_informateur", "Informateur — ancien champ"),
         ("contact_informateur", "Contact de l’informateur"),
         ("observations", "Observations"),
         ("photo_charge", "Photo du chargé"),
@@ -828,6 +1100,9 @@ class HistoriqueModification(models.Model):
 
         if champ == "village":
             return self._objet_ou_reference(Village, valeur)
+
+        if champ in ("charge_grade", "informateur_grade"):
+            return self._objet_ou_reference(GradeEcclesial, valeur)
 
         if champ in (
             "cree_par",
@@ -1750,9 +2025,9 @@ class ResponsabiliteHierarchique(models.Model):
     @property
     def nom_responsable_actuel(self):
         mandat = self.mandat_courant
-        if not mandat or not mandat.nom_responsable:
+        if not mandat:
             return "Non renseigné"
-        return mandat.nom_responsable
+        return mandat.identite_responsable_affichage
 
     def clean(self):
         super().clean()
@@ -1828,7 +2103,21 @@ class MandatResponsableEcclesial(models.Model):
         on_delete=models.PROTECT,
         related_name="mandats",
     )
-    nom_responsable = models.CharField(max_length=200, blank=True)
+    grade = models.ForeignKey(
+        GradeEcclesial,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mandats_responsables_ecclesiaux",
+        verbose_name="Grade du responsable",
+    )
+    nom = models.CharField(max_length=120, blank=True, verbose_name="Nom du responsable")
+    prenoms = models.CharField(max_length=180, blank=True, verbose_name="Prénoms du responsable")
+    nom_responsable = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Champ historique conservé pour compatibilité. Il est synchronisé depuis nom/prénoms.",
+    )
     contact_responsable = models.CharField(max_length=50, blank=True)
     date_debut = models.DateField(null=True, blank=True)
     date_fin = models.DateField(null=True, blank=True)
@@ -1870,6 +2159,7 @@ class MandatResponsableEcclesial(models.Model):
         ]
         indexes = [
             models.Index(fields=["poste", "statut"], name="mandat_poste_statut_idx"),
+            models.Index(fields=["nom", "prenoms"], name="mandat_nom_prenoms_idx"),
         ]
 
     @property
@@ -1882,10 +2172,43 @@ class MandatResponsableEcclesial(models.Model):
         fin = self.date_fin.strftime("%d/%m/%Y") if self.date_fin else "En cours"
         return f"{debut} — {fin}"
 
+    @property
+    def nom_prenoms(self):
+        return _nom_prenoms_affichage(
+            nom=self.nom,
+            prenoms=self.prenoms,
+            legacy=self.nom_responsable,
+        )
+
+    @property
+    def identite_responsable_affichage(self):
+        return _identite_structuree_affichage(
+            grade=self.grade,
+            nom=self.nom,
+            prenoms=self.prenoms,
+            legacy=self.nom_responsable,
+        )
+
+    @property
+    def grade_abreviation(self):
+        return self.grade.abreviation if self.grade_id and self.grade else ""
+
+    @property
+    def grade_libelle(self):
+        return self.grade.libelle_francophone if self.grade_id and self.grade else ""
+
     def clean(self):
         super().clean()
         if self.date_debut and self.date_fin and self.date_fin < self.date_debut:
             raise ValidationError({"date_fin": "La date de fin ne peut pas précéder la date de début."})
+
+        titulaire_renseigne = bool(
+            self.grade_id
+            or (self.nom or "").strip()
+            or (self.prenoms or "").strip()
+            or (self.nom_responsable or "").strip()
+        )
+        titulaire_nom_renseigne = bool((self.nom or "").strip() or (self.nom_responsable or "").strip())
 
         if (
             self.statut
@@ -1893,9 +2216,9 @@ class MandatResponsableEcclesial(models.Model):
                 StatutMandatResponsableEcclesial.ACTIF,
                 StatutMandatResponsableEcclesial.SUSPENDU,
             )
-            and not (self.nom_responsable or "").strip()
+            and not titulaire_nom_renseigne
         ):
-            raise ValidationError({"nom_responsable": "Le nom est obligatoire pour un mandat actif ou suspendu."})
+            raise ValidationError({"nom": "Le nom est obligatoire pour un mandat actif ou suspendu."})
 
         if (
             self.statut
@@ -1903,11 +2226,9 @@ class MandatResponsableEcclesial(models.Model):
                 StatutMandatResponsableEcclesial.A_RENSEIGNER,
                 StatutMandatResponsableEcclesial.VACANT,
             )
-            and (self.nom_responsable or "").strip()
+            and titulaire_renseigne
         ):
-            raise ValidationError(
-                {"nom_responsable": "Un poste vacant ou à renseigner ne doit pas avoir de titulaire."}
-            )
+            raise ValidationError({"nom": "Un poste vacant ou à renseigner ne doit pas avoir de titulaire."})
 
         if (
             self.statut
@@ -1923,13 +2244,20 @@ class MandatResponsableEcclesial(models.Model):
             raise ValidationError({"date_fin": "Un mandat en cours ne doit pas avoir de date de fin."})
 
     def save(self, *args, **kwargs):
+        self.nom = (self.nom or "").strip().upper()
+        self.prenoms = (self.prenoms or "").strip()
         self.nom_responsable = (self.nom_responsable or "").strip()
         self.contact_responsable = (self.contact_responsable or "").strip()
+
+        nom_prenoms = _nom_prenoms_affichage(nom=self.nom, prenoms=self.prenoms, legacy="")
+        if self.nom and nom_prenoms:
+            self.nom_responsable = nom_prenoms
+
         self.full_clean()
         return super().save(*args, **kwargs)
 
     def __str__(self):
-        nom = self.nom_responsable or self.get_statut_display()
+        nom = self.identite_responsable_affichage or self.get_statut_display()
         return f"{self.poste.titre_officiel} — {nom}"
 
 

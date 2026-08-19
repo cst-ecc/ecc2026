@@ -76,7 +76,10 @@
       {% with mandat=poste.mandat_courant %}
       <div class="rounded-lg border border-slate-200 p-4">
         <p class="font-semibold text-slate-900">{{ poste.titre_officiel }}</p>
-        <p class="mt-1 text-sm text-slate-700">{% if mandat and mandat.nom_responsable %}{{ mandat.nom_responsable }}{% else %}Nom non renseigné{% endif %}</p>
+        <p class="mt-1 text-sm text-slate-700">{% if mandat and mandat.identite_responsable_affichage != "Non renseigné" %}{{ mandat.identite_responsable_affichage }}{% else %}Nom non renseigné{% endif %}</p>
+        {% if mandat and mandat.grade %}
+          <p class="mt-1 text-xs text-slate-500">Grade : {{ mandat.grade.libelle }}{% if mandat.grade.abreviation %} — {{ mandat.grade.abreviation }}{% endif %}</p>
+        {% endif %}
         <p class="mt-1 text-xs text-slate-500">{% if mandat %}{{ mandat.get_statut_display }} · {{ mandat.periode_affichage }}{% else %}Aucun mandat ouvert{% endif %}</p>
       </div>
       {% endwith %}

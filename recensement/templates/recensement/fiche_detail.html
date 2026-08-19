@@ -84,7 +84,14 @@
   <div class="app-card">
     {% include "recensement/includes/components/_card_header.html" with titre="Chargé de paroisse" %}
     <dl class="p-5 grid grid-cols-3 gap-y-2 text-sm">
-      <dt class="col-span-1 text-slate-500">Nom</dt><dd class="col-span-2">{{ fiche.parish_shepherd }}</dd>
+      <dt class="col-span-1 text-slate-500">Identité</dt><dd class="col-span-2 font-medium">{{ fiche.charge_identite_affichage }}</dd>
+      {% if fiche.charge_grade %}
+        <dt class="col-span-1 text-slate-500">Grade</dt><dd class="col-span-2">{{ fiche.charge_grade.libelle }}{% if fiche.charge_grade.abreviation %} — {{ fiche.charge_grade.abreviation }}{% endif %}</dd>
+      {% endif %}
+      {% if fiche.charge_nom or fiche.charge_prenoms %}
+        <dt class="col-span-1 text-slate-500">Nom</dt><dd class="col-span-2">{{ fiche.charge_nom|default:"—" }}</dd>
+        <dt class="col-span-1 text-slate-500">Prénoms</dt><dd class="col-span-2">{{ fiche.charge_prenoms|default:"—" }}</dd>
+      {% endif %}
       <dt class="col-span-1 text-slate-500">Contact</dt><dd class="col-span-2">{{ fiche.contact_responsable|default:"—" }}</dd>
       {% if fiche.photo_charge %}
         <dt class="col-span-1 text-slate-500">Photo</dt>
@@ -166,8 +173,15 @@
           {% endif %}
         </dd>
         <dt class="col-span-1 text-slate-500">Date du recensement</dt><dd class="col-span-2">{{ fiche.date_recensement|date:"d/m/Y H:i" }}</dd>
-        {% if fiche.nom_informateur %}
-          <dt class="col-span-1 text-slate-500">Informateur</dt><dd class="col-span-2">{{ fiche.nom_informateur }}</dd>
+        {% if fiche.a_informateur_renseigne %}
+          <dt class="col-span-1 text-slate-500">Informateur</dt><dd class="col-span-2">{{ fiche.informateur_identite_affichage|default:"—" }}</dd>
+          {% if fiche.informateur_grade %}
+            <dt class="col-span-1 text-slate-500">Grade informateur</dt><dd class="col-span-2">{{ fiche.informateur_grade.libelle }}{% if fiche.informateur_grade.abreviation %} — {{ fiche.informateur_grade.abreviation }}{% endif %}</dd>
+          {% endif %}
+          {% if fiche.informateur_nom or fiche.informateur_prenoms %}
+            <dt class="col-span-1 text-slate-500">Nom informateur</dt><dd class="col-span-2">{{ fiche.informateur_nom|default:"—" }}</dd>
+            <dt class="col-span-1 text-slate-500">Prénoms informateur</dt><dd class="col-span-2">{{ fiche.informateur_prenoms|default:"—" }}</dd>
+          {% endif %}
           <dt class="col-span-1 text-slate-500">Contact informateur</dt><dd class="col-span-2">{{ fiche.contact_informateur|default:"—" }}</dd>
         {% endif %}
       </dl>

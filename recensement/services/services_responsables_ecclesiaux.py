@@ -41,7 +41,13 @@ def snapshot_poste(poste):
 def snapshot_mandat(mandat):
     return {
         "id": mandat.pk,
+        "grade_id": mandat.grade_id,
+        "grade_libelle": mandat.grade.libelle_francophone if mandat.grade_id else "",
+        "grade_abreviation": mandat.grade.abreviation if mandat.grade_id else "",
+        "nom": mandat.nom,
+        "prenoms": mandat.prenoms,
         "nom_responsable": mandat.nom_responsable,
+        "identite_responsable": mandat.identite_responsable_affichage,
         "contact_responsable": mandat.contact_responsable,
         "date_debut": mandat.date_debut.isoformat() if mandat.date_debut else None,
         "date_fin": mandat.date_fin.isoformat() if mandat.date_fin else None,
@@ -216,7 +222,7 @@ def remplacer_responsable(*, poste_id, donnees, motif, utilisateur):
 def postes_avec_mandat_courant(queryset=None):
     courant = MandatResponsableEcclesial.objects.filter(
         statut__in=MandatResponsableEcclesial.STATUTS_COURANTS,
-    ).select_related("cree_par", "modifie_par")
+    ).select_related("grade", "cree_par", "modifie_par")
     qs = queryset if queryset is not None else ResponsabiliteHierarchique.objects.all()
     return qs.select_related(
         "region",
@@ -263,7 +269,12 @@ def responsables_pour_fiche(fiche, index):
         resultat[niveau] = {
             "poste": poste,
             "titre": poste.titre_officiel if poste else "Non renseigné",
-            "nom": mandat.nom_responsable if mandat and mandat.nom_responsable else "Non renseigné",
+            "identite": mandat.identite_responsable_affichage if mandat else "Non renseigné",
+            "grade": mandat.grade_libelle if mandat else "",
+            "grade_abreviation": mandat.grade_abreviation if mandat else "",
+            "nom": mandat.nom if mandat and mandat.nom else "",
+            "prenoms": mandat.prenoms if mandat and mandat.prenoms else "",
+            "nom_legacy": mandat.nom_responsable if mandat and mandat.nom_responsable else "",
             "statut": mandat.get_statut_display() if mandat else "À renseigner",
             "periode": mandat.periode_affichage if mandat else "—",
         }

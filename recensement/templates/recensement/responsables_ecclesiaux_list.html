@@ -39,7 +39,7 @@
 <div class="overflow-x-auto app-card">
   <table class="min-w-full text-sm app-table">
     <thead class="bg-brand-800 text-white text-left">
-      <tr><th class="px-4 py-3">Niveau</th><th class="px-4 py-3">Structure</th><th class="px-4 py-3">Titre</th><th class="px-4 py-3">Responsable actuel</th><th class="px-4 py-3">Période</th><th class="px-4 py-3">Statut</th><th class="px-4 py-3">Actions</th></tr>
+      <tr><th class="px-4 py-3">Niveau</th><th class="px-4 py-3">Structure</th><th class="px-4 py-3">Titre</th><th class="px-4 py-3">Grade</th><th class="px-4 py-3">Responsable actuel</th><th class="px-4 py-3">Période</th><th class="px-4 py-3">Statut</th><th class="px-4 py-3">Actions</th></tr>
     </thead>
     <tbody class="divide-y divide-slate-100">
       {% for poste in postes %}
@@ -48,13 +48,14 @@
         <td class="px-4 py-3">{{ poste.get_niveau_display }}</td>
         <td class="px-4 py-3">{{ poste.libelle_structure }}</td>
         <td class="px-4 py-3 font-medium">{{ poste.titre_officiel }}{% if poste.titre_verrouille %}<span class="ml-1 text-xs text-slate-400">🔒</span>{% endif %}</td>
-        <td class="px-4 py-3">{% if mandat and mandat.nom_responsable %}{{ mandat.nom_responsable }}{% else %}<span class="text-amber-700">Non renseigné</span>{% endif %}</td>
+        <td class="px-4 py-3">{% if mandat and mandat.grade %}{{ mandat.grade.abreviation|default:mandat.grade.libelle }}{% else %}—{% endif %}</td>
+        <td class="px-4 py-3">{% if mandat and mandat.identite_responsable_affichage != "Non renseigné" %}{{ mandat.identite_responsable_affichage }}{% else %}<span class="text-amber-700">Non renseigné</span>{% endif %}</td>
         <td class="px-4 py-3 whitespace-nowrap">{% if mandat %}{{ mandat.periode_affichage }}{% else %}—{% endif %}</td>
         <td class="px-4 py-3">{% if mandat %}{{ mandat.get_statut_display }}{% else %}<span class="text-amber-700">Sans mandat</span>{% endif %}</td>
         <td class="px-4 py-3 whitespace-nowrap"><a href="{% url 'recensement:responsable_ecclesial_detail' poste.pk %}" class="text-brand-600 hover:underline">Gérer</a></td>
       </tr>
       {% endwith %}
-      {% empty %}<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Aucun poste ecclésial trouvé.</td></tr>{% endfor %}
+      {% empty %}<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Aucun poste ecclésial trouvé.</td></tr>{% endfor %}
     </tbody>
   </table>
 </div>

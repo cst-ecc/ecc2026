@@ -4,12 +4,14 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from ..models import (
+    GradeEcclesial,
     MandatResponsableEcclesial,
     NiveauResponsabiliteEcclesiale,
     ResponsabiliteHierarchique,
     StatutMandatResponsableEcclesial,
 )
 from .base import INPUT_CSS, SELECT_CSS
+from .grade_fields import GradeEcclesialChoiceField
 from .validators import valider_telephone_international
 
 
@@ -110,9 +112,20 @@ class PosteEcclesialForm(forms.ModelForm):
 class MandatResponsableEcclesialForm(forms.ModelForm):
     """Ouverture ou mise à jour d'un mandat courant."""
 
+    grade = GradeEcclesialChoiceField(
+        queryset=GradeEcclesial.objects.none(),
+        required=False,
+        label="Grade du responsable",
+        widget=forms.Select(attrs={"class": SELECT_CSS}),
+        empty_label="Grade non renseigné",
+    )
+
     class Meta:
         model = MandatResponsableEcclesial
         fields = (
+            "grade",
+            "nom",
+            "prenoms",
             "nom_responsable",
             "contact_responsable",
             "date_debut",
@@ -120,9 +133,10 @@ class MandatResponsableEcclesialForm(forms.ModelForm):
             "observations",
         )
         widgets = {
-            "nom_responsable": forms.TextInput(
-                attrs={"class": INPUT_CSS, "placeholder": "Laisser vide si le poste est vacant"}
-            ),
+            "grade": forms.Select(attrs={"class": SELECT_CSS}),
+            "nom": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Nom de famille, ex : ASSOGBA"}),
+            "prenoms": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Prénoms, ex : Jean Koffi"}),
+            "nom_responsable": forms.HiddenInput(),
             "contact_responsable": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Téléphone facultatif"}),
             "date_debut": forms.DateInput(attrs={"class": INPUT_CSS, "type": "date"}),
             "statut": forms.Select(attrs={"class": SELECT_CSS}),
@@ -131,6 +145,12 @@ class MandatResponsableEcclesialForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        grade_courant_id = self.instance.grade_id if self.instance and self.instance.pk else None
+        self.fields["grade"].queryset = GradeEcclesial.objects.pour_formulaires_hommes(
+            grade_courant_id=grade_courant_id,
+        )
+        self.fields["grade"].empty_label = "Grade non renseigné"
+        self.fields["nom_responsable"].required = False
         self.fields["statut"].choices = [
             choice
             for choice in StatutMandatResponsableEcclesial.choices
@@ -143,11 +163,35 @@ class MandatResponsableEcclesialForm(forms.ModelForm):
             )
         ]
 
+    @staticmethod
+    def _nom_prenoms(nom, prenoms):
+        return " ".join(part for part in ((nom or "").strip().upper(), (prenoms or "").strip()) if part).strip()
+
+    def clean_nom(self):
+        return (self.cleaned_data.get("nom") or "").strip().upper()
+
+    def clean_prenoms(self):
+        return (self.cleaned_data.get("prenoms") or "").strip()
+
     def clean_contact_responsable(self):
         value = (self.cleaned_data.get("contact_responsable") or "").strip()
         if value:
             valider_telephone_international(value)
         return value
+
+    def clean(self):
+        cleaned = super().clean()
+        nom = (cleaned.get("nom") or "").strip()
+        prenoms = (cleaned.get("prenoms") or "").strip()
+        nom_responsable = self._nom_prenoms(nom, prenoms)
+        if nom:
+            cleaned["nom_responsable"] = nom_responsable
+        elif prenoms:
+            self.add_error("nom", "Renseignez le nom du responsable avant les prénoms.")
+            cleaned["nom_responsable"] = (cleaned.get("nom_responsable") or "").strip()
+        else:
+            cleaned["nom_responsable"] = (cleaned.get("nom_responsable") or "").strip()
+        return cleaned
 
 
 class RemplacementResponsableEcclesialForm(MandatResponsableEcclesialForm):
@@ -161,8 +205,8 @@ class RemplacementResponsableEcclesialForm(MandatResponsableEcclesialForm):
         cleaned = super().clean()
         if cleaned.get("statut") != StatutMandatResponsableEcclesial.ACTIF:
             self.add_error("statut", "Le nouveau mandat doit être actif.")
-        if not (cleaned.get("nom_responsable") or "").strip():
-            self.add_error("nom_responsable", "Le nom du nouveau responsable est obligatoire.")
+        if not (cleaned.get("nom") or cleaned.get("nom_responsable") or "").strip():
+            self.add_error("nom", "Le nom du nouveau responsable est obligatoire.")
         return cleaned
 
 

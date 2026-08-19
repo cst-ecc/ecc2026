@@ -4,6 +4,7 @@ from .models import (
     AffectationTerritoriale,
     District,
     FicheParoisse,
+    GradeEcclesial,
     HistoriqueAffectationTerritoriale,
     HistoriqueModification,
     HistoriqueResponsabiliteHierarchique,
@@ -167,6 +168,61 @@ class ProfilAdmin(admin.ModelAdmin):
 
 
 # ---------------------------------------------------------------------------
+# Grades ecclésiaux
+# ---------------------------------------------------------------------------
+
+
+@admin.register(GradeEcclesial)
+class GradeEcclesialAdmin(admin.ModelAdmin):
+    list_display = (
+        "libelle_francophone",
+        "abreviation",
+        "categorie",
+        "genre",
+        "niveau_onction",
+        "ordre",
+        "est_base_commune",
+        "est_actif",
+    )
+    list_filter = ("genre", "categorie", "est_base_commune", "est_actif")
+    search_fields = (
+        "libelle_francophone",
+        "libelle_anglophone",
+        "libelle_harmonise",
+        "abreviation",
+        "code",
+        "niveau_onction",
+    )
+    ordering = ("genre", "categorie", "ordre", "libelle_francophone")
+    readonly_fields = ("created_at", "updated_at")
+
+    @staticmethod
+    def _peut_gerer(request):
+        user = request.user
+        if not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        profil = getattr(user, "profil", None)
+        return bool(profil and profil.role == Profil.Role.SUPER_ADMIN)
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        if obj is not None:
+            fields.append("code")
+        return tuple(fields)
+
+    def has_add_permission(self, request):
+        return self._peut_gerer(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self._peut_gerer(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._peut_gerer(request)
+
+
+# ---------------------------------------------------------------------------
 # Fiches de recensement
 # ---------------------------------------------------------------------------
 
@@ -195,14 +251,19 @@ class FicheParoisseAdmin(admin.ModelAdmin):
     list_filter = ("region", "province", "statut_batiment", "statut_validation")
     search_fields = (
         "nom_paroisse",
+        "charge_nom",
+        "charge_prenoms",
         "parish_shepherd",
+        "informateur_nom",
+        "informateur_prenoms",
+        "nom_informateur",
         "village__nom",
         "nouvelle_localite_nom",
         "cree_par__username",
     )
     date_hierarchy = "date_recensement"
     readonly_fields = ("date_recensement",)
-    autocomplete_fields = ["region", "province", "district", "zone", "village"]
+    autocomplete_fields = ["region", "province", "district", "zone", "village", "charge_grade", "informateur_grade"]
     inlines = [PhotoParoisseInline]
 
     fieldsets = (
@@ -221,7 +282,14 @@ class FicheParoisseAdmin(admin.ModelAdmin):
         (
             "Chargé de paroisse",
             {
-                "fields": ("parish_shepherd", "contact_responsable", "photo_charge"),
+                "fields": (
+                    "charge_grade",
+                    "charge_nom",
+                    "charge_prenoms",
+                    "parish_shepherd",
+                    "contact_responsable",
+                    "photo_charge",
+                ),
             },
         ),
         (
@@ -233,7 +301,13 @@ class FicheParoisseAdmin(admin.ModelAdmin):
         (
             "Informateur",
             {
-                "fields": ("nom_informateur", "contact_informateur"),
+                "fields": (
+                    "informateur_grade",
+                    "informateur_nom",
+                    "informateur_prenoms",
+                    "nom_informateur",
+                    "contact_informateur",
+                ),
             },
         ),
         (
@@ -375,6 +449,9 @@ class MandatResponsableEcclesialInline(admin.TabularInline):
     model = MandatResponsableEcclesial
     extra = 0
     readonly_fields = (
+        "grade",
+        "nom",
+        "prenoms",
         "nom_responsable",
         "contact_responsable",
         "date_debut",
@@ -413,6 +490,10 @@ class ResponsabiliteHierarchiqueAdmin(admin.ModelAdmin):
         "district__nom",
         "zone__nom",
         "site_particulier__nom",
+        "mandats__grade__libelle_francophone",
+        "mandats__grade__abreviation",
+        "mandats__nom",
+        "mandats__prenoms",
         "mandats__nom_responsable",
     )
     autocomplete_fields = ("region", "province", "district", "zone", "site_particulier")
@@ -435,10 +516,23 @@ class ResponsabiliteHierarchiqueAdmin(admin.ModelAdmin):
 
 @admin.register(MandatResponsableEcclesial)
 class MandatResponsableEcclesialAdmin(admin.ModelAdmin):
-    list_display = ("poste", "nom_responsable", "statut", "date_debut", "date_fin", "modifie_par")
-    list_filter = ("statut", "poste__niveau")
-    search_fields = ("poste__titre_officiel", "nom_responsable", "poste__structure_nom")
+    list_display = ("poste", "identite_admin", "grade", "statut", "date_debut", "date_fin", "modifie_par")
+    list_filter = ("statut", "poste__niveau", "grade")
+    search_fields = (
+        "poste__titre_officiel",
+        "grade__libelle_francophone",
+        "grade__abreviation",
+        "nom",
+        "prenoms",
+        "nom_responsable",
+        "poste__structure_nom",
+    )
+    autocomplete_fields = ("poste", "grade")
     readonly_fields = ("date_creation", "date_modification")
+
+    @admin.display(description="Responsable")
+    def identite_admin(self, obj):
+        return obj.identite_responsable_affichage
 
 
 @admin.register(HistoriqueResponsabiliteHierarchique)

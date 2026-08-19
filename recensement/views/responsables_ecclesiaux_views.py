@@ -53,6 +53,10 @@ def responsable_ecclesial_list(request):
             | Q(district__nom__icontains=recherche)
             | Q(zone__nom__icontains=recherche)
             | Q(site_particulier__nom__icontains=recherche)
+            | Q(mandats__grade__libelle__icontains=recherche)
+            | Q(mandats__grade__abreviation__icontains=recherche)
+            | Q(mandats__nom__icontains=recherche)
+            | Q(mandats__prenoms__icontains=recherche)
             | Q(mandats__nom_responsable__icontains=recherche)
         ).distinct()
 
@@ -106,7 +110,7 @@ def responsable_ecclesial_list(request):
 def responsable_ecclesial_detail(request, pk):
     _exiger_super_admin(request.user)
     poste = get_object_or_404(postes_avec_mandat_courant(), pk=pk)
-    mandats = poste.mandats.select_related("cree_par", "modifie_par").all()
+    mandats = poste.mandats.select_related("grade", "cree_par", "modifie_par").all()
     historique = poste.historique.select_related("effectue_par", "mandat")[:200]
     return render(
         request,

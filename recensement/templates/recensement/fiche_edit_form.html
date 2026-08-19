@@ -73,12 +73,24 @@
   <div class="app-card">
     {% include "recensement/includes/components/_card_header.html" with titre="Chargé de paroisse" %}
     <div class="p-5 grid sm:grid-cols-2 gap-4">
+      {{ form.parish_shepherd }}
       <div>
-        {% include "recensement/includes/forms/_field.html" with field=form.parish_shepherd %}
+        {% include "recensement/includes/forms/_field.html" with field=form.charge_grade %}
+      </div>
+      <div>
+        {% include "recensement/includes/forms/_field.html" with field=form.charge_nom %}
+      </div>
+      <div>
+        {% include "recensement/includes/forms/_field.html" with field=form.charge_prenoms %}
       </div>
       <div>
         {% include "recensement/includes/forms/_field.html" with field=form.contact_responsable %}
       </div>
+      {% if fiche.parish_shepherd and not fiche.charge_nom and not fiche.charge_prenoms %}
+        <div class="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Ancienne valeur conservée : {{ fiche.parish_shepherd }}. Renseignez Nom et Prénoms pour structurer cette identité.
+        </div>
+      {% endif %}
       <div class="sm:col-span-2">
         {# Champ non factorisé : le rappel "Photo actuelle" s'intercale entre le label #}
         {# et le widget, ce que le composant _field.html ne permet pas sans altérer    #}
@@ -142,12 +154,24 @@
   <div class="app-card">
     {% include "recensement/includes/components/_card_header.html" with titre="Informateur" %}
     <div class="p-5 grid sm:grid-cols-2 gap-4">
+      {{ form.nom_informateur }}
       <div>
-        {% include "recensement/includes/forms/_field.html" with field=form.nom_informateur %}
+        {% include "recensement/includes/forms/_field.html" with field=form.informateur_grade %}
+      </div>
+      <div>
+        {% include "recensement/includes/forms/_field.html" with field=form.informateur_nom %}
+      </div>
+      <div>
+        {% include "recensement/includes/forms/_field.html" with field=form.informateur_prenoms %}
       </div>
       <div>
         {% include "recensement/includes/forms/_field.html" with field=form.contact_informateur %}
       </div>
+      {% if fiche.nom_informateur and not fiche.informateur_nom and not fiche.informateur_prenoms %}
+        <div class="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Ancienne valeur conservée : {{ fiche.nom_informateur }}. Renseignez Nom et Prénoms pour structurer cette identité.
+        </div>
+      {% endif %}
     </div>
   </div>
 

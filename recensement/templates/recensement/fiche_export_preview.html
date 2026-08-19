@@ -23,10 +23,10 @@
       Le fichier Excel contiendra uniquement les colonnes suivantes :
     </p>
     <div class="mt-2 flex flex-wrap gap-2 text-xs">
-      <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700">Région + responsable</span>
-      <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700">Province + responsable</span>
-      <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700">District + responsable</span>
-      <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700">Zone + responsable</span>
+      <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700">Région + titre + grade + responsable</span>
+      <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700">Province + titre + grade + responsable</span>
+      <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700">District + titre + grade + responsable</span>
+      <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700">Zone + titre + grade + responsable</span>
       <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700">Paroisse</span>
     </div>
   </div>
@@ -113,10 +113,10 @@
                                 <li>
                                   <span class="font-medium">{{ fiche.nom_paroisse }}</span>
                                   <span class="block ml-5 text-xs text-slate-400">
-                                    Région : {{ fiche.responsables_ecclesiaux.region.titre }} — {{ fiche.responsables_ecclesiaux.region.nom }} ·
-                                    Province : {{ fiche.responsables_ecclesiaux.province.titre }} — {{ fiche.responsables_ecclesiaux.province.nom }} ·
-                                    District : {{ fiche.responsables_ecclesiaux.district.titre }} — {{ fiche.responsables_ecclesiaux.district.nom }} ·
-                                    Zone : {{ fiche.responsables_ecclesiaux.zone.titre }} — {{ fiche.responsables_ecclesiaux.zone.nom }}
+                                    Région : {{ fiche.responsables_ecclesiaux.region.titre }} — {{ fiche.responsables_ecclesiaux.region.identite }} ·
+                                    Province : {{ fiche.responsables_ecclesiaux.province.titre }} — {{ fiche.responsables_ecclesiaux.province.identite }} ·
+                                    District : {{ fiche.responsables_ecclesiaux.district.titre }} — {{ fiche.responsables_ecclesiaux.district.identite }} ·
+                                    Zone : {{ fiche.responsables_ecclesiaux.zone.titre }} — {{ fiche.responsables_ecclesiaux.zone.identite }}
                                   </span>
                                 </li>
                               {% endfor %}

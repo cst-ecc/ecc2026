@@ -36,7 +36,10 @@
   {% with mandat=poste.mandat_courant %}
     {% if mandat %}
       <dl class="grid md:grid-cols-2 gap-4 text-sm mt-4">
-        <div><dt class="text-xs text-slate-500">Responsable</dt><dd class="mt-1 font-semibold">{{ mandat.nom_responsable|default:"Non renseigné" }}</dd></div>
+        <div><dt class="text-xs text-slate-500">Responsable</dt><dd class="mt-1 font-semibold">{{ mandat.identite_responsable_affichage|default:"Non renseigné" }}</dd></div>
+        <div><dt class="text-xs text-slate-500">Grade</dt><dd class="mt-1">{% if mandat.grade %}{{ mandat.grade.libelle }}{% if mandat.grade.abreviation %} — {{ mandat.grade.abreviation }}{% endif %}{% else %}—{% endif %}</dd></div>
+        <div><dt class="text-xs text-slate-500">Nom</dt><dd class="mt-1">{{ mandat.nom|default:"—" }}</dd></div>
+        <div><dt class="text-xs text-slate-500">Prénoms</dt><dd class="mt-1">{{ mandat.prenoms|default:"—" }}</dd></div>
         <div><dt class="text-xs text-slate-500">Statut</dt><dd class="mt-1">{{ mandat.get_statut_display }}</dd></div>
         <div><dt class="text-xs text-slate-500">Période</dt><dd class="mt-1">{{ mandat.periode_affichage }}</dd></div>
         <div><dt class="text-xs text-slate-500">Contact</dt><dd class="mt-1">{{ mandat.contact_responsable|default:"—" }}</dd></div>
@@ -54,7 +57,7 @@
       <tbody class="divide-y divide-slate-100">
         {% for mandat in mandats %}
         <tr>
-          <td class="px-4 py-3">{{ mandat.nom_responsable|default:"Non renseigné" }}</td>
+          <td class="px-4 py-3">{{ mandat.identite_responsable_affichage|default:"Non renseigné" }}</td>
           <td class="px-4 py-3">{{ mandat.periode_affichage }}</td>
           <td class="px-4 py-3">{{ mandat.get_statut_display }}</td>
           <td class="px-4 py-3">

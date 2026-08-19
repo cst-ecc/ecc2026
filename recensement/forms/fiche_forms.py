@@ -20,7 +20,7 @@ from ..doublons import (
     appliquer_infos_doublon_sur_instance,
     normaliser_nom_paroisse,
 )
-from ..models import District, FicheParoisse, Profil, Province, Region, Village, Zone
+from ..models import District, FicheParoisse, GradeEcclesial, Profil, Province, Region, Village, Zone
 from ..permissions import get_role, peut_creer_dans_zone, zones_autorisees
 from .base import (
     INPUT_CSS,
@@ -29,6 +29,7 @@ from .base import (
     MultipleImageField,
     RegionModelChoiceField,
 )
+from .grade_fields import GradeEcclesialChoiceField
 from .validators import MAX_ANNEE_FONDATION, valider_image, valider_telephone_international
 
 # ---------------------------------------------------------------------------
@@ -118,10 +119,83 @@ class FicheParoisseForm(forms.ModelForm):
         ),
     )
 
+    charge_grade = GradeEcclesialChoiceField(
+        queryset=GradeEcclesial.objects.none(),
+        required=False,
+        label="Grade du chargé de paroisse",
+        widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_charge_grade"}),
+        empty_label="Grade non renseigné",
+    )
+    charge_nom = forms.CharField(
+        required=False,
+        label="Nom du chargé de paroisse",
+        widget=forms.TextInput(
+            attrs={
+                "class": INPUT_CSS,
+                "id": "id_charge_nom",
+                "placeholder": "Nom de famille, ex : ASSOGBA",
+                "autocomplete": "family-name",
+            }
+        ),
+    )
+    charge_prenoms = forms.CharField(
+        required=False,
+        label="Prénoms du chargé de paroisse",
+        widget=forms.TextInput(
+            attrs={
+                "class": INPUT_CSS,
+                "id": "id_charge_prenoms",
+                "placeholder": "Prénoms, ex : Jean Koffi",
+                "autocomplete": "given-name",
+            }
+        ),
+    )
+    parish_shepherd = forms.CharField(required=False, widget=forms.HiddenInput())
+
+    informateur_grade = GradeEcclesialChoiceField(
+        queryset=GradeEcclesial.objects.none(),
+        required=False,
+        label="Grade de l'informateur",
+        widget=forms.Select(attrs={"class": SELECT_CSS, "id": "id_informateur_grade"}),
+        empty_label="Grade non renseigné",
+    )
+    informateur_nom = forms.CharField(
+        required=False,
+        label="Nom de l'informateur",
+        widget=forms.TextInput(
+            attrs={
+                "class": INPUT_CSS,
+                "id": "id_informateur_nom",
+                "placeholder": "Nom de famille",
+                "autocomplete": "family-name",
+            }
+        ),
+    )
+    informateur_prenoms = forms.CharField(
+        required=False,
+        label="Prénoms de l'informateur",
+        widget=forms.TextInput(
+            attrs={
+                "class": INPUT_CSS,
+                "id": "id_informateur_prenoms",
+                "placeholder": "Prénoms",
+                "autocomplete": "given-name",
+            }
+        ),
+    )
+    nom_informateur = forms.CharField(required=False, widget=forms.HiddenInput())
+
     CHAMPS_SENSIBLES_A_CONSERVER_SI_ABSENTS = (
         "latitude",
         "longitude",
         "precision_gps",
+        "charge_grade",
+        "charge_nom",
+        "charge_prenoms",
+        "parish_shepherd",
+        "informateur_grade",
+        "informateur_nom",
+        "informateur_prenoms",
         "nom_informateur",
         "contact_informateur",
         "observations",
@@ -202,6 +276,17 @@ class FicheParoisseForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.user = user
         self.alerte_doublon = None
+
+        charge_grade_courant_id = self.instance.charge_grade_id if self.instance and self.instance.pk else None
+        informateur_grade_courant_id = (
+            self.instance.informateur_grade_id if self.instance and self.instance.pk else None
+        )
+        self.fields["charge_grade"].queryset = GradeEcclesial.objects.pour_formulaires_hommes(
+            grade_courant_id=charge_grade_courant_id,
+        )
+        self.fields["informateur_grade"].queryset = GradeEcclesial.objects.pour_formulaires_hommes(
+            grade_courant_id=informateur_grade_courant_id,
+        )
 
         # En modification, on force explicitement les valeurs initiales des champs
         # sensibles afin d'éviter qu'un problème de rendu HTML les affiche vides.
@@ -382,6 +467,9 @@ class FicheParoisseForm(forms.ModelForm):
             "nouvelle_localite_nom",
             "nom_paroisse",
             "annee_fondation",
+            "charge_grade",
+            "charge_nom",
+            "charge_prenoms",
             "parish_shepherd",
             "contact_responsable",
             "photo_charge",
@@ -391,6 +479,9 @@ class FicheParoisseForm(forms.ModelForm):
             "latitude",
             "longitude",
             "precision_gps",
+            "informateur_grade",
+            "informateur_nom",
+            "informateur_prenoms",
             "nom_informateur",
             "contact_informateur",
             "observations",
@@ -447,11 +538,17 @@ class FicheParoisseForm(forms.ModelForm):
         }
         labels = {
             "nom_paroisse": "Nom de la paroisse",
-            "parish_shepherd": "Chargé de paroisse",
+            "charge_grade": "Grade du chargé de paroisse",
+            "charge_nom": "Nom du chargé de paroisse",
+            "charge_prenoms": "Prénoms du chargé de paroisse",
+            "parish_shepherd": "Chargé de paroisse — ancien champ",
             "photo_charge": "Photo du chargé de paroisse (facultative)",
             "statut_batiment": "État du bâtiment / lieu de culte",
             "statut_batiment_autre": "Précision si autre",
-            "nom_informateur": "Nom de l'informateur",
+            "informateur_grade": "Grade de l'informateur",
+            "informateur_nom": "Nom de l'informateur",
+            "informateur_prenoms": "Prénoms de l'informateur",
+            "nom_informateur": "Informateur — ancien champ",
             "contact_informateur": "Contact de l'informateur",
             "observations": "Observations",
         }
@@ -462,11 +559,35 @@ class FicheParoisseForm(forms.ModelForm):
             raise forms.ValidationError("Une erreur est survenue. Veuillez réessayer.")
         return value
 
+    @staticmethod
+    def _nom_famille(value):
+        return (value or "").strip().upper()
+
+    @staticmethod
+    def _prenoms(value):
+        return (value or "").strip()
+
+    @staticmethod
+    def _nom_prenoms(nom, prenoms):
+        return " ".join(part for part in (nom, prenoms) if part).strip()
+
     def clean_nom_paroisse(self):
         return (self.cleaned_data.get("nom_paroisse") or "").strip()
 
+    def clean_charge_nom(self):
+        return self._nom_famille(self.cleaned_data.get("charge_nom"))
+
+    def clean_charge_prenoms(self):
+        return self._prenoms(self.cleaned_data.get("charge_prenoms"))
+
     def clean_parish_shepherd(self):
         return (self.cleaned_data.get("parish_shepherd") or "").strip()
+
+    def clean_informateur_nom(self):
+        return self._nom_famille(self.cleaned_data.get("informateur_nom"))
+
+    def clean_informateur_prenoms(self):
+        return self._prenoms(self.cleaned_data.get("informateur_prenoms"))
 
     def clean_nouvelle_localite_nom(self):
         return (self.cleaned_data.get("nouvelle_localite_nom") or "").strip()
@@ -510,6 +631,36 @@ class FicheParoisseForm(forms.ModelForm):
             for field_name in self.CHAMPS_SENSIBLES_A_CONSERVER_SI_ABSENTS:
                 if field_name in self.fields and field_name not in self.data:
                     cleaned_data[field_name] = getattr(self.instance, field_name, None)
+
+        charge_nom = cleaned_data.get("charge_nom")
+        charge_prenoms = cleaned_data.get("charge_prenoms")
+        charge_nom_prenoms = self._nom_prenoms(charge_nom, charge_prenoms)
+        charge_legacy = (cleaned_data.get("parish_shepherd") or "").strip()
+        if charge_nom:
+            cleaned_data["parish_shepherd"] = charge_nom_prenoms
+        elif charge_prenoms:
+            self.add_error(
+                "charge_nom",
+                "Renseignez le nom du chargé de paroisse avant les prénoms.",
+            )
+        elif not charge_legacy:
+            self.add_error(
+                "charge_nom",
+                "Renseignez au moins le nom du chargé de paroisse.",
+            )
+
+        informateur_nom = cleaned_data.get("informateur_nom")
+        informateur_prenoms = cleaned_data.get("informateur_prenoms")
+        informateur_nom_prenoms = self._nom_prenoms(informateur_nom, informateur_prenoms)
+        if informateur_nom:
+            cleaned_data["nom_informateur"] = informateur_nom_prenoms
+        elif informateur_prenoms:
+            self.add_error(
+                "informateur_nom",
+                "Renseignez le nom de l'informateur avant les prénoms.",
+            )
+        else:
+            cleaned_data["nom_informateur"] = (cleaned_data.get("nom_informateur") or "").strip()
 
         statut_batiment = cleaned_data.get("statut_batiment")
         statut_batiment_autre = (cleaned_data.get("statut_batiment_autre") or "").strip()
@@ -616,6 +767,8 @@ class FicheParoisseForm(forms.ModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.nom_paroisse_normalise = normaliser_nom_paroisse(instance.nom_paroisse)
+        instance.parish_shepherd = self.cleaned_data.get("parish_shepherd") or instance.parish_shepherd
+        instance.nom_informateur = self.cleaned_data.get("nom_informateur") or ""
 
         if self.alerte_doublon:
             appliquer_infos_doublon_sur_instance(
