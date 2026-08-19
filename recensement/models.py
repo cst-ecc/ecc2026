@@ -498,7 +498,7 @@ class GradeEcclesial(models.Model):
     """
 
     class Categorie(models.TextChoices):
-        GENERAL = "general", "Grades généraux"
+        GENERAL = "general", "Corprs de leaders"
         VISIONNAIRE = "visionnaire", "Corps des visionnaires"
         ALLAGBA = "allagba", "Corps des Allagba"
         AUTRE = "autre", "Autre"

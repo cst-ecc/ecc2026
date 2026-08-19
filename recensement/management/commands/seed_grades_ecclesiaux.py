@@ -54,7 +54,7 @@ def _grade(
 
 GRADES_ECC_HOMMES = (
     # ------------------------------------------------------------------
-    # Grades généraux hommes
+    # Corprs des hommes
     # ------------------------------------------------------------------
     _grade("frere", GENERAL, 1, "Fidèle simple", "Frère", "Brother", "Frère", est_base_commune=True),
     _grade(

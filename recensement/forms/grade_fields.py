@@ -1,25 +1,23 @@
-"""Champs de formulaire réutilisables pour le référentiel des grades ECC."""
+"""Champs de formulaire réutilisables pour le référentiel des grades ECC.
+
+Hotfix production : on conserve le ModelChoiceIterator standard de Django.
+Le regroupement personnalisé en <optgroup> a été retiré afin de garantir
+un rendu compatible avec le widget Select de Django 5.0.x.
+"""
 
 from django import forms
-from django.forms.models import ModelChoiceIterator
-
-
-class _GroupedGradeChoiceIterator(ModelChoiceIterator):
-    """Regroupe les grades par catégorie sans modifier leur valeur de POST."""
-
-    def __iter__(self):
-        if self.field.empty_label is not None:
-            yield ("", self.field.empty_label)
-
-        groupes = {}
-        for grade in self.queryset:
-            groupes.setdefault(grade.get_categorie_display(), []).append(self.choice(grade))
-
-        for libelle_groupe, choix in groupes.items():
-            yield from (libelle_groupe, choix)
 
 
 class GradeEcclesialChoiceField(forms.ModelChoiceField):
-    """ModelChoiceField sécurisé avec affichage en ``<optgroup>`` par catégorie."""
+    """Champ de choix d'un grade ECC, validé par le QuerySet Django.
 
-    iterator = _GroupedGradeChoiceIterator
+    Le libellé contient la catégorie pour éviter toute ambiguïté entre les
+    grades de même nom appartenant à plusieurs corps, par exemple « Frère ».
+    """
+
+    def label_from_instance(self, obj):
+        categorie = obj.get_categorie_display() if getattr(obj, "categorie", None) else ""
+
+        libelle = str(obj)
+
+        return f"{categorie} — {libelle}" if categorie else libelle

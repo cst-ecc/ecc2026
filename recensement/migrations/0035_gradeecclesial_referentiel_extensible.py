@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
             name="categorie",
             field=models.CharField(
                 choices=[
-                    ("general", "Grades généraux"),
+                    ("general", "Corps des Leaders"),
                     ("visionnaire", "Corps des visionnaires"),
                     ("allagba", "Corps des Allagba"),
                     ("autre", "Autre"),
