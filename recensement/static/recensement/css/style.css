@@ -618,3 +618,188 @@ input[type="submit"]:disabled {
         box-shadow 0.2s ease,
         opacity 0.2s ease;
 }
+/* ========================================================================== */
+/* Prévisualisation / galerie des images existantes                           */
+/* ========================================================================== */
+
+.image-gallery-trigger {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: zoom-in;
+}
+
+.image-gallery-trigger:focus-visible {
+    outline: 3px solid rgba(24, 139, 213, .3);
+    outline-offset: 3px;
+    border-radius: .65rem;
+}
+
+.image-gallery-preview[hidden] {
+    display: none !important;
+}
+
+.image-gallery-preview {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgba(2, 18, 31, .92);
+    backdrop-filter: blur(5px);
+}
+
+.image-gallery-preview__dialog {
+    position: relative;
+    display: grid;
+    width: min(96vw, 1200px);
+    height: min(92vh, 900px);
+    place-items: center;
+}
+
+.image-gallery-preview__figure {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .75rem;
+    margin: 0;
+}
+
+.image-gallery-preview__stage {
+    display: grid;
+    width: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    place-items: center;
+}
+
+.image-gallery-preview__image {
+    display: block;
+    max-width: 100%;
+    max-height: calc(92vh - 4.5rem);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: .8rem;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, .35);
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.image-gallery-preview__caption {
+    display: flex;
+    min-height: 1.75rem;
+    max-width: min(90vw, 900px);
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem 1rem;
+    color: #e2e8f0;
+    font-size: .875rem;
+    text-align: center;
+}
+
+.image-gallery-preview__title {
+    font-weight: 600;
+}
+
+.image-gallery-preview__counter {
+    color: #cbd5e1;
+    font-variant-numeric: tabular-nums;
+}
+
+.image-gallery-preview__close,
+.image-gallery-preview__nav {
+    position: absolute;
+    z-index: 2;
+    display: inline-grid;
+    width: 3rem;
+    height: 3rem;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, .25);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, .7);
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .2);
+    cursor: pointer;
+    transition: background-color .15s ease, transform .15s ease;
+}
+
+.image-gallery-preview__close:hover,
+.image-gallery-preview__nav:hover {
+    background: rgba(30, 41, 59, .95);
+}
+
+.image-gallery-preview__close:focus-visible,
+.image-gallery-preview__nav:focus-visible {
+    outline: 3px solid rgba(255, 255, 255, .75);
+    outline-offset: 2px;
+}
+
+.image-gallery-preview__close {
+    top: 0;
+    right: 0;
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.image-gallery-preview__nav {
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2.25rem;
+    line-height: 1;
+}
+
+.image-gallery-preview__nav--prev {
+    left: 0;
+}
+
+.image-gallery-preview__nav--next {
+    right: 0;
+}
+
+.image-gallery-preview__nav[hidden] {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    .image-gallery-preview {
+        padding: .5rem;
+    }
+
+    .image-gallery-preview__dialog {
+        width: 100%;
+        height: 96vh;
+    }
+
+    .image-gallery-preview__image {
+        max-height: calc(96vh - 5rem);
+        border-radius: .55rem;
+    }
+
+    .image-gallery-preview__close,
+    .image-gallery-preview__nav {
+        width: 2.75rem;
+        height: 2.75rem;
+        background: rgba(15, 23, 42, .78);
+    }
+
+    .image-gallery-preview__close {
+        top: .25rem;
+        right: .25rem;
+    }
+
+    .image-gallery-preview__nav--prev {
+        left: .25rem;
+    }
+
+    .image-gallery-preview__nav--next {
+        right: .25rem;
+    }
+}

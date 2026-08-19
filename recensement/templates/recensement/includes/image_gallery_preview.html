@@ -1,0 +1,64 @@
+{#
+  Viewer réutilisable pour les éléments portant [data-gallery-item].
+  Le JavaScript lit uniquement les URL déjà rendues dans la page : aucune
+  route média ni règle de permission n'est modifiée ici.
+#}
+<div
+  id="image-gallery-preview"
+  class="image-gallery-preview"
+  hidden
+  aria-hidden="true"
+>
+  <div
+    class="image-gallery-preview__dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Prévisualisation des images"
+    aria-describedby="image-gallery-caption"
+  >
+    <button
+      type="button"
+      class="image-gallery-preview__close"
+      data-gallery-close
+      aria-label="Fermer la prévisualisation"
+    >
+      <span aria-hidden="true">×</span>
+    </button>
+
+    <button
+      type="button"
+      class="image-gallery-preview__nav image-gallery-preview__nav--prev"
+      data-gallery-prev
+      aria-label="Afficher l’image précédente"
+      hidden
+    >
+      <span aria-hidden="true">‹</span>
+    </button>
+
+    <figure class="image-gallery-preview__figure">
+      <div class="image-gallery-preview__stage">
+        <img
+          class="image-gallery-preview__image"
+          data-gallery-image
+          src=""
+          alt=""
+          draggable="false"
+        >
+      </div>
+      <figcaption id="image-gallery-caption" class="image-gallery-preview__caption">
+        <span class="image-gallery-preview__title" data-gallery-title></span>
+        <span class="image-gallery-preview__counter" data-gallery-counter></span>
+      </figcaption>
+    </figure>
+
+    <button
+      type="button"
+      class="image-gallery-preview__nav image-gallery-preview__nav--next"
+      data-gallery-next
+      aria-label="Afficher l’image suivante"
+      hidden
+    >
+      <span aria-hidden="true">›</span>
+    </button>
+  </div>
+</div>

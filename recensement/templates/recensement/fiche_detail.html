@@ -1,5 +1,5 @@
 {% extends "recensement/base.html" %}
-{% load l10n %}
+{% load static l10n %}
 
 {% block title %}{{ fiche.nom_paroisse }} — Détail{% endblock %}
 
@@ -89,9 +89,18 @@
       {% if fiche.photo_charge %}
         <dt class="col-span-1 text-slate-500">Photo</dt>
         <dd class="col-span-2">
-          <a href="{{ fiche.photo_charge.url }}" target="_blank" rel="noopener">
+          <button
+            type="button"
+            class="image-gallery-trigger rounded-lg"
+            data-gallery-item
+            data-gallery-group="fiche-{{ fiche.pk }}"
+            data-gallery-src="{{ fiche.photo_charge.url }}"
+            data-gallery-alt="Photo du chargé de paroisse"
+            data-gallery-title="Photo du chargé de paroisse"
+            aria-label="Agrandir la photo du chargé de paroisse"
+          >
             <img src="{{ fiche.photo_charge.url }}" alt="Photo du chargé de paroisse" class="h-20 w-20 object-cover rounded-lg border border-slate-200">
-          </a>
+          </button>
         </dd>
       {% endif %}
     </dl>
@@ -102,9 +111,18 @@
     {% include "recensement/includes/components/_card_header.html" with titre="Photos de la paroisse" %}
     <div class="p-5 flex flex-wrap gap-3">
       {% for photo in fiche.photos.all %}
-        <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
-          <img src="{{ photo.image.url }}" alt="Photo de la paroisse" class="h-24 w-24 object-cover rounded-lg border border-slate-200">
-        </a>
+        <button
+          type="button"
+          class="image-gallery-trigger rounded-lg"
+          data-gallery-item
+          data-gallery-group="fiche-{{ fiche.pk }}"
+          data-gallery-src="{{ photo.image.url }}"
+          data-gallery-alt="Photo {{ forloop.counter }} de la paroisse {{ fiche.nom_paroisse }}"
+          data-gallery-title="Photo de la paroisse {{ forloop.counter }}"
+          aria-label="Agrandir la photo {{ forloop.counter }} de la paroisse"
+        >
+          <img src="{{ photo.image.url }}" alt="Photo {{ forloop.counter }} de la paroisse {{ fiche.nom_paroisse }}" class="h-24 w-24 object-cover rounded-lg border border-slate-200">
+        </button>
       {% endfor %}
     </div>
   </div>
@@ -264,4 +282,10 @@
   </div>
   {% endif %}
 </div>
+
+{% include "recensement/includes/image_gallery_preview.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'recensement/js/image_gallery.js' %}" defer></script>
 {% endblock %}
