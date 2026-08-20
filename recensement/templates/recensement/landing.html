@@ -1,21 +1,73 @@
 {% extends "recensement/base_public.html" %}
 {% load static %}
-{% block title %}Recensement des Paroisses — Église du Christianisme Céleste{% endblock %}
+
+{% block title %}Plateforme de digitalisation — Église du Christianisme Céleste{% endblock %}
+{% block meta_description %}Plateforme modulaire de digitalisation de l’Église du Christianisme Céleste, déployée progressivement à partir de la gestion des paroisses.{% endblock %}
+
 {% block content %}
 <section class="landing-hero relative overflow-hidden rounded-3xl px-6 py-14 text-center text-white shadow-soft sm:py-20">
   <div class="absolute inset-0 opacity-10" aria-hidden="true"></div>
-  <div class="relative z-10 mx-auto max-w-3xl">
+  <div class="relative z-10 mx-auto max-w-4xl">
     <img src="{% static 'recensement/img/logo-cst.png' %}" alt="Conseil Supérieur de Transition" class="mx-auto mb-5 h-24 w-24 rounded-full bg-white p-2 object-contain shadow-lg">
-    <p class="mb-3 text-xs font-semibold uppercase tracking-[.22em] text-accent-300 sm:text-sm">Église du Christianisme Céleste</p>
-    <h1 class="text-3xl font-bold tracking-tight sm:text-5xl">Recensement des Paroisses</h1>
-    <p class="mx-auto mt-4 max-w-2xl text-base text-brand-50 sm:text-lg">Une plateforme sécurisée pour recenser et cartographier les Paroisses.</p>
-    <a href="{% url 'login' %}" class="mt-8 inline-flex items-center gap-2 rounded-xl bg-accent-400 px-6 py-3 font-semibold text-brand-950 shadow hover:bg-accent-300" data-loader-message="Ouverture de la connexion…">Connexion agent <span aria-hidden="true">→</span></a>
+    <p class="mb-3 text-xs font-semibold uppercase tracking-[.22em] text-accent-300 sm:text-sm">
+      Église du Christianisme Céleste
+    </p>
+    <h1 class="text-3xl font-bold tracking-tight sm:text-5xl">
+      Plateforme de digitalisation de l’ECC
+    </h1>
+    <p class="mx-auto mt-5 max-w-3xl text-base leading-7 text-brand-50 sm:text-lg">
+      Une plateforme modulaire destinée à organiser progressivement les données, les services et les référentiels de l’Église dans un environnement sécurisé et évolutif.
+    </p>
+    <a href="{% url 'login' %}"
+       class="mt-8 inline-flex items-center gap-2 rounded-xl bg-accent-400 px-6 py-3 font-semibold text-brand-950 shadow hover:bg-accent-300"
+       data-loader-message="Ouverture de la connexion…">
+      Accéder à la plateforme <span aria-hidden="true">→</span>
+    </a>
     <p class="mt-3 text-sm text-brand-100">Accès réservé aux utilisateurs habilités.</p>
   </div>
 </section>
-<div class="mx-auto mt-8 grid max-w-4xl gap-4 sm:grid-cols-3">
-  <article class="app-card p-5 text-center"><h2 class="font-semibold text-brand-800">Saisie terrain</h2><p class="mt-1 text-sm text-slate-500">Informations paroissiales, photos et coordonnées GPS.</p></article>
-  <article class="app-card p-5 text-center"><h2 class="font-semibold text-brand-800">Validation hiérarchique</h2><p class="mt-1 text-sm text-slate-500">Suivi clair selon les rôles et les périmètres.</p></article>
-  <article class="app-card p-5 text-center"><h2 class="font-semibold text-brand-800">Données sécurisées</h2><p class="mt-1 text-sm text-slate-500">Accès contrôlé, traçabilité et exports administratifs.</p></article>
-</div>
+
+<section class="mx-auto mt-10 max-w-5xl">
+  <div class="mx-auto max-w-3xl text-center">
+    <p class="text-xs font-semibold uppercase tracking-[.18em] text-brand-600">Déploiement progressif</p>
+    <h2 class="mt-2 text-2xl font-bold text-slate-900">Une architecture pensée par modules</h2>
+    <p class="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
+      La plateforme commence avec le module <strong>Paroisses</strong>, dont le recensement des paroisses au Bénin constitue le premier sous-module opérationnel. Elle est préparée pour accueillir progressivement d’autres domaines de gestion de l’ECC.
+    </p>
+  </div>
+
+  <div class="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <article class="app-card p-5">
+      <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden="true">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v5m-2.5-2.5h5M7 22v-8l5-4 5 4v8M4 22h16M10 22v-5h4v5" /></svg>
+      </div>
+      <h3 class="font-semibold text-slate-900">Paroisses</h3>
+      <p class="mt-2 text-sm leading-6 text-slate-500">Recensement, validation, codification et préparation de la gestion administrative des paroisses.</p>
+    </article>
+
+    <article class="app-card p-5">
+      <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden="true">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20h16M6 20V9l6-5 6 5v11M9 20v-6h6v6" /></svg>
+      </div>
+      <h3 class="font-semibold text-slate-900">Patrimoines et Sites</h3>
+      <p class="mt-2 text-sm leading-6 text-slate-500">Gestion distincte des sites particuliers et préparation du futur inventaire patrimonial de l’Église.</p>
+    </article>
+
+    <article class="app-card p-5">
+      <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden="true">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16v14H4V7Zm-1-4h18v4H3V3Zm6 8h6" /></svg>
+      </div>
+      <h3 class="font-semibold text-slate-900">Documents et Archives</h3>
+      <p class="mt-2 text-sm leading-6 text-slate-500">Centralisation future des ordres de culte, textes bibliques, Constitution, règlement intérieur, cantiques et archives de l’Église.</p>
+    </article>
+
+    <article class="app-card p-5">
+      <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden="true">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87" /></svg>
+      </div>
+      <h3 class="font-semibold text-slate-900">Extension progressive</h3>
+      <p class="mt-2 text-sm leading-6 text-slate-500">Fidèles, grades, responsables ecclésiaux, administration, exports et futurs services pourront être intégrés sans reconstruire l’existant.</p>
+    </article>
+  </div>
+</section>
 {% endblock %}

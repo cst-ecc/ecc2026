@@ -5,6 +5,7 @@ from recensement.healthcheck import healthcheck
 from . import access_views, views
 from .views import (
     doublon_views,
+    module_views,
     notifications_views,
     qrcode_views,
     responsables_ecclesiaux_views,
@@ -16,6 +17,22 @@ urlpatterns = [
     path("healthcheck/", healthcheck, name="healthcheck"),
     path("", views.landing, name="landing"),
     path("apres-connexion/", views.post_login_redirect, name="post_login_redirect"),
+    path("modules/", module_views.module_home, name="module_home"),
+    path(
+        "modules/<slug:module_slug>/",
+        module_views.module_detail,
+        name="module_detail",
+    ),
+    path(
+        "modules/<slug:module_slug>/construction/",
+        module_views.module_construction,
+        name="module_construction",
+    ),
+    path(
+        "modules/<slug:module_slug>/<slug:submodule_slug>/construction/",
+        module_views.submodule_construction,
+        name="submodule_construction",
+    ),
     path("tableau-de-bord/", views.dashboard, name="dashboard"),
     path("suivi-modifications/", views.suivi_modifications, name="suivi_modifications"),
     path("carte/", views.carte_paroisses, name="carte"),

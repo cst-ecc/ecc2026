@@ -1,0 +1,75 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}{{ module.nom }} — Plateforme de digitalisation ECC{% endblock %}
+
+{% block sidebar_brand %}
+  <a href="{% url 'recensement:module_detail' module.slug %}" class="min-w-0 truncate font-semibold text-white">
+    {{ module.nom }}
+  </a>
+{% endblock %}
+
+{% block sidebar_navigation %}
+  <a href="{% url 'recensement:module_home' %}" class="sidebar-link mb-2"><span>← Tous les modules</span></a>
+
+  <details class="sidebar-group" open>
+    <summary class="sidebar-summary"><span>Sous-modules</span><span aria-hidden="true">›</span></summary>
+    <div class="sidebar-submenu">
+      {% for submodule in module.submodules %}
+        <a href="{{ submodule.url }}" class="sidebar-link">
+          <span class="min-w-0 truncate">{{ submodule.nom }}</span>
+          {% if submodule.statut == "actif" %}
+            <span class="ml-2 h-2 w-2 shrink-0 rounded-full bg-green-400" title="Actif"></span>
+          {% elif submodule.statut == "partiel" %}
+            <span class="ml-2 h-2 w-2 shrink-0 rounded-full bg-amber-300" title="Partiel"></span>
+          {% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  </details>
+{% endblock %}
+
+{% block app_header_title %}{{ module.nom }}{% endblock %}
+{% block footer_context %}{{ module.nom }}{% endblock %}
+
+{% block content %}
+<nav class="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-500" aria-label="Fil d’Ariane">
+  <a href="{% url 'recensement:module_home' %}" class="font-medium text-brand-700 hover:underline">Modules</a>
+  <span aria-hidden="true">/</span>
+  <span class="text-slate-700">{{ module.nom }}</span>
+</nav>
+
+<section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+  <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+    <div class="max-w-3xl">
+      <div class="flex items-center gap-3">
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-700" aria-hidden="true">
+          {% include "recensement/modules/includes/module_icon.html" with icon=module.icone %}
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold text-slate-900">{{ module.nom }}</h1>
+          <div class="mt-1">{% include "recensement/modules/includes/module_status_badge.html" with statut=module.statut %}</div>
+        </div>
+      </div>
+      <p class="mt-4 text-sm leading-6 text-slate-600 sm:text-base">{{ module.description }}</p>
+    </div>
+
+    <div class="shrink-0 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+      <span class="font-semibold text-slate-900">{{ module.nb_sous_modules }}</span>
+      sous-module{{ module.nb_sous_modules|pluralize }}
+    </div>
+  </div>
+</section>
+
+<div class="mb-5 mt-8">
+  <h2 class="text-lg font-semibold text-slate-900">Sous-modules</h2>
+  <p class="mt-1 text-sm text-slate-500">Ouvrez une fonctionnalité disponible ou consultez les éléments prévus pour les prochaines étapes.</p>
+</div>
+
+<div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+  {% for submodule in module.submodules %}
+    {% include "recensement/modules/includes/submodule_card.html" with submodule=submodule %}
+  {% empty %}
+    <div class="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Aucun sous-module n’est encore déclaré.</div>
+  {% endfor %}
+</div>
+{% endblock %}

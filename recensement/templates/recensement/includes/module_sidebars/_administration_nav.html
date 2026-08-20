@@ -1,0 +1,12 @@
+{% with url_name=request.resolver_match.url_name %}
+<a href="{% url 'recensement:module_detail' 'administration' %}" class="sidebar-link mb-2"><span>← Sous-modules</span></a>
+
+<details class="sidebar-group" open>
+  <summary class="sidebar-summary"><span>Administration</span><span aria-hidden="true">›</span></summary>
+  <div class="sidebar-submenu">
+    <a href="{% url 'recensement:utilisateur_list' %}" class="sidebar-link {% if url_name == 'utilisateur_list' or url_name == 'utilisateur_update' or url_name == 'utilisateur_created' %}is-active{% endif %}">Utilisateurs</a>
+    <a href="{% url 'recensement:utilisateur_create' %}" class="sidebar-link {% if url_name == 'utilisateur_create' %}is-active{% endif %}">Nouvel utilisateur</a>
+    <a href="{% url 'recensement:historique_affectations' %}" class="sidebar-link {% if url_name == 'historique_affectations' or 'affectation' in url_name %}is-active{% endif %}">Historique des accès</a>
+  </div>
+</details>
+{% endwith %}

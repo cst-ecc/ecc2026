@@ -78,6 +78,8 @@ def role_context(request):
         "peut_gerer_sites_particuliers": peut_gerer_sites_particuliers(user),
         "peut_gerer_responsables_ecclesiaux": peut_gerer_responsables_ecclesiaux(user),
         "peut_rechercher_paroisses": peut_rechercher_paroisses(user),
+        # Identité visuelle du module courant (Super administrateur uniquement).
+        "ui_module": _build_ui_module(request, role),
         # Périmètre utilisateur pour l'affichage dans les templates.
         "user_scope": _build_user_scope(user, role),
     }
@@ -179,3 +181,59 @@ def _build_user_scope(user, role):
         scope["couverture_label"] = ""
 
     return scope
+
+
+# ---------------------------------------------------------------------------
+# Identité visuelle des modules pour le Super administrateur.
+# ---------------------------------------------------------------------------
+
+
+def _build_ui_module(request, role):
+    """Détermine le shell visuel du module courant.
+
+    Cette fonction ne porte aucune permission métier. Elle sert uniquement à
+    choisir le titre et la sidebar affichés dans ``base.html`` pour le Super
+    administrateur. Les autres rôles conservent exactement la navigation
+    historique du recensement.
+    """
+    if role != Profil.Role.SUPER_ADMIN:
+        return None
+
+    resolver_match = getattr(request, "resolver_match", None)
+    url_name = getattr(resolver_match, "url_name", "") or ""
+
+    if "site_particulier" in url_name or url_name == "responsabilite_hierarchique_update":
+        return {
+            "slug": "sites-particuliers",
+            "sidebar_title": "Sites particuliers",
+            "header_title": "Gestion des sites particuliers",
+            "home_url_name": "recensement:site_particulier_list",
+            "sidebar_template": "recensement/includes/module_sidebars/_sites_particuliers_nav.html",
+        }
+
+    if "responsable_ecclesial" in url_name or "mandat_responsable" in url_name:
+        return {
+            "slug": "responsables-ecclesiaux",
+            "sidebar_title": "Responsables ecclésiaux",
+            "header_title": "Responsables ecclésiaux",
+            "home_url_name": "recensement:responsable_ecclesial_list",
+            "sidebar_template": "recensement/includes/module_sidebars/_responsables_nav.html",
+        }
+
+    if "utilisateur" in url_name or "affectation" in url_name or url_name == "historique_affectations":
+        return {
+            "slug": "administration",
+            "sidebar_title": "Administration",
+            "header_title": "Administration de la plateforme",
+            "home_url_name": "recensement:utilisateur_list",
+            "sidebar_template": "recensement/includes/module_sidebars/_administration_nav.html",
+        }
+
+    # Les routes historiques restantes appartiennent au module Paroisses.
+    return {
+        "slug": "paroisses",
+        "sidebar_title": "Paroisses",
+        "header_title": "Recensement des paroisses",
+        "home_url_name": "recensement:dashboard",
+        "sidebar_template": "recensement/includes/module_sidebars/_paroisses_nav.html",
+    }

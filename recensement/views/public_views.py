@@ -17,5 +17,5 @@ def landing(request):
 def post_login_redirect(request):
     """Aiguillage après connexion selon le rôle."""
     if get_role(request.user) == Profil.Role.SUPER_ADMIN:
-        return redirect("recensement:dashboard")
+        return redirect("recensement:module_home")
     return redirect("recensement:fiche_list")

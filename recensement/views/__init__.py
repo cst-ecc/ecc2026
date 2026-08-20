@@ -77,6 +77,9 @@ from .legacy_user_views import (
     utilisateur_toggle_actif,
     utilisateur_update,
 )
+
+# --- Portail modulaire Super administrateur -------------------------------
+from .module_views import module_construction, module_home
 from .notifications_views import (
     notification_marquer_lue,
     notifications_liste,
@@ -119,6 +122,8 @@ __all__ = [
     # Pages publiques
     "landing",
     "post_login_redirect",
+    "module_home",
+    "module_construction",
     # Tableau de bord
     "dashboard",
     "suivi_modifications",

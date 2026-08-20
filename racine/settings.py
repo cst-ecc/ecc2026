@@ -124,7 +124,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Authentification — connexion requise pour la saisie des fiches
 # ---------------------------------------------------------------------------
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "recensement:fiche_list"
+LOGIN_REDIRECT_URL = "recensement:post_login_redirect"  # page d'accueil après connexion
 LOGOUT_REDIRECT_URL = "recensement:landing"
 
 # ---------------------------------------------------------------------------

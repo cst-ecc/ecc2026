@@ -21,9 +21,17 @@
     aria-label="Navigation principale"
   >
     <div class="h-14 shrink-0 flex items-center justify-between gap-2 px-4 border-b border-brand-700">
-      <a href="{% url 'recensement:fiche_list' %}" class="min-w-0 truncate font-semibold text-white">
-        Recensement
-      </a>
+      {% block sidebar_brand %}
+        {% if is_super_admin and ui_module %}
+          <a href="{% url ui_module.home_url_name %}" class="min-w-0 truncate font-semibold text-white">
+            {{ ui_module.sidebar_title }}
+          </a>
+        {% else %}
+          <a href="{% url 'recensement:fiche_list' %}" class="min-w-0 truncate font-semibold text-white">
+            Recensement
+          </a>
+        {% endif %}
+      {% endblock %}
 
       <button
         id="sidebar-close"
@@ -38,7 +46,13 @@
     </div>
 
     <nav class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
-      {% include "recensement/includes/_sidebar_nav.html" %}
+      {% block sidebar_navigation %}
+        {% if is_super_admin and ui_module %}
+          {% include ui_module.sidebar_template %}
+        {% else %}
+          {% include "recensement/includes/_sidebar_nav.html" %}
+        {% endif %}
+      {% endblock %}
     </nav>
 
     <div class="shrink-0 border-t border-brand-700 bg-brand-900 p-3">
@@ -81,7 +95,13 @@
 
           <div class="min-w-0">
             <div class="truncate text-sm font-semibold text-slate-900 sm:text-base">
-              Recensement des paroisses
+              {% block app_header_title %}
+                {% if is_super_admin and ui_module %}
+                  {{ ui_module.header_title }}
+                {% else %}
+                  Recensement des paroisses
+                {% endif %}
+              {% endblock %}
             </div>
             {% if user_scope %}
               <div class="hidden truncate text-xs text-slate-500 sm:block">
@@ -126,7 +146,7 @@
 
     <footer class="mt-6 border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
       <p>
-        &copy; {% now "Y" %} Église du Christianisme Céleste — Recensement des paroisses
+        &copy; {% now "Y" %} Église du Christianisme Céleste — {% block footer_context %}{% if is_super_admin and ui_module %}{{ ui_module.sidebar_title }}{% else %}Recensement des paroisses{% endif %}{% endblock %}
       </p>
 
       <p class="mt-2">

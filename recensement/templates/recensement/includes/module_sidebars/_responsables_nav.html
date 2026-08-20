@@ -1,0 +1,11 @@
+{% with url_name=request.resolver_match.url_name %}
+<a href="{% url 'recensement:module_detail' 'responsables-ecclesiaux' %}" class="sidebar-link mb-2"><span>← Sous-modules</span></a>
+
+<details class="sidebar-group" open>
+  <summary class="sidebar-summary"><span>Responsables ecclésiaux</span><span aria-hidden="true">›</span></summary>
+  <div class="sidebar-submenu">
+    <a href="{% url 'recensement:responsable_ecclesial_list' %}" class="sidebar-link {% if url_name == 'responsable_ecclesial_list' or url_name == 'responsable_ecclesial_detail' or 'mandat_responsable' in url_name or url_name == 'responsable_ecclesial_remplacer' %}is-active{% endif %}">Postes & mandats</a>
+    <a href="{% url 'recensement:responsable_ecclesial_create' %}" class="sidebar-link {% if url_name == 'responsable_ecclesial_create' %}is-active{% endif %}">Nouveau poste</a>
+  </div>
+</details>
+{% endwith %}

@@ -1,0 +1,11 @@
+{% with url_name=request.resolver_match.url_name %}
+<a href="{% url 'recensement:module_detail' 'patrimoines-sites' %}" class="sidebar-link mb-2"><span>← Patrimoines et Sites</span></a>
+
+<details class="sidebar-group" open>
+  <summary class="sidebar-summary"><span>Sites particuliers</span><span aria-hidden="true">›</span></summary>
+  <div class="sidebar-submenu">
+    <a href="{% url 'recensement:site_particulier_list' %}" class="sidebar-link {% if url_name == 'site_particulier_list' or url_name == 'site_particulier_detail' or url_name == 'site_particulier_update' or url_name == 'responsabilite_hierarchique_update' %}is-active{% endif %}">Liste des sites</a>
+    <a href="{% url 'recensement:site_particulier_create' %}" class="sidebar-link {% if url_name == 'site_particulier_create' %}is-active{% endif %}">Ajouter un site</a>
+  </div>
+</details>
+{% endwith %}

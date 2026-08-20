@@ -1,0 +1,45 @@
+{% if icon == "church" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v5m-2.5-2.5h5M7 22v-8l5-4 5 4v8M4 22h16M10 22v-5h4v5" /></svg>
+{% elif icon == "members" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+{% elif icon == "shepherd" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM5 21a7 7 0 0 1 14 0M19 3v18" /></svg>
+{% elif icon == "grades" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m12 3 2.2 4.46 4.92.72-3.56 3.47.84 4.9L12 14.23l-4.4 2.32.84-4.9-3.56-3.47 4.92-.72L12 3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M8 18.5 7 22l5-2 5 2-1-3.5" /></svg>
+{% elif icon == "leadership" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM5 21a7 7 0 0 1 14 0" /><path stroke-linecap="round" stroke-linejoin="round" d="m18 5 1 1 2-2" /></svg>
+{% elif icon == "site" or icon == "map" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>
+{% elif icon == "landmark" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9h18M5 9v9m4-9v9m6-9v9m4-9v9M2 21h20M12 3l9 4H3l9-4Z" /></svg>
+{% elif icon == "admin" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="m9 12 2 2 4-5" /></svg>
+{% elif icon == "export" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" /></svg>
+{% elif icon == "clipboard" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5h6m-5-2h4a2 2 0 0 1 2 2h2v16H6V5h2a2 2 0 0 1 2-2Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 11h6M9 15h6" /></svg>
+{% elif icon == "check" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path stroke-linecap="round" stroke-linejoin="round" d="m8 12 2.5 2.5L16 9" /></svg>
+{% elif icon == "building" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 21V5h10v16M14 10h6v11M8 9h2m-2 4h2m-2 4h2m8-3h1m-1 4h1M2 21h20" /></svg>
+{% elif icon == "history" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v5h5M12 7v5l3 2" /></svg>
+{% elif icon == "chart" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20V10h4v10m4 0V4h4v16m4 0v-7h-4M2 20h20" /></svg>
+{% elif icon == "code" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8 9-3 3 3 3m8-6 3 3-3 3m-2-9-4 12" /></svg>
+{% elif icon == "archive" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16v14H4V7Zm-1-4h18v4H3V3Zm6 8h6" /></svg>
+{% elif icon == "document" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 2h8l4 4v16H6V2Zm8 0v5h5M9 12h6M9 16h6" /></svg>
+{% elif icon == "book" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4.5A2.5 2.5 0 0 1 6.5 2H11v18H6.5A2.5 2.5 0 0 0 4 22V4.5ZM20 4.5A2.5 2.5 0 0 0 17.5 2H13v18h4.5A2.5 2.5 0 0 1 20 22V4.5Z" /></svg>
+{% elif icon == "music" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 18V5l10-2v13M9 9l10-2" /><circle cx="6" cy="18" r="3" /><circle cx="16" cy="16" r="3" /></svg>
+{% elif icon == "publish" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V3m0 0 4 4m-4-4L8 7M5 11H3v10h18V11h-2" /></svg>
+{% elif icon == "plus" %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v8M8 12h8" /></svg>
+{% else %}
+<svg class="{% if size == 'lg' %}h-8 w-8{% else %}h-6 w-6{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.09A1.7 1.7 0 0 0 9 19.36a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.08V3h4v.08A1.7 1.7 0 0 0 15 4.64a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9 1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z" /></svg>
+{% endif %}
