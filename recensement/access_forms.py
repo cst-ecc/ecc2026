@@ -1,17 +1,20 @@
 """Formulaires dédiés à la gestion hiérarchique des comptes et accès."""
 
 from django import forms
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
 from .forms.validators import valider_telephone_international
 from .models import (
     AffectationTerritoriale,
     District,
+    Employe,
     Profil,
     Province,
     Region,
     Zone,
 )
+from .module_registry import iter_module_access_choices
 from .permissions import (
     districts_autorises,
     get_role,
@@ -773,3 +776,71 @@ class ActionAffectationForm(forms.Form):
             }
         ),
     )
+
+
+class UtilisateurSystemeForm(forms.Form):
+    """Création minimale d'un utilisateur global de la plateforme.
+
+    Ce formulaire ne touche pas aux rôles OP ni aux affectations territoriales.
+    Les accès sont attribués via ``AccesModuleUtilisateur``.
+    """
+
+    first_name = forms.CharField(
+        required=False,
+        max_length=150,
+        label="Prénom",
+        widget=forms.TextInput(attrs={"class": INPUT_CSS, "autocomplete": "given-name"}),
+    )
+    last_name = forms.CharField(
+        required=True,
+        max_length=150,
+        label="Nom",
+        widget=forms.TextInput(attrs={"class": INPUT_CSS, "autocomplete": "family-name"}),
+    )
+    email = forms.EmailField(
+        required=False,
+        label="Adresse e-mail",
+        widget=forms.EmailInput(attrs={"class": INPUT_CSS, "placeholder": "exemple@ecc.bj", "autocomplete": "email"}),
+    )
+    is_active = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Compte actif",
+        widget=forms.CheckboxInput(attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}),
+    )
+    employe = forms.ModelChoiceField(
+        required=False,
+        queryset=Employe.objects.none(),
+        label="Fiche employé à lier",
+        widget=forms.Select(attrs={"class": SELECT_CSS}),
+        help_text="Facultatif. Les employés déjà liés à un utilisateur ne sont pas proposés.",
+    )
+    acces_modules = forms.MultipleChoiceField(
+        required=False,
+        choices=iter_module_access_choices(),
+        label="Modules et sous-modules autorisés",
+        widget=forms.CheckboxSelectMultiple(
+            attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}
+        ),
+        help_text="Ces accès sont indépendants des rôles OP du recensement.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["employe"].queryset = (
+            Employe.objects.filter(utilisateur__isnull=True).select_related("organisation").order_by("nom", "prenoms")
+        )
+
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        if email and User.objects.filter(email__iexact=email).exists():
+            raise ValidationError("Un compte utilise déjà cette adresse e-mail.")
+        return email
+
+    def clean(self):
+        cleaned = super().clean()
+        employe = cleaned.get("employe")
+        email = cleaned.get("email") or ""
+        if employe and not email and employe.email:
+            cleaned["email"] = employe.email
+        return cleaned

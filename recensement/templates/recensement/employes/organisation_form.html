@@ -1,0 +1,27 @@
+{% extends "recensement/base.html" %}
+{% block title %}{% if is_edit %}Modifier l’organisation{% else %}Nouvelle organisation{% endif %} — Administration{% endblock %}
+{% block sidebar_brand %}<a href="{% url 'recensement:module_detail' 'administration' %}" class="min-w-0 truncate font-semibold text-white">Administration</a>{% endblock %}
+{% block sidebar_navigation %}{% include "recensement/includes/module_sidebars/_administration_nav.html" %}{% endblock %}
+{% block app_header_title %}Administration — Organisations{% endblock %}
+{% block footer_context %}Administration{% endblock %}
+{% block content %}
+<a href="{% url 'recensement:organisation_list' %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour aux organisations</a>
+<div class="mx-auto mt-4 max-w-2xl">
+  <h1 class="mb-4 text-xl font-semibold text-slate-900">{% if is_edit %}Modifier l’organisation{% else %}Nouvelle organisation{% endif %}</h1>
+  <form method="post" class="app-card space-y-4 p-5">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}
+      <div>
+        {% if field.field.widget.input_type == 'checkbox' %}
+          <label class="flex items-center gap-2 text-sm text-slate-700">{{ field }} {{ field.label }}</label>
+        {% else %}
+          <label class="mb-1 block text-sm font-medium text-slate-700">{{ field.label }}</label>{{ field }}
+        {% endif %}
+        {% for error in field.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    {% endfor %}
+    <div class="flex justify-end gap-2 pt-2"><a href="{% url 'recensement:organisation_list' %}" class="rounded-lg border border-slate-300 px-4 py-2.5 font-medium text-slate-700 hover:bg-slate-50">Annuler</a><button class="rounded-lg bg-brand-600 px-5 py-2.5 font-semibold text-white hover:bg-brand-700">Enregistrer</button></div>
+  </form>
+</div>
+{% endblock %}

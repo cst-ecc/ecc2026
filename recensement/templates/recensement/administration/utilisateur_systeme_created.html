@@ -1,0 +1,47 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}Utilisateur système créé — {{ utilisateur.username }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-lg">
+  <div class="mb-6 rounded-2xl border border-green-200 bg-green-50 p-6 text-center">
+    <div class="mb-3 text-4xl">✅</div>
+    <h1 class="text-xl font-semibold text-green-800">Utilisateur système créé</h1>
+    <p class="mt-1 text-green-700">Ce compte n’est pas un opérateur du recensement tant qu’aucune affectation territoriale n’est définie dans Gestion des opérateurs.</p>
+  </div>
+
+  <div class="app-card space-y-4 p-6">
+    <div>
+      <p class="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">Identifiant</p>
+      <p class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 font-mono text-lg font-bold text-slate-900">{{ utilisateur.username }}</p>
+    </div>
+    <div>
+      <p class="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">Nom complet</p>
+      <p class="text-slate-800">{{ utilisateur.get_full_name|default:"—" }}</p>
+    </div>
+    <div>
+      <p class="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">E-mail</p>
+      <p class="text-slate-800">{{ utilisateur.email|default:"Non renseigné" }}</p>
+    </div>
+    {% if utilisateur.fiche_employe %}
+      <div>
+        <p class="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">Employé lié</p>
+        <p class="text-slate-800">{{ utilisateur.fiche_employe.matricule }} — {{ utilisateur.fiche_employe.nom_complet }}</p>
+      </div>
+    {% endif %}
+
+    {% if mdp_provisoire %}
+      <div class="border-t border-slate-100 pt-4">
+        <p class="mb-1 text-xs font-medium uppercase tracking-wide text-amber-700">Mot de passe provisoire — affiché une seule fois</p>
+        <p class="select-all rounded-lg border border-red-200 bg-red-50 px-4 py-2 font-mono text-lg font-bold text-red-700">{{ mdp_provisoire }}</p>
+        <p class="mt-2 text-xs text-slate-500">Transmettez-le par un canal sécurisé.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="mt-6 flex justify-end gap-3">
+    <a href="{% url 'recensement:utilisateur_systeme_create' %}" class="rounded-lg border border-brand-600 px-4 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50">Créer un autre utilisateur</a>
+    <a href="{% url 'recensement:utilisateur_systeme_list' %}" class="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">Retour à la liste</a>
+  </div>
+</div>
+{% endblock %}

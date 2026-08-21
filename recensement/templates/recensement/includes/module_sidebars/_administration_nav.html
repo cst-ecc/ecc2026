@@ -1,12 +1,28 @@
-{% with url_name=request.resolver_match.url_name %}
+{% with url_name=request.resolver_match.url_name submodule_slug=request.resolver_match.kwargs.submodule_slug %}
 <a href="{% url 'recensement:module_detail' 'administration' %}" class="sidebar-link mb-2"><span>← Sous-modules</span></a>
 
 <details class="sidebar-group" open>
   <summary class="sidebar-summary"><span>Administration</span><span aria-hidden="true">›</span></summary>
   <div class="sidebar-submenu">
-    <a href="{% url 'recensement:utilisateur_list' %}" class="sidebar-link {% if url_name == 'utilisateur_list' or url_name == 'utilisateur_update' or url_name == 'utilisateur_created' %}is-active{% endif %}">Utilisateurs</a>
-    <a href="{% url 'recensement:utilisateur_create' %}" class="sidebar-link {% if url_name == 'utilisateur_create' %}is-active{% endif %}">Nouvel utilisateur</a>
-    <a href="{% url 'recensement:historique_affectations' %}" class="sidebar-link {% if url_name == 'historique_affectations' or 'affectation' in url_name %}is-active{% endif %}">Historique des accès</a>
+    <a href="{% url 'recensement:utilisateur_systeme_list' %}"
+       class="sidebar-link {% if url_name == 'utilisateur_systeme_list' or url_name == 'utilisateur_systeme_create' %}is-active{% endif %}">
+      <span>Gestion des utilisateurs</span>
+    </a>
+
+    <a href="{% url 'recensement:utilisateur_list' %}"
+       class="sidebar-link {% if url_name == 'utilisateur_list' or url_name == 'utilisateur_create' or url_name == 'utilisateur_update' or url_name == 'utilisateur_created' or url_name == 'utilisateur_reset_password' or url_name == 'utilisateur_delete' or url_name == 'historique_affectations' or 'affectation' in url_name %}is-active{% endif %}">
+      <span>Gestion des opérateurs</span>
+    </a>
+
+    <a href="{% url 'recensement:role_plateforme_list' %}"
+       class="sidebar-link {% if url_name == 'role_plateforme_list' or url_name == 'role_plateforme_create' or url_name == 'role_plateforme_detail' or url_name == 'role_plateforme_update' or url_name == 'role_plateforme_toggle' %}is-active{% endif %}">
+      <span>Rôles et permissions</span>
+    </a>
+
+    <a href="{% url 'recensement:submodule_construction' 'administration' 'journal-activite' %}"
+       class="sidebar-link {% if submodule_slug == 'journal-activite' %}is-active{% endif %}">
+      <span>Journal d’activité</span>
+    </a>
   </div>
 </details>
 {% endwith %}

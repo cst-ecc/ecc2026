@@ -1,14 +1,14 @@
 {% extends "recensement/base.html" %}
 
-{% block title %}Compte créé — {{ utilisateur.username }}{% endblock %}
+{% block title %}Opérateur créé — {{ utilisateur.username }}{% endblock %}
 
 {% block content %}
 <div class="max-w-lg mx-auto">
 
   <div class="bg-green-50 border border-green-200 rounded-2xl p-6 mb-6 text-center">
     <div class="text-4xl mb-3">✅</div>
-    <h1 class="text-xl font-semibold text-green-800">Compte créé avec succès</h1>
-    <p class="text-green-700 mt-1">L'identifiant a été généré automatiquement.</p>
+    <h1 class="text-xl font-semibold text-green-800">Compte opérateur créé avec succès</h1>
+    <p class="text-green-700 mt-1">L’identifiant de recensement a été généré automatiquement.</p>
   </div>
 
   {% if statut_email_creation %}
@@ -99,11 +99,11 @@
     </a>
     <a href="{% url 'recensement:utilisateur_create' %}"
        class="border border-brand-600 text-brand-700 hover:bg-brand-50 font-medium px-4 py-2.5 rounded-lg text-sm">
-      Créer un autre compte
+      Créer un autre opérateur / agent
     </a>
     <a href="{% url 'recensement:utilisateur_list' %}"
        class="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-5 py-2.5 rounded-lg text-sm">
-      Retour à la liste
+      Retour aux opérateurs
     </a>
   </div>
 

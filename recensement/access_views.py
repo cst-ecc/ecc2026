@@ -1,5 +1,9 @@
 """Vues de gestion hiérarchique des utilisateurs et de leurs accès territoriaux."""
 
+import re
+import secrets
+import unicodedata
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -17,12 +21,14 @@ from .access_forms import (
     AffectationTerritorialeForm,
     ProfilTerritorialForm,
     UtilisateurContactForm,
+    UtilisateurSystemeForm,
     libelle_affectation_multiple,
     queryset_affectations_autorisees,
 )
 from .forms import TailwindSetPasswordForm
 from .identifiants import generer_identifiant, generer_mot_de_passe_provisoire
 from .models import (
+    AccesModuleUtilisateur,
     AffectationTerritoriale,
     District,
     HistoriqueAffectationTerritoriale,
@@ -31,6 +37,7 @@ from .models import (
     Profil,
     Province,
     Region,
+    RoleUtilisateurPlateforme,
     Zone,
 )
 from .permissions import (
@@ -48,10 +55,77 @@ from .services.services_affectations import (
     serialiser_profil,
     synchroniser_affectations_multiples,
 )
+from .services.services_employes import synchroniser_acces_modules
 from .services.services_utilisateurs_mailing import envoyer_email_creation_utilisateur
 
 UTILISATEURS_PAR_PAGE = 25
 HISTORIQUE_AFFECTATIONS_PAR_PAGE = 50
+
+ROLES_OPERATEURS_RECENSEMENT = (
+    Profil.Role.OP_PROVINCE,
+    Profil.Role.OP_DISTRICT,
+    Profil.Role.OP_ZONE,
+    Profil.Role.AGENT,
+)
+
+
+def _exiger_super_admin(user):
+    if get_role(user) != Profil.Role.SUPER_ADMIN:
+        raise PermissionDenied("Cette page est réservée au Super administrateur.")
+
+
+def _condition_operateur_recensement():
+    """Utilisateurs réellement rattachés au recensement territorial.
+
+    Un compte global peut disposer d'un Profil créé automatiquement par le signal
+    post_save. Il ne devient pas pour autant opérateur du recensement tant que le
+    rattachement territorial obligatoire de son rôle n'est pas renseigné.
+    """
+    return (
+        Q(profil__role=Profil.Role.OP_PROVINCE, profil__province__isnull=False)
+        | Q(profil__role=Profil.Role.OP_DISTRICT, profil__district__isnull=False)
+        | Q(profil__role=Profil.Role.OP_ZONE, profil__zone__isnull=False)
+        | Q(profil__role=Profil.Role.AGENT, profil__zone__isnull=False)
+    )
+
+
+def _filtrer_operateurs_recensement(queryset):
+    return queryset.filter(_condition_operateur_recensement())
+
+
+def _est_operateur_recensement_obj(utilisateur):
+    profil = getattr(utilisateur, "profil", None)
+    if not profil:
+        return False
+    if profil.role == Profil.Role.OP_PROVINCE:
+        return bool(profil.province_id)
+    if profil.role == Profil.Role.OP_DISTRICT:
+        return bool(profil.district_id)
+    if profil.role in (Profil.Role.OP_ZONE, Profil.Role.AGENT):
+        return bool(profil.zone_id)
+    return False
+
+
+def _normaliser_segment_identifiant(value):
+    value = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode("ascii")
+    value = re.sub(r"[^a-zA-Z0-9]", "", value).lower()
+    return value[:16]
+
+
+def _generer_identifiant_systeme(*, first_name="", last_name="", email=""):
+    base = (
+        _normaliser_segment_identifiant(last_name) or _normaliser_segment_identifiant(email.split("@", 1)[0]) or "user"
+    )
+    prefixe = f"sys{base}"
+    username = prefixe
+    compteur = 1
+    while User.objects.filter(username=username).exists():
+        compteur += 1
+        if compteur <= 99:
+            username = f"{prefixe}{compteur:02d}"
+        else:
+            username = f"{prefixe}{''.join(secrets.choice('23456789abcdefghjkmnpqrstuvwxyz') for _ in range(4))}"
+    return username
 
 
 def _exiger_gestionnaire(user):
@@ -150,6 +224,183 @@ def _contexte_formulaire(
 
 @login_required
 @require_GET
+def utilisateur_systeme_list(request):
+    """Liste des utilisateurs globaux de la plateforme.
+
+    Cette page n'administre pas les affectations territoriales. Les opérateurs
+    du recensement restent gérés dans ``utilisateur_list``.
+    """
+    _exiger_super_admin(request.user)
+
+    utilisateurs = (
+        User.objects.select_related("profil", "fiche_employe").prefetch_related("acces_modules_plateforme").all()
+    )
+
+    q = (request.GET.get("q") or "").strip()[:100]
+    statut = (request.GET.get("statut") or "").strip()
+    module = (request.GET.get("module") or "").strip()[:80]
+
+    if q:
+        utilisateurs = utilisateurs.filter(
+            Q(username__icontains=q)
+            | Q(first_name__icontains=q)
+            | Q(last_name__icontains=q)
+            | Q(email__icontains=q)
+            | Q(fiche_employe__matricule__icontains=q)
+            | Q(fiche_employe__nom__icontains=q)
+            | Q(fiche_employe__prenoms__icontains=q)
+        )
+
+    if statut == "actifs":
+        utilisateurs = utilisateurs.filter(is_active=True)
+    elif statut == "inactifs":
+        utilisateurs = utilisateurs.filter(is_active=False)
+
+    if module:
+        utilisateurs = utilisateurs.filter(
+            acces_modules_plateforme__module_slug=module,
+            acces_modules_plateforme__statut=AccesModuleUtilisateur.Statut.ACTIVE,
+        )
+
+    acces_actifs = (
+        AccesModuleUtilisateur.objects.filter(
+            utilisateur_id=OuterRef("pk"),
+            statut=AccesModuleUtilisateur.Statut.ACTIVE,
+        )
+        .order_by()
+        .values("utilisateur_id")
+        .annotate(total=Count("pk"))
+        .values("total")[:1]
+    )
+    roles_globaux_actifs = (
+        RoleUtilisateurPlateforme.objects.filter(
+            utilisateur_id=OuterRef("pk"),
+            statut=RoleUtilisateurPlateforme.Statut.ACTIVE,
+            role__est_actif=True,
+        )
+        .order_by()
+        .values("utilisateur_id")
+        .annotate(total=Count("pk"))
+        .values("total")[:1]
+    )
+
+    utilisateurs = (
+        utilisateurs.annotate(
+            nb_acces_modules=Subquery(acces_actifs),
+            nb_roles_globaux=Subquery(roles_globaux_actifs),
+        )
+        .distinct()
+        .order_by("username")
+    )
+
+    paginator = Paginator(utilisateurs, UTILISATEURS_PAR_PAGE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
+
+    utilisateurs_page = list(page_obj.object_list)
+    for utilisateur in utilisateurs_page:
+        utilisateur.est_operateur_recensement = _est_operateur_recensement_obj(utilisateur)
+
+    modules_disponibles = (
+        AccesModuleUtilisateur.objects.filter(statut=AccesModuleUtilisateur.Statut.ACTIVE)
+        .order_by("module_slug")
+        .values_list("module_slug", flat=True)
+        .distinct()
+    )
+
+    return render(
+        request,
+        "recensement/administration/utilisateur_systeme_list.html",
+        {
+            "utilisateurs": utilisateurs_page,
+            "page_obj": page_obj,
+            "page_range": paginator.get_elided_page_range(
+                number=page_obj.number,
+                on_each_side=1,
+                on_ends=1,
+            ),
+            "pagination_ellipsis": paginator.ELLIPSIS,
+            "pagination_query": pagination_params.urlencode(),
+            "total": paginator.count,
+            "q": q,
+            "statut_filtre": statut,
+            "module_filtre": module,
+            "modules_disponibles": modules_disponibles,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def utilisateur_systeme_create(request):
+    """Création d'un utilisateur global de plateforme, sans rôle OP."""
+    _exiger_super_admin(request.user)
+    if request.method == "POST":
+        form = UtilisateurSystemeForm(request.POST)
+        if form.is_valid():
+            mot_de_passe = generer_mot_de_passe_provisoire()
+            employe = form.cleaned_data.get("employe")
+            utilisateur = User.objects.create_user(
+                username=_generer_identifiant_systeme(
+                    first_name=form.cleaned_data.get("first_name", ""),
+                    last_name=form.cleaned_data.get("last_name", ""),
+                    email=form.cleaned_data.get("email", ""),
+                ),
+                password=mot_de_passe,
+                first_name=form.cleaned_data.get("first_name", ""),
+                last_name=form.cleaned_data.get("last_name", ""),
+                email=form.cleaned_data.get("email", ""),
+                is_active=bool(form.cleaned_data.get("is_active")),
+            )
+
+            if employe:
+                employe.utilisateur = utilisateur
+                employe.acces_plateforme = True
+                employe.email = employe.email or utilisateur.email
+                employe.save(update_fields=["utilisateur", "acces_plateforme", "email", "date_modification"])
+
+            synchroniser_acces_modules(
+                utilisateur=utilisateur,
+                valeurs=form.cleaned_data.get("acces_modules") or [],
+                attributeur=request.user,
+                employe=employe,
+                motif="Accès attribués depuis la gestion des utilisateurs système.",
+            )
+
+            request.session["utilisateur_systeme_mdp_username"] = utilisateur.username
+            request.session["utilisateur_systeme_mdp_valeur"] = mot_de_passe
+            messages.success(request, "Utilisateur système créé avec succès.")
+            return redirect("recensement:utilisateur_systeme_created", pk=utilisateur.pk)
+        messages.error(request, "Veuillez corriger les erreurs indiquées.")
+    else:
+        form = UtilisateurSystemeForm()
+
+    return render(
+        request,
+        "recensement/administration/utilisateur_systeme_form.html",
+        {"form": form, "is_edit": False},
+    )
+
+
+@login_required
+@require_GET
+def utilisateur_systeme_created(request, pk):
+    _exiger_super_admin(request.user)
+    utilisateur = get_object_or_404(User.objects.select_related("profil", "fiche_employe"), pk=pk)
+    mot_de_passe = request.session.pop("utilisateur_systeme_mdp_valeur", None)
+    username_session = request.session.pop("utilisateur_systeme_mdp_username", None)
+    if username_session != utilisateur.username:
+        mot_de_passe = None
+    return render(
+        request,
+        "recensement/administration/utilisateur_systeme_created.html",
+        {"utilisateur": utilisateur, "mdp_provisoire": mot_de_passe},
+    )
+
+
+@login_required
+@require_GET
 def ajax_affectations_multiples_options(request):
     """Recherche paginée des territoires attribuables au rôle cible.
 
@@ -221,7 +472,7 @@ def ajax_affectations_multiples_options(request):
 @require_GET
 def utilisateur_list(request):
     _exiger_gestionnaire(request.user)
-    utilisateurs = utilisateurs_visibles_pour(request.user)
+    utilisateurs = _filtrer_operateurs_recensement(utilisateurs_visibles_pour(request.user))
     role = get_role(request.user)
 
     filtre_role = (request.GET.get("role") or "").strip()
@@ -285,7 +536,7 @@ def utilisateur_list(request):
             "pagination_ellipsis": paginator.ELLIPSIS,
             "pagination_query": pagination_params.urlencode(),
             "total": paginator.count,
-            "roles": Profil.Role.choices,
+            "roles": [(value, label) for value, label in Profil.Role.choices if value in ROLES_OPERATEURS_RECENSEMENT],
             "regions": Region.objects.all() if role == Profil.Role.SUPER_ADMIN else [],
             "provinces": Province.objects.all() if role == Profil.Role.SUPER_ADMIN else [],
             "filtre_role": filtre_role,

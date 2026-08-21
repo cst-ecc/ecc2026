@@ -5,10 +5,12 @@ from recensement.healthcheck import healthcheck
 from . import access_views, views
 from .views import (
     doublon_views,
+    employes_views,
     module_views,
     notifications_views,
     qrcode_views,
     responsables_ecclesiaux_views,
+    roles_permissions_views,
 )
 
 app_name = "recensement"
@@ -58,6 +60,61 @@ urlpatterns = [
         name="ajax_affectations_multiples_options",
     ),
     path("ajax/doublons-fiche/", doublon_views.ajax_verifier_doublon_fiche, name="ajax_verifier_doublon_fiche"),
+    # Administration — Organisations et employés
+    path("administration/organisations/", employes_views.organisation_list, name="organisation_list"),
+    path("administration/organisations/nouveau/", employes_views.organisation_create, name="organisation_create"),
+    path(
+        "administration/organisations/<int:pk>/modifier/",
+        employes_views.organisation_update,
+        name="organisation_update",
+    ),
+    path("administration/employes/", employes_views.employe_list, name="employe_list"),
+    path("administration/employes/nouveau/", employes_views.employe_create, name="employe_create"),
+    path("administration/employes/<int:pk>/", employes_views.employe_detail, name="employe_detail"),
+    path("administration/employes/<int:pk>/modifier/", employes_views.employe_update, name="employe_update"),
+    path(
+        "administration/employes/<int:pk>/statut/<str:statut>/",
+        employes_views.employe_changer_statut,
+        name="employe_changer_statut",
+    ),
+    path("employes/verifier/<str:matricule>/", employes_views.employe_verifier, name="employe_verifier"),
+    path("employes/verifier/<str:matricule>/qrcode.png", employes_views.employe_qrcode, name="employe_qrcode"),
+    # Administration — Rôles globaux et permissions modulaires
+    path(
+        "administration/roles-permissions/", roles_permissions_views.role_plateforme_list, name="role_plateforme_list"
+    ),
+    path(
+        "administration/roles-permissions/nouveau/",
+        roles_permissions_views.role_plateforme_create,
+        name="role_plateforme_create",
+    ),
+    path(
+        "administration/roles-permissions/<int:pk>/",
+        roles_permissions_views.role_plateforme_detail,
+        name="role_plateforme_detail",
+    ),
+    path(
+        "administration/roles-permissions/<int:pk>/modifier/",
+        roles_permissions_views.role_plateforme_update,
+        name="role_plateforme_update",
+    ),
+    path(
+        "administration/roles-permissions/<int:pk>/activer-desactiver/",
+        roles_permissions_views.role_plateforme_toggle,
+        name="role_plateforme_toggle",
+    ),
+    # Gestion des utilisateurs système (globale, hors affectations territoriales)
+    path("administration/utilisateurs/", access_views.utilisateur_systeme_list, name="utilisateur_systeme_list"),
+    path(
+        "administration/utilisateurs/nouveau/",
+        access_views.utilisateur_systeme_create,
+        name="utilisateur_systeme_create",
+    ),
+    path(
+        "administration/utilisateurs/<int:pk>/cree/",
+        access_views.utilisateur_systeme_created,
+        name="utilisateur_systeme_created",
+    ),
     # Gestion hiérarchique des comptes et accès territoriaux
     path("utilisateurs/", access_views.utilisateur_list, name="utilisateur_list"),
     path("utilisateurs/nouveau/", access_views.utilisateur_create, name="utilisateur_create"),

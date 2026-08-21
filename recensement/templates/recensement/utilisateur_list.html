@@ -1,20 +1,26 @@
 {% extends "recensement/base.html" %}
 
-{% block title %}Utilisateurs — Recensement{% endblock %}
+{% block title %}Gestion des opérateurs — Recensement{% endblock %}
 
 {% block content %}
 <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
-  <h1 class="text-xl font-semibold text-slate-900">Comptes utilisateurs ({{ total }})</h1>
+  <div>
+    <h1 class="text-xl font-semibold text-slate-900">Gestion des opérateurs du recensement ({{ total }})</h1>
+    <p class="mt-1 max-w-3xl text-sm text-slate-500">
+      Cette page concerne uniquement les OP PROVINCE, OP DISTRICT, OP ZONE et Agents recenseurs.
+      Les utilisateurs globaux de la plateforme sont gérés dans « Gestion des utilisateurs ».
+    </p>
+  </div>
   <div class="flex gap-2 flex-wrap">
     {% if request.user.is_superuser or request.user.profil.is_super_admin %}
       <a href="{% url 'recensement:historique_affectations' %}"
          class="inline-flex items-center border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-lg">
-        Historique des accès
+        Historique des accès territoriaux
       </a>
     {% endif %}
     <a href="{% url 'recensement:utilisateur_create' %}"
        class="inline-flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg">
-      + Nouveau compte
+      + Nouvel opérateur / agent
     </a>
   </div>
 </div>
@@ -24,10 +30,10 @@
 <form method="get" class="mb-4 bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
   <div class="grid sm:grid-cols-3 lg:grid-cols-5 gap-3">
     <div>
-      <label class="block text-xs font-medium text-slate-600 mb-1">Rôle</label>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Rôle de recensement</label>
       <select name="role"
               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <option value="">— Tous les rôles —</option>
+        <option value="">— Tous les rôles du recensement —</option>
         {% for value, label in roles %}
           <option value="{{ value }}" {% if filtre_role == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
@@ -75,7 +81,7 @@
         <th class="px-4 py-3 font-medium">Identifiant</th>
         <th class="px-4 py-3 font-medium">Nom</th>
         <th class="px-4 py-3 font-medium">Contact</th>
-        <th class="px-4 py-3 font-medium">Rôle</th>
+        <th class="px-4 py-3 font-medium">Rôle recensement</th>
         <th class="px-4 py-3 font-medium">Périmètre</th>
         <th class="px-4 py-3 font-medium">Accès supplémentaires</th>
         <th class="px-4 py-3 font-medium">Créé par</th>
@@ -199,7 +205,7 @@
           {% elif u.is_superuser or u.profil.is_super_admin %}
             <span class="text-slate-400">Consultation uniquement</span>
           {% else %}
-            <a href="{% url 'recensement:utilisateur_update' u.pk %}" class="text-brand-600 hover:underline">Gérer les accès</a>
+            <a href="{% url 'recensement:utilisateur_update' u.pk %}" class="text-brand-600 hover:underline">Gérer affectations</a>
             <span class="text-slate-300">·</span>
             <a href="{% url 'recensement:utilisateur_reset_password' u.pk %}" class="text-brand-600 hover:underline">Mot de passe</a>
             <span class="text-slate-300">·</span>

@@ -1,0 +1,119 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}Employés — Administration{% endblock %}
+{% block sidebar_brand %}<a href="{% url 'recensement:module_detail' 'administration' %}" class="min-w-0 truncate font-semibold text-white">Administration</a>{% endblock %}
+{% block sidebar_navigation %}{% include "recensement/includes/module_sidebars/_administration_nav.html" %}{% endblock %}
+{% block app_header_title %}Administration — Employés{% endblock %}
+{% block footer_context %}Administration{% endblock %}
+
+{% block content %}
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <a href="{% url 'recensement:module_detail' 'administration' %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour au module Administration</a>
+    <h1 class="mt-2 text-xl font-semibold text-slate-900">Employés ({{ total }})</h1>
+    <p class="mt-1 text-sm text-slate-500">Gestion administrative distincte des comptes utilisateurs.</p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="{% url 'recensement:organisation_list' %}" class="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Organisations</a>
+    <a href="{% url 'recensement:employe_create' %}" class="inline-flex items-center rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">+ Nouvel employé</a>
+  </div>
+</div>
+
+<form method="get" class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+  <div class="grid gap-3 lg:grid-cols-5">
+    <div class="lg:col-span-2">
+      <label class="mb-1 block text-xs font-medium text-slate-600">Recherche</label>
+      <input type="search" name="q" value="{{ q }}" placeholder="Matricule, nom, fonction, organisation..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+    </div>
+    <div>
+      <label class="mb-1 block text-xs font-medium text-slate-600">Organisation</label>
+      <select name="organisation" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">— Toutes —</option>
+        {% for organisation in organisations %}
+          <option value="{{ organisation.pk }}" {% if organisation_filtre == organisation.pk|stringformat:'d' %}selected{% endif %}>{{ organisation.sigle }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="mb-1 block text-xs font-medium text-slate-600">Statut</label>
+      <select name="statut" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">— Tous —</option>
+        {% for value, label in statuts %}
+          <option value="{{ value }}" {% if statut_filtre == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="flex items-end gap-2">
+      <button class="flex-1 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700" type="submit">Filtrer</button>
+      <a href="{% url 'recensement:employe_list' %}" class="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50">Reset</a>
+    </div>
+  </div>
+</form>
+
+<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <table class="min-w-full text-sm">
+    <thead class="bg-slate-800 text-left text-white">
+      <tr>
+        <th class="px-4 py-3 font-medium">Matricule</th>
+        <th class="px-4 py-3 font-medium">Identité</th>
+        <th class="px-4 py-3 font-medium">Fonction</th>
+        <th class="px-4 py-3 font-medium">Organisation</th>
+        <th class="px-4 py-3 font-medium">Période</th>
+        <th class="px-4 py-3 font-medium">Accès</th>
+        <th class="px-4 py-3 font-medium">E-mail</th>
+        <th class="px-4 py-3 font-medium">Statut</th>
+        <th class="px-4 py-3 font-medium">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for employe in employes %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-3 font-mono text-xs font-semibold text-slate-900">{{ employe.matricule }}</td>
+          <td class="px-4 py-3"><span class="font-medium text-slate-900">{{ employe.nom }}</span><br><span class="text-slate-500">{{ employe.prenoms|default:"—" }}</span></td>
+          <td class="px-4 py-3 text-slate-700">{{ employe.fonction }}</td>
+          <td class="px-4 py-3 text-slate-600">{{ employe.organisation.sigle }}</td>
+          <td class="px-4 py-3 text-xs text-slate-600">{{ employe.periode_service }}</td>
+          <td class="px-4 py-3 text-xs">
+            {% if employe.acces_plateforme and employe.utilisateur %}
+              <span class="rounded-full bg-green-50 px-2 py-0.5 font-semibold text-green-700">Oui</span><br><span class="text-slate-400">{{ employe.utilisateur.username }}</span>
+            {% elif employe.acces_plateforme %}
+              <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">À lier</span>
+            {% else %}
+              <span class="text-slate-400">Non</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 text-xs">
+            {% if employe.dernier_email_acces_statut == 'envoye' %}<span class="rounded-full bg-green-50 px-2 py-0.5 font-semibold text-green-700">Envoyé</span>
+            {% elif employe.dernier_email_acces_statut == 'non_envoye' %}<span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">Non envoyé</span>
+            {% elif employe.dernier_email_acces_statut == 'echec' %}<span class="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-700">Échec</span>
+            {% else %}<span class="text-slate-400">—</span>{% endif %}
+          </td>
+          <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{{ employe.get_statut_display }}</span></td>
+          <td class="whitespace-nowrap px-4 py-3 text-sm">
+            <a href="{% url 'recensement:employe_detail' employe.pk %}" class="text-brand-600 hover:underline">Voir</a>
+            <span class="text-slate-300">·</span>
+            <a href="{% url 'recensement:employe_update' employe.pk %}" class="text-brand-600 hover:underline">Modifier</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="9" class="px-4 py-8 text-center text-slate-400">Aucun employé enregistré.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="mt-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Pagination des employés">
+  <div class="text-sm text-slate-500">{{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total }}</div>
+  <div class="flex flex-wrap gap-1.5">
+    {% if page_obj.has_previous %}<a class="rounded-lg border border-slate-300 px-3 py-2 text-sm" href="?page={{ page_obj.previous_page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}">Précédente</a>{% endif %}
+    {% for page_number in page_range %}
+      {% if page_number == pagination_ellipsis %}<span class="px-2 py-2 text-sm text-slate-400">{{ pagination_ellipsis }}</span>
+      {% elif page_number == page_obj.number %}<span class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white">{{ page_number }}</span>
+      {% else %}<a class="rounded-lg border border-slate-300 px-3 py-2 text-sm" href="?page={{ page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}">{{ page_number }}</a>{% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}<a class="rounded-lg border border-slate-300 px-3 py-2 text-sm" href="?page={{ page_obj.next_page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}">Suivante</a>{% endif %}
+  </div>
+</nav>
+{% endif %}
+{% endblock %}

@@ -1,3 +1,7 @@
+import re
+import secrets
+import unicodedata
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -5,6 +9,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 # ---------------------------------------------------------------------------
 # Référentiel géo-ecclésial (importé depuis le fichier Excel de cartographie)
@@ -2513,3 +2518,543 @@ class HistoriqueSiteParticulier(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} — {self.site.nom} — {self.date_action:%d/%m/%Y %H:%M}"
+
+
+# ---------------------------------------------------------------------------
+# Administration générale — Organisations, employés et accès modulaires
+# ---------------------------------------------------------------------------
+
+_MATRICULE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def _normaliser_sigle_organisation(value):
+    """Normalise un sigle pour les matricules : majuscules, sans espace ni tiret."""
+    value = (value or "").strip()
+    value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    value = re.sub(r"[^A-Za-z0-9]", "", value).upper()
+    return value[:12]
+
+
+def _sigle_depuis_nom(nom):
+    mots = re.findall(
+        r"[A-Za-z0-9]+", unicodedata.normalize("NFKD", nom or "").encode("ascii", "ignore").decode("ascii")
+    )
+    sigle = "".join(mot[0] for mot in mots if mot).upper()
+    return sigle[:8] or "ORG"
+
+
+class OrganisationAdministrative(models.Model):
+    """Organisation administrative liée à l'ECC, au CST, au CSMo ou à une structure rattachée."""
+
+    class TypeOrganisation(models.TextChoices):
+        CSMO = "csmo", "Conseil Supérieur de Mise en œuvre"
+        CST = "cst", "Conseil Supérieur de Transition"
+        ECC = "ecc", "Église du Christianisme Céleste"
+        DIOCESE = "diocese", "Diocèse"
+        COMMISSION = "commission", "Commission"
+        DEPARTEMENT = "departement", "Département"
+        AUTRE = "autre", "Autre structure"
+
+    nom = models.CharField(max_length=200, unique=True, verbose_name="Nom de l'organisation")
+    sigle = models.CharField(
+        max_length=20,
+        unique=True,
+        verbose_name="Sigle",
+        help_text="Utilisé dans le matricule des employés. Exemple : CSMO, CST, ECC.",
+    )
+    type_organisation = models.CharField(
+        max_length=30,
+        choices=TypeOrganisation.choices,
+        default=TypeOrganisation.AUTRE,
+        db_index=True,
+        verbose_name="Type d'organisation",
+    )
+    description = models.TextField(blank=True)
+    est_active = models.BooleanField(default=True, db_index=True)
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="organisations_administratives_creees",
+    )
+    modifie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="organisations_administratives_modifiees",
+    )
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nom"]
+        verbose_name = "Organisation administrative"
+        verbose_name_plural = "Organisations administratives"
+        indexes = [
+            models.Index(fields=["type_organisation", "est_active"], name="orgadm_type_active_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        sigle = _normaliser_sigle_organisation(self.sigle) or _sigle_depuis_nom(self.nom)
+        if len(sigle) < 2:
+            raise ValidationError({"sigle": "Le sigle doit contenir au moins deux caractères exploitables."})
+        self.sigle = sigle
+        self.nom = (self.nom or "").strip()
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.sigle} — {self.nom}"
+
+
+class Employe(models.Model):
+    """Fiche administrative d'un employé, distincte du compte utilisateur Django."""
+
+    class Statut(models.TextChoices):
+        ACTIF = "actif", "Actif"
+        INACTIF = "inactif", "Inactif"
+        SUSPENDU = "suspendu", "Suspendu"
+        FIN_SERVICE = "fin_service", "Fin de service"
+        ARCHIVE = "archive", "Archivé"
+
+    matricule = models.CharField(
+        max_length=40,
+        unique=True,
+        editable=False,
+        db_index=True,
+        help_text="Matricule généré automatiquement au format YYYYSIGLEXXXXX, sans tiret.",
+    )
+    nom = models.CharField(max_length=120, verbose_name="Nom")
+    prenoms = models.CharField(max_length=180, blank=True, verbose_name="Prénoms")
+    fonction = models.CharField(max_length=200, verbose_name="Fonction")
+    organisation = models.ForeignKey(
+        OrganisationAdministrative,
+        on_delete=models.PROTECT,
+        related_name="employes",
+        verbose_name="Organisation",
+    )
+    date_debut_service = models.DateField(verbose_name="Date de début de service")
+    date_fin_service = models.DateField(null=True, blank=True, verbose_name="Date de fin de service")
+    statut = models.CharField(max_length=20, choices=Statut.choices, default=Statut.ACTIF, db_index=True)
+    telephone = models.CharField(max_length=30, blank=True, verbose_name="Téléphone")
+    email = models.EmailField(blank=True, verbose_name="Adresse e-mail")
+    photo = models.ImageField(upload_to="employes/photos/%Y/%m/", null=True, blank=True, verbose_name="Photo")
+    observations = models.TextField(blank=True)
+
+    utilisateur = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fiche_employe",
+        verbose_name="Compte utilisateur lié",
+        help_text="Lien facultatif : un employé peut exister sans compte utilisateur.",
+    )
+    acces_plateforme = models.BooleanField(
+        default=False,
+        verbose_name="Autoriser l'accès à la plateforme",
+        help_text="Indique si l'employé est autorisé à disposer d'un accès applicatif.",
+    )
+    acces_modules_snapshot = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Instantané des modules/sous-modules autorisés au moment de l'enregistrement.",
+    )
+
+    dernier_email_acces_statut = models.CharField(max_length=20, blank=True)
+    dernier_email_acces_motif = models.TextField(blank=True)
+    dernier_email_acces_adresse = models.EmailField(blank=True)
+    dernier_email_acces_date = models.DateTimeField(null=True, blank=True)
+
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employes_crees",
+    )
+    modifie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employes_modifies",
+    )
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nom", "prenoms", "matricule"]
+        verbose_name = "Employé"
+        verbose_name_plural = "Employés"
+        indexes = [
+            models.Index(fields=["statut", "organisation"], name="employe_statut_org_idx"),
+            models.Index(fields=["nom", "prenoms"], name="employe_nom_prenoms_idx"),
+        ]
+
+    @property
+    def nom_complet(self):
+        return " ".join(part for part in (self.nom, self.prenoms) if part).strip()
+
+    @property
+    def est_en_service(self):
+        return self.statut == self.Statut.ACTIF and self.date_fin_service is None
+
+    @property
+    def periode_service(self):
+        debut = self.date_debut_service.strftime("%d/%m/%Y") if self.date_debut_service else "Début non renseigné"
+        fin = self.date_fin_service.strftime("%d/%m/%Y") if self.date_fin_service else "En cours"
+        return f"{debut} — {fin}"
+
+    def _generer_matricule(self):
+        annee = timezone.localdate().year
+        sigle = _normaliser_sigle_organisation(self.organisation.sigle if self.organisation_id else "ORG") or "ORG"
+        for _ in range(80):
+            suffixe = "".join(secrets.choice(_MATRICULE_ALPHABET) for _ in range(5))
+            matricule = f"{annee}{sigle}{suffixe}"
+            if not Employe.objects.filter(matricule=matricule).exists():
+                return matricule
+        raise ValidationError("Impossible de générer un matricule unique. Veuillez réessayer.")
+
+    def clean(self):
+        super().clean()
+        self.nom = (self.nom or "").strip().upper()
+        self.prenoms = (self.prenoms or "").strip()
+        self.fonction = (self.fonction or "").strip()
+        self.telephone = (self.telephone or "").strip()
+        self.email = (self.email or "").strip().lower()
+        if self.date_debut_service and self.date_fin_service and self.date_fin_service < self.date_debut_service:
+            raise ValidationError(
+                {"date_fin_service": "La date de fin ne peut pas précéder la date de début de service."}
+            )
+        if self.date_fin_service and self.statut == self.Statut.ACTIF:
+            raise ValidationError(
+                {"statut": "Un employé avec une date de fin de service ne peut pas rester au statut actif."}
+            )
+
+    def save(self, *args, **kwargs):
+        if not self.matricule:
+            self.matricule = self._generer_matricule()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.matricule} — {self.nom_complet}"
+
+
+class AccesModuleUtilisateur(models.Model):
+    """Prépare les accès modulaires sans modifier les rôles territoriaux du recensement."""
+
+    class Statut(models.TextChoices):
+        ACTIVE = "active", "Active"
+        SUSPENDUE = "suspendue", "Suspendue"
+        REVOQUEE = "revoquee", "Révoquée"
+
+    utilisateur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="acces_modules_plateforme",
+    )
+    module_slug = models.SlugField(max_length=80)
+    submodule_slug = models.SlugField(max_length=100, blank=True)
+    statut = models.CharField(max_length=15, choices=Statut.choices, default=Statut.ACTIVE, db_index=True)
+    peut_consulter = models.BooleanField(default=True)
+    peut_creer = models.BooleanField(default=False)
+    peut_modifier = models.BooleanField(default=False)
+    peut_administrer = models.BooleanField(default=False)
+    attribue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="acces_modules_attribues",
+    )
+    date_attribution = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+    date_fin = models.DateTimeField(null=True, blank=True)
+    motif = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["utilisateur__username", "module_slug", "submodule_slug"]
+        verbose_name = "Accès modulaire utilisateur"
+        verbose_name_plural = "Accès modulaires utilisateurs"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["utilisateur", "module_slug", "submodule_slug"],
+                condition=models.Q(statut="active"),
+                name="unique_acces_module_actif_user",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["utilisateur", "statut"], name="acces_module_user_statut_idx"),
+            models.Index(fields=["module_slug", "submodule_slug"], name="acces_module_slug_idx"),
+        ]
+
+    @property
+    def est_module_entier(self):
+        return not bool(self.submodule_slug)
+
+    def __str__(self):
+        cible = self.module_slug if self.est_module_entier else f"{self.module_slug}/{self.submodule_slug}"
+        return f"{self.utilisateur.get_username()} → {cible} ({self.get_statut_display()})"
+
+
+class RolePlateforme(models.Model):
+    """Rôle global de plateforme, distinct des rôles OP du recensement.
+
+    Un rôle global sert à regrouper des permissions par module ou sous-module
+    de la plateforme ECC. Il ne porte aucun périmètre territorial et ne doit
+    jamais remplacer ``Profil.Role`` pour OP PROVINCE, OP DISTRICT, OP ZONE ou
+    Agent recenseur.
+    """
+
+    code = models.SlugField(
+        max_length=90,
+        unique=True,
+        editable=False,
+        help_text="Code technique stable généré depuis le nom du rôle global.",
+    )
+    nom = models.CharField(max_length=150, unique=True, verbose_name="Nom du rôle")
+    description = models.TextField(blank=True)
+    est_actif = models.BooleanField(default=True, db_index=True)
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="roles_plateforme_crees",
+    )
+    modifie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="roles_plateforme_modifies",
+    )
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nom"]
+        verbose_name = "Rôle global de plateforme"
+        verbose_name_plural = "Rôles globaux de plateforme"
+        indexes = [models.Index(fields=["est_actif", "nom"], name="rolepf_actif_nom_idx")]
+
+    @staticmethod
+    def _normaliser_code(value):
+        value = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode("ascii")
+        value = re.sub(r"[^a-zA-Z0-9]+", "-", value).strip("-").lower()
+        return value[:80] or "role"
+
+    def clean(self):
+        super().clean()
+        self.nom = (self.nom or "").strip()
+        if not self.nom:
+            raise ValidationError({"nom": "Le nom du rôle est obligatoire."})
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            base = self._normaliser_code(self.nom)
+            code = base
+            compteur = 1
+            while RolePlateforme.objects.filter(code=code).exclude(pk=self.pk).exists():
+                compteur += 1
+                code = f"{base[:74]}-{compteur}"
+            self.code = code
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nom
+
+
+class PermissionRolePlateforme(models.Model):
+    """Permission d'un rôle global sur un module ou un sous-module."""
+
+    role = models.ForeignKey(RolePlateforme, on_delete=models.CASCADE, related_name="permissions")
+    module_slug = models.SlugField(max_length=80)
+    submodule_slug = models.SlugField(max_length=100, blank=True)
+
+    peut_consulter = models.BooleanField(default=True)
+    peut_creer = models.BooleanField(default=False)
+    peut_modifier = models.BooleanField(default=False)
+    peut_supprimer = models.BooleanField(default=False)
+    peut_archiver = models.BooleanField(default=False)
+    peut_exporter = models.BooleanField(default=False)
+    peut_valider = models.BooleanField(default=False)
+    peut_administrer = models.BooleanField(default=False)
+    peut_telecharger = models.BooleanField(default=False)
+    peut_publier = models.BooleanField(default=False)
+    peut_gerer_qrcode = models.BooleanField(default=False)
+    peut_gerer_acces = models.BooleanField(default=False)
+
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["role__nom", "module_slug", "submodule_slug"]
+        verbose_name = "Permission de rôle global"
+        verbose_name_plural = "Permissions de rôles globaux"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["role", "module_slug", "submodule_slug"],
+                name="unique_perm_role_cible",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["role", "module_slug"], name="roleperm_role_mod_idx"),
+            models.Index(fields=["module_slug", "submodule_slug"], name="roleperm_cible_idx"),
+        ]
+
+    @property
+    def cible_valeur(self):
+        if self.submodule_slug:
+            return f"submodule:{self.module_slug}:{self.submodule_slug}"
+        return f"module:{self.module_slug}"
+
+    def __str__(self):
+        cible = self.module_slug if not self.submodule_slug else f"{self.module_slug}/{self.submodule_slug}"
+        return f"{self.role.nom} → {cible}"
+
+
+class RoleUtilisateurPlateforme(models.Model):
+    """Affectation d'un rôle global de plateforme à un utilisateur système."""
+
+    class Statut(models.TextChoices):
+        ACTIVE = "active", "Active"
+        SUSPENDUE = "suspendue", "Suspendue"
+        REVOQUEE = "revoquee", "Révoquée"
+
+    utilisateur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="roles_plateforme",
+    )
+    role = models.ForeignKey(RolePlateforme, on_delete=models.CASCADE, related_name="attributions_utilisateurs")
+    statut = models.CharField(max_length=15, choices=Statut.choices, default=Statut.ACTIVE, db_index=True)
+    attribue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="roles_plateforme_attribues",
+    )
+    date_attribution = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+    date_fin = models.DateTimeField(null=True, blank=True)
+    motif = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["utilisateur__username", "role__nom"]
+        verbose_name = "Rôle global attribué"
+        verbose_name_plural = "Rôles globaux attribués"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["utilisateur", "role"],
+                condition=models.Q(statut="active"),
+                name="unique_role_user_actif",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["utilisateur", "statut"], name="roleuser_user_statut_idx"),
+            models.Index(fields=["role", "statut"], name="roleuser_role_statut_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.utilisateur.get_username()} → {self.role.nom} ({self.get_statut_display()})"
+
+
+class HistoriqueRolePlateforme(models.Model):
+    """Traçabilité des modifications de rôles globaux et de leurs permissions."""
+
+    class Action(models.TextChoices):
+        CREATION_ROLE = "creation_role", "Création du rôle"
+        MODIFICATION_ROLE = "modification_role", "Modification du rôle"
+        ACTIVATION_ROLE = "activation_role", "Activation du rôle"
+        DESACTIVATION_ROLE = "desactivation_role", "Désactivation du rôle"
+        MODIFICATION_PERMISSIONS = "modification_permissions", "Modification des permissions"
+        ATTRIBUTION_UTILISATEUR = "attribution_utilisateur", "Attribution à un utilisateur"
+        RETRAIT_UTILISATEUR = "retrait_utilisateur", "Retrait à un utilisateur"
+
+    role = models.ForeignKey(
+        RolePlateforme,
+        on_delete=models.CASCADE,
+        related_name="historique",
+    )
+    utilisateur_cible = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historiques_roles_plateforme_cible",
+    )
+    action = models.CharField(max_length=40, choices=Action.choices, db_index=True)
+    effectue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historiques_roles_plateforme_effectues",
+    )
+    donnees_avant = models.JSONField(default=dict, blank=True)
+    donnees_apres = models.JSONField(default=dict, blank=True)
+    details = models.JSONField(default=dict, blank=True)
+    commentaire = models.TextField(blank=True)
+    date_action = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_action", "-id"]
+        verbose_name = "Historique de rôle global"
+        verbose_name_plural = "Historiques de rôles globaux"
+        indexes = [models.Index(fields=["action", "date_action"], name="hist_rolepf_action_idx")]
+
+    def __str__(self):
+        return f"{self.get_action_display()} — {self.role.nom} — {self.date_action:%d/%m/%Y %H:%M}"
+
+
+class HistoriqueEmploye(models.Model):
+    """Journal des actions administratives effectuées sur les employés."""
+
+    class Action(models.TextChoices):
+        CREATION = "creation", "Création"
+        MODIFICATION = "modification", "Modification"
+        CHANGEMENT_STATUT = "changement_statut", "Changement de statut"
+        LIAISON_UTILISATEUR = "liaison_utilisateur", "Liaison à un utilisateur"
+        CREATION_UTILISATEUR = "creation_utilisateur", "Création du compte utilisateur"
+        MODIFICATION_ACCES = "modification_acces", "Modification des accès modulaires"
+        EMAIL_ACCES_ENVOYE = "email_acces_envoye", "E-mail d'accès envoyé"
+        EMAIL_ACCES_NON_ENVOYE = "email_acces_non_envoye", "E-mail d'accès non envoyé"
+        EMAIL_ACCES_ECHEC = "email_acces_echec", "Échec d'envoi d'e-mail d'accès"
+        QR_CODE = "qr_code", "Consultation ou génération QR code"
+        ARCHIVAGE = "archivage", "Archivage"
+
+    employe = models.ForeignKey(Employe, on_delete=models.CASCADE, related_name="historique")
+    action = models.CharField(max_length=40, choices=Action.choices, db_index=True)
+    effectue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historiques_employes_effectues",
+    )
+    donnees_avant = models.JSONField(default=dict, blank=True)
+    donnees_apres = models.JSONField(default=dict, blank=True)
+    details = models.JSONField(default=dict, blank=True)
+    commentaire = models.TextField(blank=True)
+    date_action = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_action", "-id"]
+        verbose_name = "Historique employé"
+        verbose_name_plural = "Historiques employés"
+        indexes = [
+            models.Index(fields=["action", "date_action"], name="hist_employe_action_date_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_action_display()} — {self.employe.matricule} — {self.date_action:%d/%m/%Y %H:%M}"

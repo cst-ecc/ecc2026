@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+<body style="margin:0;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;">
+        <tr><td style="background:#06456d;color:#ffffff;padding:24px 28px;">
+          <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#d9effd;">Plateforme ECC</div>
+          <h1 style="margin:8px 0 0;font-size:22px;line-height:1.3;">Accès à la plateforme</h1>
+        </td></tr>
+        <tr><td style="padding:28px;">
+          <p style="margin:0 0 14px;">Bonjour <strong>{{ employe.prenoms }} {{ employe.nom }}</strong>,</p>
+          <p style="margin:0 0 18px;color:#475569;line-height:1.6;">Votre fiche employé est enregistrée et votre accès à la Plateforme ECC est disponible.</p>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:18px 0;">
+            <tr><td style="padding:10px;border-bottom:1px solid #e2e8f0;color:#64748b;">Matricule</td><td style="padding:10px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-weight:bold;">{{ employe.matricule }}</td></tr>
+            <tr><td style="padding:10px;border-bottom:1px solid #e2e8f0;color:#64748b;">Identifiant</td><td style="padding:10px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-weight:bold;">{{ utilisateur.username }}</td></tr>
+            <tr><td style="padding:10px;border-bottom:1px solid #e2e8f0;color:#64748b;">Fonction</td><td style="padding:10px;border-bottom:1px solid #e2e8f0;">{{ employe.fonction }}</td></tr>
+            <tr><td style="padding:10px;color:#64748b;">Organisation</td><td style="padding:10px;">{{ employe.organisation.nom }} ({{ employe.organisation.sigle }})</td></tr>
+          </table>
+          {% if mot_de_passe_provisoire %}
+            <div style="border:1px solid #fbbf24;background:#fffbeb;color:#92400e;border-radius:12px;padding:14px;margin:18px 0;">
+              <strong>Mot de passe provisoire :</strong><br>
+              <span style="font-family:monospace;font-size:18px;font-weight:bold;">{{ mot_de_passe_provisoire }}</span><br>
+              <span style="font-size:13px;">Merci de le modifier dès votre première connexion.</span>
+            </div>
+          {% endif %}
+          <p style="margin:18px 0 8px;font-weight:bold;">Modules ou sous-modules autorisés</p>
+          {% if acces_modules %}
+            <ul style="margin:0 0 20px;padding-left:18px;color:#475569;line-height:1.6;">{% for acces in acces_modules %}<li>{{ acces }}</li>{% endfor %}</ul>
+          {% else %}
+            <p style="color:#64748b;">Aucun accès modulaire actif n'est encore renseigné.</p>
+          {% endif %}
+          <p style="margin:24px 0;"><a href="{{ login_url }}" style="display:inline-block;background:#0b6eae;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 18px;border-radius:10px;">Accéder à la plateforme</a></p>
+          <p style="font-size:13px;color:#64748b;line-height:1.6;">Page de vérification du matricule : <a href="{{ verification_url }}" style="color:#0b6eae;">{{ verification_url }}</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{% extends "recensement/base_public.html" %}
+{% block title %}Vérification employé — {{ employe.matricule }}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-2xl py-8">
+  <div class="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-soft sm:p-8">
+    <p class="font-mono text-sm font-semibold text-brand-700">{{ employe.matricule }}</p>
+    <h1 class="mt-2 text-2xl font-bold text-slate-900">{{ employe.nom_complet }}</h1>
+    <p class="mt-1 text-slate-600">{{ employe.fonction }}</p>
+    <div class="mt-5 grid gap-3 text-left text-sm sm:grid-cols-2">
+      <div class="rounded-xl bg-slate-50 p-4"><span class="text-slate-400">Organisation</span><br><strong>{{ employe.organisation.sigle }}</strong><br>{{ employe.organisation.nom }}</div>
+      <div class="rounded-xl bg-slate-50 p-4"><span class="text-slate-400">Statut</span><br><strong>{{ employe.get_statut_display }}</strong></div>
+      <div class="rounded-xl bg-slate-50 p-4"><span class="text-slate-400">Période</span><br><strong>{{ employe.periode_service }}</strong></div>
+      <div class="rounded-xl bg-slate-50 p-4"><span class="text-slate-400">Vérification</span><br><strong>Fiche employé enregistrée</strong></div>
+    </div>
+    {% if employe.statut != 'actif' %}<div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Cet employé n'est pas actuellement au statut actif.</div>{% endif %}
+    <p class="mt-5 text-xs text-slate-400">Cette page n’affiche pas les informations internes, accès, observations, téléphone ou e-mail personnel.</p>
+  </div>
+</div>
+{% endblock %}

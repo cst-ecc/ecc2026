@@ -1,0 +1,76 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}{% if is_edit %}Modifier {{ employe.matricule }}{% else %}Nouvel employé{% endif %} — Administration{% endblock %}
+{% block sidebar_brand %}<a href="{% url 'recensement:module_detail' 'administration' %}" class="min-w-0 truncate font-semibold text-white">Administration</a>{% endblock %}
+{% block sidebar_navigation %}{% include "recensement/includes/module_sidebars/_administration_nav.html" %}{% endblock %}
+{% block app_header_title %}Administration — Employés{% endblock %}
+{% block footer_context %}Administration{% endblock %}
+
+{% block content %}
+<a href="{% url 'recensement:employe_list' %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour aux employés</a>
+<h1 class="mt-2 text-xl font-semibold text-slate-900">{% if is_edit %}Modifier l’employé {{ employe.matricule }}{% else %}Nouvel employé{% endif %}</h1>
+<p class="mt-1 mb-6 text-sm text-slate-500">La fiche employé reste distincte du compte utilisateur. Le matricule est généré automatiquement.</p>
+
+<form method="post" enctype="multipart/form-data" class="space-y-5">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+
+  <section class="app-card">
+    <div class="border-b border-slate-100 px-5 py-3 font-semibold text-slate-800">Identité administrative</div>
+    <div class="grid gap-4 p-5 sm:grid-cols-2">
+      <div><label class="mb-1 block text-sm font-medium text-slate-700">{{ form.nom.label }}</label>{{ form.nom }}{% for error in form.nom.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}</div>
+      <div><label class="mb-1 block text-sm font-medium text-slate-700">{{ form.prenoms.label }}</label>{{ form.prenoms }}{% for error in form.prenoms.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}</div>
+      <div><label class="mb-1 block text-sm font-medium text-slate-700">{{ form.fonction.label }}</label>{{ form.fonction }}{% for error in form.fonction.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}</div>
+      <div>
+        <div class="mb-1 flex items-center justify-between gap-2"><label class="block text-sm font-medium text-slate-700">{{ form.organisation.label }}</label><a href="{% url 'recensement:organisation_create' %}" class="text-xs font-medium text-brand-600 hover:underline">Ajouter une organisation</a></div>
+        {{ form.organisation }}{% for error in form.organisation.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div><label class="mb-1 block text-sm font-medium text-slate-700">{{ form.date_debut_service.label }}</label>{{ form.date_debut_service }}{% for error in form.date_debut_service.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}</div>
+      <div><label class="mb-1 block text-sm font-medium text-slate-700">{{ form.date_fin_service.label }}</label>{{ form.date_fin_service }}{% for error in form.date_fin_service.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}</div>
+      <div><label class="mb-1 block text-sm font-medium text-slate-700">{{ form.statut.label }}</label>{{ form.statut }}{% for error in form.statut.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}</div>
+      <div><label class="mb-1 block text-sm font-medium text-slate-700">{{ form.photo.label }}</label>{{ form.photo }}{% for error in form.photo.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}</div>
+    </div>
+  </section>
+
+  <section class="app-card">
+    <div class="border-b border-slate-100 px-5 py-3 font-semibold text-slate-800">Coordonnées</div>
+    <div class="grid gap-4 p-5 sm:grid-cols-2">
+      <div><label class="mb-1 block text-sm font-medium text-slate-700">{{ form.email.label }}</label>{{ form.email }}<p class="mt-1 text-xs text-slate-400">L'absence d'e-mail n'empêche pas la création, mais aucun e-mail d'accès ne sera envoyé.</p>{% for error in form.email.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}</div>
+      <div><label class="mb-1 block text-sm font-medium text-slate-700">{{ form.telephone.label }}</label>{{ form.telephone }}{% for error in form.telephone.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}</div>
+    </div>
+  </section>
+
+  <section class="app-card">
+    <div class="border-b border-slate-100 px-5 py-3 font-semibold text-slate-800">Accès plateforme facultatif</div>
+    <div class="space-y-4 p-5">
+      <label class="flex items-start gap-3 text-sm text-slate-700">{{ form.acces_plateforme }}<span><strong>{{ form.acces_plateforme.label }}</strong><br><span class="text-slate-500">Cette option ne remplace pas les rôles OP du recensement.</span></span></label>
+      {% for error in form.acces_plateforme.errors %}<p class="text-sm text-red-600">{{ error }}</p>{% endfor %}
+
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div><label class="mb-1 block text-sm font-medium text-slate-700">{{ form.utilisateur.label }}</label>{{ form.utilisateur }}<p class="mt-1 text-xs text-slate-400">Lier un compte déjà existant.</p>{% for error in form.utilisateur.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}</div>
+        <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">{{ form.creer_compte_utilisateur }}<span><strong>{{ form.creer_compte_utilisateur.label }}</strong><br><span class="text-slate-500">Un identifiant basé sur le matricule et un mot de passe provisoire seront générés.</span>{% for error in form.creer_compte_utilisateur.errors %}<span class="mt-1 block text-red-600">{{ error }}</span>{% endfor %}</span></label>
+      </div>
+
+      <div>
+        <p class="mb-2 text-sm font-medium text-slate-700">{{ form.acces_modules.label }}</p>
+        <div class="grid max-h-72 gap-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-2">
+          {% for checkbox in form.acces_modules %}
+            <label class="flex items-start gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">{{ checkbox.tag }}<span>{{ checkbox.choice_label }}</span></label>
+          {% endfor %}
+        </div>
+        {% for error in form.acces_modules.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="app-card">
+    <div class="border-b border-slate-100 px-5 py-3 font-semibold text-slate-800">Observations</div>
+    <div class="p-5">{{ form.observations }}{% for error in form.observations.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}</div>
+  </section>
+
+  <div class="flex justify-end gap-2">
+    <a href="{% url 'recensement:employe_list' %}" class="rounded-lg border border-slate-300 px-4 py-2.5 font-medium text-slate-700 hover:bg-slate-50">Annuler</a>
+    <button type="submit" class="rounded-lg bg-brand-600 px-5 py-2.5 font-semibold text-white hover:bg-brand-700">{% if is_edit %}Enregistrer{% else %}Créer l’employé{% endif %}</button>
+  </div>
+</form>
+{% endblock %}

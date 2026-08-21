@@ -1,0 +1,113 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}{% if is_edit %}Modifier {{ role_obj.nom }}{% else %}Créer un rôle global{% endif %} — Rôles et permissions{% endblock %}
+
+{% block content %}
+<nav class="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-500" aria-label="Fil d’Ariane">
+  <a href="{% url 'recensement:module_home' %}" class="font-medium text-brand-700 hover:underline">Modules</a>
+  <span aria-hidden="true">/</span>
+  <a href="{% url 'recensement:module_detail' 'administration' %}" class="font-medium text-brand-700 hover:underline">Administration</a>
+  <span aria-hidden="true">/</span>
+  <a href="{% url 'recensement:role_plateforme_list' %}" class="font-medium text-brand-700 hover:underline">Rôles et permissions</a>
+  <span aria-hidden="true">/</span>
+  <span class="text-slate-700">{% if is_edit %}Modifier{% else %}Créer{% endif %}</span>
+</nav>
+
+<h1 class="text-xl font-semibold text-slate-900">{% if is_edit %}Modifier le rôle global{% else %}Créer un rôle global{% endif %}</h1>
+<p class="mb-6 mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+  Les rôles globaux donnent des droits sur les modules et sous-modules de la plateforme. Ils ne remplacent pas les rôles OP du recensement.
+</p>
+
+<form method="post" class="space-y-5">
+  {% csrf_token %}
+
+  {% if form.non_field_errors or permissions_form.non_field_errors or utilisateurs_form.non_field_errors %}
+    <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+      {% for error in permissions_form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+      {% for error in utilisateurs_form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+    </div>
+  {% endif %}
+
+  <section class="app-card p-5">
+    <h2 class="font-semibold text-slate-900">Identité du rôle</h2>
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+      <div>
+        <label for="{{ form.nom.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">{{ form.nom.label }}</label>
+        {{ form.nom }}
+        {% for error in form.nom.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <label class="mt-7 flex items-center gap-2 text-sm text-slate-700">
+        {{ form.est_actif }}
+        <span>{{ form.est_actif.label }}</span>
+      </label>
+    </div>
+    <div class="mt-4">
+      <label for="{{ form.description.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">{{ form.description.label }}</label>
+      {{ form.description }}
+      {% for error in form.description.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+    </div>
+  </section>
+
+  <section class="app-card p-5">
+    <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <h2 class="font-semibold text-slate-900">Permissions par module ou sous-module</h2>
+        <p class="mt-1 text-sm text-slate-500">Cochez au moins une action sur les cibles concernées.</p>
+      </div>
+      <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Rôles globaux uniquement</span>
+    </div>
+
+    <div class="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+      <table class="min-w-full text-xs">
+        <thead class="bg-slate-50 text-left text-slate-600">
+          <tr>
+            <th class="min-w-[260px] px-3 py-3 font-semibold">Module / sous-module</th>
+            <th class="px-3 py-3 font-semibold">Consulter</th>
+            <th class="px-3 py-3 font-semibold">Créer</th>
+            <th class="px-3 py-3 font-semibold">Modifier</th>
+            <th class="px-3 py-3 font-semibold">Supprimer</th>
+            <th class="px-3 py-3 font-semibold">Archiver</th>
+            <th class="px-3 py-3 font-semibold">Exporter</th>
+            <th class="px-3 py-3 font-semibold">Valider</th>
+            <th class="px-3 py-3 font-semibold">Administrer</th>
+            <th class="px-3 py-3 font-semibold">Télécharger</th>
+            <th class="px-3 py-3 font-semibold">Publier</th>
+            <th class="px-3 py-3 font-semibold">QR code</th>
+            <th class="px-3 py-3 font-semibold">Accès</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 bg-white">
+          {% for row in permission_rows %}
+          <tr>
+            <td class="px-3 py-2 font-medium text-slate-700">{{ row.label }}</td>
+            {% for action in row.actions %}
+            <td class="px-3 py-2 text-center">{{ action.field }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="app-card p-5">
+    <h2 class="font-semibold text-slate-900">Utilisateurs associés</h2>
+    <p class="mt-1 text-sm text-slate-500">Association facultative. Le Super administrateur conserve tous les droits même sans rôle global.</p>
+    <div class="mt-4 max-h-72 overflow-y-auto rounded-xl border border-slate-200 p-3">
+      {{ utilisateurs_form.utilisateurs }}
+    </div>
+    <div class="mt-4">
+      <label for="{{ utilisateurs_form.motif.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">{{ utilisateurs_form.motif.label }}</label>
+      {{ utilisateurs_form.motif }}
+    </div>
+  </section>
+
+  <div class="flex justify-end gap-2">
+    <a href="{% url 'recensement:role_plateforme_list' %}" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Annuler</a>
+    <button type="submit" class="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
+      {% if is_edit %}Enregistrer{% else %}Créer le rôle{% endif %}
+    </button>
+  </div>
+</form>
+{% endblock %}

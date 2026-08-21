@@ -1,0 +1,23 @@
+Bonjour {{ employe.prenoms }} {{ employe.nom }},
+
+Votre accès à la Plateforme ECC est prêt.
+
+Matricule employé : {{ employe.matricule }}
+Identifiant : {{ utilisateur.username }}
+Fonction : {{ employe.fonction }}
+Organisation : {{ employe.organisation.nom }} ({{ employe.organisation.sigle }})
+
+{% if mot_de_passe_provisoire %}Mot de passe provisoire : {{ mot_de_passe_provisoire }}
+Merci de le modifier dès votre première connexion.
+{% else %}Utilisez votre mot de passe habituel. Si vous ne le connaissez pas, contactez l'administrateur.
+{% endif %}
+
+Modules ou sous-modules autorisés :
+{% if acces_modules %}{% for acces in acces_modules %}- {{ acces }}
+{% endfor %}{% else %}- Aucun accès modulaire actif n'est encore renseigné.
+{% endif %}
+
+Accéder à la plateforme : {{ login_url }}
+Vérification du matricule : {{ verification_url }}
+
+Ce message est généré automatiquement par la Plateforme ECC.

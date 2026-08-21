@@ -1,0 +1,172 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}Gestion des utilisateurs — Administration{% endblock %}
+
+{% block content %}
+<nav class="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-500" aria-label="Fil d’Ariane">
+  <a href="{% url 'recensement:module_home' %}" class="font-medium text-brand-700 hover:underline">Modules</a>
+  <span aria-hidden="true">/</span>
+  <a href="{% url 'recensement:module_detail' 'administration' %}" class="font-medium text-brand-700 hover:underline">Administration</a>
+  <span aria-hidden="true">/</span>
+  <span class="text-slate-700">Gestion des utilisateurs</span>
+</nav>
+
+<div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+  <div>
+    <h1 class="text-xl font-semibold text-slate-900">Gestion des utilisateurs système ({{ total }})</h1>
+    <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+      Cette page concerne les comptes globaux de la plateforme et leurs accès modulaires.
+      Les OP et Agents du recensement sont gérés séparément dans « Gestion des opérateurs ».
+    </p>
+  </div>
+  <div class="flex shrink-0 flex-wrap gap-2">
+    <a href="{% url 'recensement:utilisateur_systeme_create' %}"
+       class="inline-flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg">
+      + Créer un utilisateur
+    </a>
+    <a href="{% url 'recensement:employe_list' %}"
+       class="inline-flex items-center border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-lg">
+      Employés
+    </a>
+    <a href="{% url 'recensement:organisation_list' %}"
+       class="inline-flex items-center border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-lg">
+      Organisations
+    </a>
+  </div>
+</div>
+
+<div class="mb-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-800">
+  <strong>Clarification :</strong> un utilisateur système est un compte global de connexion à la plateforme.
+  Un opérateur du recensement est un compte rattaché à OP PROVINCE, OP DISTRICT, OP ZONE ou Agent recenseur,
+  avec périmètre territorial. Les affectations territoriales ne se gèrent pas sur cette page.
+</div>
+
+<form method="get" class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+  <div class="grid gap-3 md:grid-cols-4">
+    <div class="md:col-span-2">
+      <label class="mb-1 block text-xs font-medium text-slate-600">Recherche</label>
+      <input type="search" name="q" value="{{ q }}" placeholder="Identifiant, nom, e-mail, matricule employé…"
+             class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+    </div>
+    <div>
+      <label class="mb-1 block text-xs font-medium text-slate-600">Statut</label>
+      <select name="statut" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">— Tous —</option>
+        <option value="actifs" {% if statut_filtre == "actifs" %}selected{% endif %}>Actifs</option>
+        <option value="inactifs" {% if statut_filtre == "inactifs" %}selected{% endif %}>Inactifs</option>
+      </select>
+    </div>
+    <div class="flex items-end gap-2">
+      <button type="submit" class="flex-1 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">Filtrer</button>
+      <a href="{% url 'recensement:utilisateur_systeme_list' %}" class="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50">Réinitialiser</a>
+    </div>
+  </div>
+</form>
+
+<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <table class="min-w-full text-sm">
+    <thead class="bg-slate-800 text-left text-white">
+      <tr>
+        <th class="px-4 py-3 font-medium">Identifiant</th>
+        <th class="px-4 py-3 font-medium">Nom</th>
+        <th class="px-4 py-3 font-medium">E-mail</th>
+        <th class="px-4 py-3 font-medium">Catégorie</th>
+        <th class="px-4 py-3 font-medium">Employé lié</th>
+        <th class="px-4 py-3 font-medium">Accès modules</th>
+        <th class="px-4 py-3 font-medium">Rôles globaux</th>
+        <th class="px-4 py-3 font-medium text-center">Statut</th>
+        <th class="px-4 py-3 font-medium">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for u in utilisateurs %}
+      <tr class="hover:bg-slate-50">
+        <td class="px-4 py-3 font-mono text-xs font-medium">{{ u.username }}{% if u == request.user %}<span class="font-sans text-xs text-slate-400"> (vous)</span>{% endif %}</td>
+        <td class="px-4 py-3">{{ u.get_full_name|default:"—" }}</td>
+        <td class="px-4 py-3 text-xs text-slate-600">{{ u.email|default:"—" }}</td>
+        <td class="px-4 py-3">
+          {% if u.is_superuser or u.profil.is_super_admin %}
+            <span class="inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">Super administrateur</span>
+          {% elif u.est_operateur_recensement %}
+            <span class="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Opérateur recensement</span>
+          {% else %}
+            <span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">Utilisateur système</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-xs text-slate-600">
+          {% if u.fiche_employe %}
+            <a href="{% url 'recensement:employe_detail' u.fiche_employe.pk %}" class="font-medium text-brand-700 hover:underline">
+              {{ u.fiche_employe.matricule }}
+            </a><br>
+            {{ u.fiche_employe.nom_complet }}
+          {% else %}
+            <span class="text-slate-400">Non lié</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-slate-600">
+          {% if u.nb_acces_modules %}
+            <span class="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">{{ u.nb_acces_modules }} accès</span>
+          {% else %}
+            <span class="text-slate-400">Aucun accès modulaire dédié</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-slate-600">
+          {% if u.nb_roles_globaux %}
+            <a href="{% url 'recensement:role_plateforme_list' %}" class="inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700 hover:underline">{{ u.nb_roles_globaux }} rôle{{ u.nb_roles_globaux|pluralize }}</a>
+          {% else %}
+            <span class="text-slate-400">Aucun rôle global</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-center">
+          {% if u.is_active %}
+            <span class="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Actif</span>
+          {% else %}
+            <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Désactivé</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap text-xs">
+          {% if u.fiche_employe %}
+            <a href="{% url 'recensement:employe_update' u.fiche_employe.pk %}" class="text-brand-600 hover:underline">Gérer accès</a>
+          {% else %}
+            <span class="text-slate-400">Accès à gérer via fiche employé ou rôle global futur</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="py-8 text-center text-slate-400">Aucun utilisateur système trouvé.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="mt-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Pagination des utilisateurs système">
+  <div class="text-sm text-slate-500">
+    Affichage de <span class="font-medium text-slate-700">{{ page_obj.start_index }}</span>
+    à <span class="font-medium text-slate-700">{{ page_obj.end_index }}</span>
+    sur <span class="font-medium text-slate-700">{{ total }}</span> utilisateur{{ total|pluralize }}
+  </div>
+  <div class="flex flex-wrap items-center gap-1.5">
+    {% if page_obj.has_previous %}
+      <a href="?page=1{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Première</a>
+      <a href="?page={{ page_obj.previous_page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Précédente</a>
+    {% endif %}
+    {% for page_number in page_range %}
+      {% if page_number == pagination_ellipsis %}
+        <span class="px-2 py-2 text-sm text-slate-400">{{ pagination_ellipsis }}</span>
+      {% elif page_number == page_obj.number %}
+        <span class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white">{{ page_number }}</span>
+      {% else %}
+        <a href="?page={{ page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ page_number }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Suivante</a>
+      <a href="?page={{ page_obj.paginator.num_pages }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Dernière</a>
+    {% endif %}
+  </div>
+</nav>
+{% elif total %}
+<p class="mt-3 text-sm text-slate-500">{{ total }} utilisateur{{ total|pluralize }} affiché{{ total|pluralize }}.</p>
+{% endif %}
+{% endblock %}

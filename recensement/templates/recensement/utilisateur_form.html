@@ -1,16 +1,16 @@
 {% extends "recensement/base.html" %}
 {% load static %}
 
-{% block title %}{% if is_edit %}Modifier un compte{% else %}Nouveau compte{% endif %} — Utilisateurs{% endblock %}
+{% block title %}{% if is_edit %}Modifier un opérateur{% else %}Nouvel opérateur ou agent{% endif %} — Recensement{% endblock %}
 
 {% block content %}
-<a href="{% url 'recensement:utilisateur_list' %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour aux utilisateurs</a>
+<a href="{% url 'recensement:utilisateur_list' %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour aux opérateurs</a>
 
 <h1 class="text-xl font-semibold text-slate-900 mt-2 mb-1">
-  {% if is_edit %}Modifier le compte : {{ utilisateur.username }}{% else %}Nouveau compte utilisateur{% endif %}
+  {% if is_edit %}Modifier l’opérateur : {{ utilisateur.username }}{% else %}Nouvel opérateur ou agent du recensement{% endif %}
 </h1>
 <p class="text-sm text-slate-500 mb-6">
-  Les rôles et territoires proposés sont limités à votre propre périmètre. Toute modification territoriale est journalisée.
+  Les rôles proposés ici sont strictement liés au recensement des paroisses. Les affectations territoriales et leurs modifications sont journalisées.
 </p>
 
 <form method="post" id="utilisateur-form" class="space-y-4">
@@ -147,7 +147,7 @@
   <div class="flex justify-end gap-2">
     <a href="{% url 'recensement:utilisateur_list' %}" class="border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg">Annuler</a>
     <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-5 py-2.5 rounded-lg">
-      {% if is_edit %}Enregistrer l’affectation principale{% else %}Créer le compte{% endif %}
+      {% if is_edit %}Enregistrer l’affectation principale{% else %}Créer l’opérateur / agent{% endif %}
     </button>
   </div>
 </form>

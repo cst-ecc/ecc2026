@@ -1,0 +1,104 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}Rôles et permissions — Administration{% endblock %}
+
+{% block content %}
+<nav class="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-500" aria-label="Fil d’Ariane">
+  <a href="{% url 'recensement:module_home' %}" class="font-medium text-brand-700 hover:underline">Modules</a>
+  <span aria-hidden="true">/</span>
+  <a href="{% url 'recensement:module_detail' 'administration' %}" class="font-medium text-brand-700 hover:underline">Administration</a>
+  <span aria-hidden="true">/</span>
+  <span class="text-slate-700">Rôles et permissions</span>
+</nav>
+
+<div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+  <div>
+    <h1 class="text-xl font-semibold text-slate-900">Rôles globaux de plateforme ({{ total }})</h1>
+    <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+      Ces rôles donnent accès aux modules et sous-modules de la plateforme. Ils sont distincts des rôles OP du recensement.
+    </p>
+  </div>
+  <a href="{% url 'recensement:role_plateforme_create' %}"
+     class="inline-flex items-center justify-center rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
+    + Créer un rôle
+  </a>
+</div>
+
+<div class="mb-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-800">
+  <strong>Important :</strong> OP PROVINCE, OP DISTRICT, OP ZONE et Agent recenseur restent dans « Gestion des opérateurs ».
+  Cette page concerne uniquement les rôles globaux : gestionnaire employés, gestionnaire documents, auditeur, etc.
+</div>
+
+<form method="get" class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+  <div class="grid gap-3 md:grid-cols-4">
+    <div class="md:col-span-2">
+      <label class="mb-1 block text-xs font-medium text-slate-600">Recherche</label>
+      <input type="search" name="q" value="{{ q }}" placeholder="Nom, code ou description…"
+             class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+    </div>
+    <div>
+      <label class="mb-1 block text-xs font-medium text-slate-600">Statut</label>
+      <select name="statut" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">— Tous —</option>
+        <option value="actifs" {% if statut_filtre == "actifs" %}selected{% endif %}>Actifs</option>
+        <option value="inactifs" {% if statut_filtre == "inactifs" %}selected{% endif %}>Inactifs</option>
+      </select>
+    </div>
+    <div class="flex items-end gap-2">
+      <button type="submit" class="flex-1 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">Filtrer</button>
+      <a href="{% url 'recensement:role_plateforme_list' %}" class="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50">Réinitialiser</a>
+    </div>
+  </div>
+</form>
+
+<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <table class="min-w-full text-sm">
+    <thead class="bg-slate-800 text-left text-white">
+      <tr>
+        <th class="px-4 py-3 font-medium">Rôle global</th>
+        <th class="px-4 py-3 font-medium">Code</th>
+        <th class="px-4 py-3 font-medium">Permissions</th>
+        <th class="px-4 py-3 font-medium">Utilisateurs liés</th>
+        <th class="px-4 py-3 font-medium text-center">Statut</th>
+        <th class="px-4 py-3 font-medium">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for role in roles %}
+      <tr class="hover:bg-slate-50">
+        <td class="px-4 py-3">
+          <a href="{% url 'recensement:role_plateforme_detail' role.pk %}" class="font-semibold text-brand-700 hover:underline">{{ role.nom }}</a>
+          {% if role.description %}<p class="mt-1 max-w-xl text-xs leading-5 text-slate-500">{{ role.description|truncatechars:160 }}</p>{% endif %}
+        </td>
+        <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ role.code }}</td>
+        <td class="px-4 py-3"><span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">{{ role.nb_permissions }} cible{{ role.nb_permissions|pluralize }}</span></td>
+        <td class="px-4 py-3"><span class="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">{{ role.nb_utilisateurs }} utilisateur{{ role.nb_utilisateurs|pluralize }}</span></td>
+        <td class="px-4 py-3 text-center">
+          {% if role.est_actif %}<span class="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Actif</span>{% else %}<span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Inactif</span>{% endif %}
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap text-xs">
+          <a href="{% url 'recensement:role_plateforme_update' role.pk %}" class="text-brand-600 hover:underline">Modifier</a>
+          <span class="text-slate-300">·</span>
+          <form method="post" action="{% url 'recensement:role_plateforme_toggle' role.pk %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="text-amber-600 hover:underline">{% if role.est_actif %}Désactiver{% else %}Activer{% endif %}</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">Aucun rôle global pour le moment.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm" aria-label="Pagination des rôles globaux">
+  <span class="text-slate-500">Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}</span>
+  <div class="flex flex-wrap gap-1.5">
+    {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" class="rounded-lg border border-slate-300 px-3 py-2 text-slate-700 hover:bg-slate-50">Précédente</a>{% endif %}
+    {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" class="rounded-lg border border-slate-300 px-3 py-2 text-slate-700 hover:bg-slate-50">Suivante</a>{% endif %}
+  </div>
+</nav>
+{% endif %}
+{% endblock %}

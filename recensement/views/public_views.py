@@ -5,6 +5,7 @@ from django.shortcuts import redirect, render
 
 from ..models import Profil
 from ..permissions import get_role
+from .module_views import utilisateur_a_acces_module
 
 
 def landing(request):
@@ -16,6 +17,6 @@ def landing(request):
 @login_required
 def post_login_redirect(request):
     """Aiguillage après connexion selon le rôle."""
-    if get_role(request.user) == Profil.Role.SUPER_ADMIN:
+    if get_role(request.user) == Profil.Role.SUPER_ADMIN or utilisateur_a_acces_module(request.user):
         return redirect("recensement:module_home")
     return redirect("recensement:fiche_list")
