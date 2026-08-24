@@ -9,9 +9,8 @@ from django import forms
 from django.contrib.auth.models import User
 
 from ..forms.base import INPUT_CSS
-from ..models import PermissionRolePlateforme, RolePlateforme, RoleUtilisateurPlateforme
+from ..models import RolePlateforme, RoleUtilisateurPlateforme
 from ..module_registry import iter_module_access_choices, parse_access_value
-
 
 ACTION_FIELDS = (
     ("peut_consulter", "Consulter"),
@@ -34,9 +33,13 @@ class RolePlateformeForm(forms.ModelForm):
         model = RolePlateforme
         fields = ["nom", "description", "est_actif"]
         widgets = {
-            "nom": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : Gestionnaire Documents et Archives"}),
+            "nom": forms.TextInput(
+                attrs={"class": INPUT_CSS, "placeholder": "Ex : Gestionnaire Documents et Archives"}
+            ),
             "description": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 4}),
-            "est_actif": forms.CheckboxInput(attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}),
+            "est_actif": forms.CheckboxInput(
+                attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}
+            ),
         }
         labels = {
             "nom": "Nom du rôle global",
@@ -121,7 +124,9 @@ class RoleUtilisateursForm(forms.Form):
         required=False,
         max_length=1000,
         label="Motif / commentaire",
-        widget=forms.Textarea(attrs={"class": INPUT_CSS, "rows": 3, "placeholder": "Facultatif, mais utile pour la traçabilité."}),
+        widget=forms.Textarea(
+            attrs={"class": INPUT_CSS, "rows": 3, "placeholder": "Facultatif, mais utile pour la traçabilité."}
+        ),
     )
 
     def __init__(self, *args, role=None, **kwargs):

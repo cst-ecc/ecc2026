@@ -31,14 +31,13 @@ from .models import (
     AccesModuleUtilisateur,
     AffectationTerritoriale,
     District,
-    Employe,
     HistoriqueAffectationTerritoriale,
     HistoriqueContactUtilisateur,
     HistoriqueCreationUtilisateurEmail,
     Profil,
-    RoleUtilisateurPlateforme,
     Province,
     Region,
+    RoleUtilisateurPlateforme,
     Zone,
 )
 from .permissions import (
@@ -56,8 +55,8 @@ from .services.services_affectations import (
     serialiser_profil,
     synchroniser_affectations_multiples,
 )
-from .services.services_utilisateurs_mailing import envoyer_email_creation_utilisateur
 from .services.services_employes import synchroniser_acces_modules
+from .services.services_utilisateurs_mailing import envoyer_email_creation_utilisateur
 
 UTILISATEURS_PAR_PAGE = 25
 HISTORIQUE_AFFECTATIONS_PAR_PAGE = 50
@@ -114,7 +113,9 @@ def _normaliser_segment_identifiant(value):
 
 
 def _generer_identifiant_systeme(*, first_name="", last_name="", email=""):
-    base = _normaliser_segment_identifiant(last_name) or _normaliser_segment_identifiant(email.split("@", 1)[0]) or "user"
+    base = (
+        _normaliser_segment_identifiant(last_name) or _normaliser_segment_identifiant(email.split("@", 1)[0]) or "user"
+    )
     prefixe = f"sys{base}"
     username = prefixe
     compteur = 1
@@ -232,9 +233,7 @@ def utilisateur_systeme_list(request):
     _exiger_super_admin(request.user)
 
     utilisateurs = (
-        User.objects.select_related("profil", "fiche_employe")
-        .prefetch_related("acces_modules_plateforme")
-        .all()
+        User.objects.select_related("profil", "fiche_employe").prefetch_related("acces_modules_plateforme").all()
     )
 
     q = (request.GET.get("q") or "").strip()[:100]
@@ -285,10 +284,14 @@ def utilisateur_systeme_list(request):
         .values("total")[:1]
     )
 
-    utilisateurs = utilisateurs.annotate(
-        nb_acces_modules=Subquery(acces_actifs),
-        nb_roles_globaux=Subquery(roles_globaux_actifs),
-    ).distinct().order_by("username")
+    utilisateurs = (
+        utilisateurs.annotate(
+            nb_acces_modules=Subquery(acces_actifs),
+            nb_roles_globaux=Subquery(roles_globaux_actifs),
+        )
+        .distinct()
+        .order_by("username")
+    )
 
     paginator = Paginator(utilisateurs, UTILISATEURS_PAR_PAGE)
     page_obj = paginator.get_page(request.GET.get("page"))

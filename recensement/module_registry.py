@@ -83,8 +83,7 @@ MODULE_DEFINITIONS = (
                 "slug": "exports-paroissiaux",
                 "nom": "Exports des paroisses",
                 "description": (
-                    "Accès aux données paroissiales exportables depuis les écrans "
-                    "existants du recensement."
+                    "Accès aux données paroissiales exportables depuis les écrans existants du recensement."
                 ),
                 "statut": "partiel",
                 "icone": "export",
@@ -116,8 +115,7 @@ MODULE_DEFINITIONS = (
                 "slug": "sites-particuliers",
                 "nom": "Sites particuliers",
                 "description": (
-                    "Gestion séparée des sites particuliers de l’ECC au moyen des "
-                    "écrans déjà disponibles."
+                    "Gestion séparée des sites particuliers de l’ECC au moyen des écrans déjà disponibles."
                 ),
                 "statut": "actif",
                 "icone": "site",
@@ -184,8 +182,7 @@ MODULE_DEFINITIONS = (
                 "slug": "ordres-de-culte",
                 "nom": "Ordres de culte",
                 "description": (
-                    "Téléversement, classement et mise à disposition future des ordres "
-                    "de culte autorisés."
+                    "Téléversement, classement et mise à disposition future des ordres de culte autorisés."
                 ),
                 "statut": "construction",
                 "icone": "document",
@@ -204,8 +201,7 @@ MODULE_DEFINITIONS = (
                 "slug": "constitution-ecc",
                 "nom": "Constitution de l’ECC",
                 "description": (
-                    "Référencement et mise à disposition des versions autorisées de la "
-                    "Constitution de l’Église."
+                    "Référencement et mise à disposition des versions autorisées de la Constitution de l’Église."
                 ),
                 "statut": "construction",
                 "icone": "document",
@@ -214,8 +210,7 @@ MODULE_DEFINITIONS = (
                 "slug": "reglement-interieur",
                 "nom": "Règlement intérieur",
                 "description": (
-                    "Référencement et consultation future des versions autorisées du "
-                    "Règlement intérieur de l’Église."
+                    "Référencement et consultation future des versions autorisées du Règlement intérieur de l’Église."
                 ),
                 "statut": "construction",
                 "icone": "document",
@@ -224,8 +219,7 @@ MODULE_DEFINITIONS = (
                 "slug": "cantiques",
                 "nom": "Cantiques",
                 "description": (
-                    "Classement et mise à disposition future des recueils et documents "
-                    "de cantiques autorisés."
+                    "Classement et mise à disposition future des recueils et documents de cantiques autorisés."
                 ),
                 "statut": "construction",
                 "icone": "music",
@@ -267,8 +261,7 @@ MODULE_DEFINITIONS = (
         "slug": "grades-onctions",
         "nom": "Grades / Onctions",
         "description": (
-            "Référentiel futur des grades ECC, onctions, catégories et versions "
-            "francophone, anglophone et harmonisée."
+            "Référentiel futur des grades ECC, onctions, catégories et versions francophone, anglophone et harmonisée."
         ),
         "statut": "construction",
         "icone": "grades",
@@ -394,15 +387,12 @@ MODULE_DEFINITIONS = (
     {
         "slug": "parametres",
         "nom": "Paramètres",
-        "description": (
-            "Paramétrage général et futurs référentiels transversaux de la plateforme."
-        ),
+        "description": ("Paramétrage général et futurs référentiels transversaux de la plateforme."),
         "statut": "construction",
         "icone": "settings",
         "submodules": (),
     },
 )
-
 
 
 # Cibles de permissions qui ne doivent pas nécessairement apparaître comme
@@ -436,7 +426,6 @@ def iter_module_access_choices():
             )
     choices.extend(PERMISSION_TARGETS_EXTRA)
     return choices
-
 
 
 def label_access_value(value):

@@ -3,14 +3,13 @@
 from django.db import transaction
 from django.utils import timezone
 
+from ..forms.roles_permissions_forms import ACTION_FIELDS
 from ..models import (
     HistoriqueRolePlateforme,
     PermissionRolePlateforme,
     RoleUtilisateurPlateforme,
 )
 from ..module_registry import label_access_value, serialize_access
-from ..forms.roles_permissions_forms import ACTION_FIELDS
-
 
 ACTION_FIELD_NAMES = tuple(field for field, _label in ACTION_FIELDS)
 
@@ -152,11 +151,15 @@ def permissions_effectives_utilisateur(utilisateur):
 
     resultat = {}
 
-    roles_actifs = RoleUtilisateurPlateforme.objects.filter(
-        utilisateur=utilisateur,
-        statut=RoleUtilisateurPlateforme.Statut.ACTIVE,
-        role__est_actif=True,
-    ).select_related("role").prefetch_related("role__permissions")
+    roles_actifs = (
+        RoleUtilisateurPlateforme.objects.filter(
+            utilisateur=utilisateur,
+            statut=RoleUtilisateurPlateforme.Statut.ACTIVE,
+            role__est_actif=True,
+        )
+        .select_related("role")
+        .prefetch_related("role__permissions")
+    )
 
     for attribution in roles_actifs:
         for permission in attribution.role.permissions.all():

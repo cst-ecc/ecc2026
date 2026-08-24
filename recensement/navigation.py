@@ -9,7 +9,6 @@ non autorisés.
 from django.urls import NoReverseMatch, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
-
 MODULE_UI = {
     "paroisses": {
         "slug": "paroisses",

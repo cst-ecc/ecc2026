@@ -26,7 +26,9 @@ def snapshot_badge(badge):
         "date_restitution": badge.date_restitution.isoformat() if badge.date_restitution else "",
         "etat_restitution": badge.etat_restitution,
         "motif_restitution": badge.motif_restitution,
-        "date_desactivation_electronique": badge.date_desactivation_electronique.isoformat() if badge.date_desactivation_electronique else "",
+        "date_desactivation_electronique": badge.date_desactivation_electronique.isoformat()
+        if badge.date_desactivation_electronique
+        else "",
     }
 
 
