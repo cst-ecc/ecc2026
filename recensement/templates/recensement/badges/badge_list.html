@@ -1,0 +1,109 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}Badges administratifs — Administration{% endblock %}
+{% block sidebar_brand %}<a href="{% url 'recensement:module_detail' 'administration' %}" class="min-w-0 truncate font-semibold text-white">Administration</a>{% endblock %}
+{% block sidebar_navigation %}{% include "recensement/includes/module_sidebars/_administration_nav.html" %}{% endblock %}
+{% block app_header_title %}Administration — Badges administratifs{% endblock %}
+{% block footer_context %}Administration{% endblock %}
+
+{% block content %}
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <a href="{% url 'recensement:employe_list' %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour aux employés</a>
+    <h1 class="mt-2 text-xl font-semibold text-slate-900">Registre des badges administratifs ({{ total }})</h1>
+    <p class="mt-1 text-sm text-slate-500">Suivi des badges, catégories, statuts, QR codes et périodes de validité.</p>
+  </div>
+</div>
+
+<form method="get" class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+  <div class="grid gap-3 lg:grid-cols-6">
+    <div class="lg:col-span-2">
+      <label class="mb-1 block text-xs font-medium text-slate-600">Recherche</label>
+      <input type="search" name="q" value="{{ q }}" placeholder="Numéro, matricule, nom, structure..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+    </div>
+    <div>
+      <label class="mb-1 block text-xs font-medium text-slate-600">Catégorie</label>
+      <select name="categorie" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">— Toutes —</option>
+        {% for categorie in categories %}
+          <option value="{{ categorie.pk }}" {% if categorie_filtre == categorie.pk|stringformat:'d' %}selected{% endif %}>{{ categorie.nom }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="mb-1 block text-xs font-medium text-slate-600">Statut</label>
+      <select name="statut" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">— Tous —</option>
+        {% for value, label in statuts %}<option value="{{ value }}" {% if statut_filtre == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="mb-1 block text-xs font-medium text-slate-600">Expiration</label>
+      <select name="expiration" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">— Toutes —</option>
+        <option value="expires" {% if expiration_filtre == 'expires' %}selected{% endif %}>Déjà expirés</option>
+        <option value="expire_bientot" {% if expiration_filtre == 'expire_bientot' %}selected{% endif %}>Expire dans 30 jours</option>
+      </select>
+    </div>
+    <div class="flex items-end gap-2">
+      <button class="flex-1 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700" type="submit">Filtrer</button>
+      <a href="{% url 'recensement:badge_list' %}" class="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50">Reset</a>
+    </div>
+  </div>
+</form>
+
+<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <table class="min-w-full text-sm">
+    <thead class="bg-slate-800 text-left text-white">
+      <tr>
+        <th class="px-4 py-3 font-medium">N° badge</th>
+        <th class="px-4 py-3 font-medium">Titulaire</th>
+        <th class="px-4 py-3 font-medium">Catégorie</th>
+        <th class="px-4 py-3 font-medium">Structure / fonction</th>
+        <th class="px-4 py-3 font-medium">Validité</th>
+        <th class="px-4 py-3 font-medium">Statut</th>
+        <th class="px-4 py-3 font-medium">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for badge in badges %}
+      <tr class="hover:bg-slate-50">
+        <td class="px-4 py-3 font-mono text-xs font-semibold text-slate-900">{{ badge.numero_badge }}<br><span class="text-slate-400">{{ badge.employe.matricule }}</span></td>
+        <td class="px-4 py-3"><span class="font-medium text-slate-900">{{ badge.employe.nom }}</span><br><span class="text-slate-500">{{ badge.employe.prenoms|default:'—' }}</span></td>
+        <td class="px-4 py-3"><span class="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">{{ badge.categorie.nom }}</span>{% if badge.precision_categorie %}<br><span class="text-xs text-slate-500">{{ badge.precision_categorie }}</span>{% endif %}</td>
+        <td class="px-4 py-3 text-slate-700">{{ badge.structure_affichage }}<br><span class="text-xs text-slate-500">{{ badge.fonction_affichage }}</span></td>
+        <td class="px-4 py-3 text-xs text-slate-600">{{ badge.date_delivrance|date:'d/m/Y' }}<br>→ {{ badge.date_expiration|date:'d/m/Y' }}</td>
+        <td class="px-4 py-3">
+          {% if badge.est_valide_verification %}<span class="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">Valide</span>
+          {% elif badge.statut_verification == 'expire' %}<span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">Expiré</span>
+          {% elif badge.statut_verification == 'perdu' or badge.statut_verification == 'vole' %}<span class="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">{{ badge.statut_verification_label }}</span>
+          {% else %}<span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{{ badge.statut_verification_label }}</span>{% endif %}
+        </td>
+        <td class="whitespace-nowrap px-4 py-3">
+          <a href="{% url 'recensement:badge_detail' badge.pk %}" class="text-brand-600 hover:underline">Voir</a>
+          <span class="text-slate-300">·</span>
+          <a href="{% url 'recensement:badge_update' badge.pk %}" class="text-brand-600 hover:underline">Modifier</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Aucun badge administratif enregistré.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="mt-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Pagination des badges">
+  <div class="text-sm text-slate-500">{{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total }}</div>
+  <div class="flex flex-wrap gap-1.5">
+    {% if page_obj.has_previous %}<a class="rounded-lg border border-slate-300 px-3 py-2 text-sm" href="?page={{ page_obj.previous_page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}">Précédente</a>{% endif %}
+    {% for page_number in page_range %}
+      {% if page_number == pagination_ellipsis %}<span class="px-2 py-2 text-sm text-slate-400">{{ pagination_ellipsis }}</span>
+      {% elif page_number == page_obj.number %}<span class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white">{{ page_number }}</span>
+      {% else %}<a class="rounded-lg border border-slate-300 px-3 py-2 text-sm" href="?page={{ page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}">{{ page_number }}</a>{% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}<a class="rounded-lg border border-slate-300 px-3 py-2 text-sm" href="?page={{ page_obj.next_page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}">Suivante</a>{% endif %}
+  </div>
+</nav>
+{% endif %}
+{% endblock %}

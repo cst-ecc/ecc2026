@@ -1,0 +1,69 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}{{ action_label }} — {{ badge.numero_badge }}{% endblock %}
+{% block sidebar_brand %}<a href="{% url 'recensement:module_detail' 'administration' %}" class="min-w-0 truncate font-semibold text-white">Administration</a>{% endblock %}
+{% block sidebar_navigation %}{% include "recensement/includes/module_sidebars/_administration_nav.html" %}{% endblock %}
+{% block app_header_title %}Administration — Action badge{% endblock %}
+{% block footer_context %}Administration{% endblock %}
+
+{% block content %}
+<a href="{% url 'recensement:badge_detail' badge.pk %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour au badge</a>
+<div class="mx-auto mt-4 max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <div class="border-b border-slate-100 px-5 py-4">
+    <h1 class="text-lg font-semibold text-slate-900">{{ action_label }}</h1>
+    <p class="mt-1 text-sm text-slate-500">{{ badge.numero_badge }} — {{ badge.titulaire_nom_complet }}</p>
+  </div>
+  <form method="post" class="space-y-4 p-5">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+
+    {% if action == 'remettre' %}
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.date_remise.id_for_label }}">{{ form.date_remise.label }}</label>
+        {{ form.date_remise }}
+        {% for error in form.date_remise.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    {% endif %}
+
+    {% if action == 'restituer' %}
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.date_restitution.id_for_label }}">{{ form.date_restitution.label }}</label>
+          {{ form.date_restitution }}
+          {% for error in form.date_restitution.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.etat_restitution.id_for_label }}">{{ form.etat_restitution.label }}</label>
+          {{ form.etat_restitution }}
+          {% for error in form.etat_restitution.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    {% if action == 'renouveler' %}
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.nouvelle_date_expiration.id_for_label }}">{{ form.nouvelle_date_expiration.label }}</label>
+        {{ form.nouvelle_date_expiration }}
+        {% for error in form.nouvelle_date_expiration.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    {% endif %}
+
+    <div>
+      <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.motif.id_for_label }}">{{ form.motif.label }}</label>
+      {{ form.motif }}
+      {% for error in form.motif.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+    </div>
+
+    {% if badge.employe.utilisateur %}
+      <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        Cet employé possède un compte utilisateur. Après une suspension, restitution, annulation, perte ou vol, vérifiez si ses accès plateforme doivent être modifiés.
+      </div>
+    {% endif %}
+
+    <div class="flex justify-end gap-2 pt-2">
+      <a href="{% url 'recensement:badge_detail' badge.pk %}" class="rounded-lg border border-slate-300 px-4 py-2.5 text-slate-700 hover:bg-slate-50">Annuler</a>
+      <button type="submit" class="rounded-lg bg-brand-600 px-5 py-2.5 font-semibold text-white hover:bg-brand-700">Valider l’action</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

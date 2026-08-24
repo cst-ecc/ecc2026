@@ -1,0 +1,80 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}{{ badge.numero_badge }} — Badge administratif{% endblock %}
+{% block sidebar_brand %}<a href="{% url 'recensement:module_detail' 'administration' %}" class="min-w-0 truncate font-semibold text-white">Administration</a>{% endblock %}
+{% block sidebar_navigation %}{% include "recensement/includes/module_sidebars/_administration_nav.html" %}{% endblock %}
+{% block app_header_title %}Administration — Badge administratif{% endblock %}
+{% block footer_context %}Administration{% endblock %}
+
+{% block content %}
+<a href="{% url 'recensement:badge_list' %}" class="text-sm text-slate-500 hover:text-slate-700">← Registre des badges</a>
+
+<section class="mt-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+  <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+    <div>
+      <p class="font-mono text-sm font-semibold text-brand-700">{{ badge.numero_badge }}</p>
+      <h1 class="mt-1 text-2xl font-bold text-slate-900">Badge administratif</h1>
+      <p class="mt-1 text-slate-600">{{ badge.titulaire_nom_complet }} — {{ badge.fonction_affichage }} — {{ badge.structure_affichage }}</p>
+      <div class="mt-3 flex flex-wrap gap-2 text-xs">
+        <span class="rounded-full bg-brand-50 px-2.5 py-1 font-semibold text-brand-700">{{ badge.categorie.nom }}</span>
+        {% if badge.precision_categorie %}<span class="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">{{ badge.precision_categorie }}</span>{% endif %}
+        {% if badge.est_valide_verification %}<span class="rounded-full bg-green-50 px-2.5 py-1 font-semibold text-green-700">Valide</span>{% else %}<span class="rounded-full bg-amber-50 px-2.5 py-1 font-semibold text-amber-700">{{ badge.statut_verification_label }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="{% url 'recensement:badge_update' badge.pk %}" class="rounded-lg border border-brand-600 px-4 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50">Modifier</a>
+      <a href="{{ qrcode_url }}" target="_blank" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Télécharger QR</a>
+      <a href="{{ verification_url }}" target="_blank" class="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">Page QR</a>
+    </div>
+  </div>
+</section>
+
+<div class="mt-6 grid gap-5 lg:grid-cols-3">
+  <section class="app-card p-5 lg:col-span-2">
+    <h2 class="mb-4 font-semibold text-slate-900">Informations du badge</h2>
+    <dl class="grid gap-4 text-sm sm:grid-cols-2">
+      <div><dt class="text-slate-400">Titulaire</dt><dd class="font-medium text-slate-800"><a href="{% url 'recensement:employe_detail' badge.employe.pk %}" class="text-brand-700 hover:underline">{{ badge.titulaire_nom_complet }}</a></dd></div>
+      <div><dt class="text-slate-400">Matricule employé</dt><dd class="font-mono font-medium text-slate-800">{{ badge.employe.matricule }}</dd></div>
+      <div><dt class="text-slate-400">Catégorie</dt><dd class="font-medium text-slate-800">{{ badge.categorie.nom }}</dd></div>
+      <div><dt class="text-slate-400">Précision</dt><dd class="font-medium text-slate-800">{{ badge.precision_categorie|default:'—' }}</dd></div>
+      <div><dt class="text-slate-400">Fonction</dt><dd class="font-medium text-slate-800">{{ badge.fonction_affichage }}</dd></div>
+      <div><dt class="text-slate-400">Structure</dt><dd class="font-medium text-slate-800">{{ badge.structure_affichage }}</dd></div>
+      <div><dt class="text-slate-400">Diocèse</dt><dd class="font-medium text-slate-800">{{ badge.diocese|default:'—' }}</dd></div>
+      <div><dt class="text-slate-400">Niveau d’habilitation</dt><dd class="font-medium text-slate-800">{{ badge.niveau_habilitation|default:'—' }}</dd></div>
+      <div><dt class="text-slate-400">Validité</dt><dd class="font-medium text-slate-800">{{ badge.periode_validite }}</dd></div>
+      <div><dt class="text-slate-400">Remise</dt><dd class="font-medium text-slate-800">{% if badge.date_remise %}{{ badge.date_remise|date:'d/m/Y' }}{% else %}Non remise{% endif %}</dd></div>
+      <div><dt class="text-slate-400">Restitution</dt><dd class="font-medium text-slate-800">{% if badge.date_restitution %}{{ badge.date_restitution|date:'d/m/Y' }} — {{ badge.get_etat_restitution_display }}{% else %}—{% endif %}</dd></div>
+      <div><dt class="text-slate-400">Désactivation électronique</dt><dd class="font-medium text-slate-800">{% if badge.date_desactivation_electronique %}{{ badge.date_desactivation_electronique|date:'d/m/Y H:i' }}{% else %}—{% endif %}</dd></div>
+    </dl>
+    {% if badge.employe.utilisateur %}<div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Cet employé possède un compte utilisateur : {{ badge.employe.utilisateur.username }}. En cas de restitution, perte, vol, suspension ou annulation du badge, vérifiez ses accès plateforme.</div>{% endif %}
+  </section>
+
+  <aside class="app-card p-5 text-center">
+    <h2 class="mb-3 font-semibold text-slate-900">QR code de vérification</h2>
+    <img src="{{ qrcode_url }}" alt="QR code badge {{ badge.numero_badge }}" class="mx-auto h-44 w-44 rounded-xl border border-slate-200 bg-white p-2">
+    <p class="mt-3 break-all text-xs text-slate-500">{{ verification_url }}</p>
+  </aside>
+</div>
+
+<section class="mt-6 app-card p-5">
+  <h2 class="mb-3 font-semibold text-slate-900">Actions badge</h2>
+  <div class="flex flex-wrap gap-2">
+    {% for action, label in actions_badge.items %}
+      <a href="{% url 'recensement:badge_action' badge.pk action %}" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{{ label }}</a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="mt-6 app-card">
+  <div class="border-b border-slate-100 px-5 py-3 font-semibold text-slate-900">Historique du badge</div>
+  <div class="divide-y divide-slate-100">
+    {% for entree in historique %}
+      <div class="p-4 text-sm">
+        <div class="flex justify-between gap-3"><strong>{{ entree.get_action_display }}</strong><span class="text-xs text-slate-400">{{ entree.date_action|date:'d/m/Y H:i' }}</span></div>
+        <p class="mt-1 text-slate-500">Par {% if entree.effectue_par %}{{ entree.effectue_par.get_username }}{% else %}—{% endif %}</p>
+        {% if entree.motif %}<p class="mt-1 text-slate-600">{{ entree.motif }}</p>{% endif %}
+      </div>
+    {% empty %}<p class="p-5 text-sm text-slate-400">Aucun historique.</p>{% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "recensement/base_public.html" %}
+{% load static %}
+
+{% block title %}Vérification de badge administratif — ECC{% endblock %}
+{% block meta_description %}Page officielle de vérification d’un badge administratif de l’Église du Christianisme Céleste.{% endblock %}
+{% block robots_meta %}<meta name="robots" content="noindex,nofollow,noarchive">{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl py-6 sm:py-10">
+  <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-soft">
+    <div class="bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700 px-6 py-8 text-center text-white">
+      <img src="{% static 'recensement/img/logo-cst.png' %}" alt="Église du Christianisme Céleste" class="mx-auto mb-4 h-20 w-20 rounded-full bg-white p-2 object-contain shadow-lg">
+      <p class="text-xs font-semibold uppercase tracking-[.20em] text-accent-300">Église du Christianisme Céleste</p>
+      <h1 class="mt-2 text-2xl font-bold">Vérification de badge administratif</h1>
+    </div>
+
+    {% if not badge %}
+      <div class="p-6 text-center sm:p-8">
+        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-2xl">!</div>
+        <h2 class="text-xl font-bold text-slate-900">Badge introuvable</h2>
+        <p class="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600">Le QR code scanné ne correspond à aucun badge administratif enregistré dans le registre de vérification.</p>
+      </div>
+    {% else %}
+      <div class="p-6 sm:p-8">
+        <div class="mb-5 text-center">
+          {% if badge.est_valide_verification %}
+            <span class="inline-flex rounded-full bg-green-50 px-4 py-1.5 text-sm font-semibold text-green-700">Badge actif et vérifiable</span>
+            <p class="mt-3 text-sm text-green-700">Ce badge est valide pour la période indiquée.</p>
+          {% elif badge.statut_verification == 'expire' %}
+            <span class="inline-flex rounded-full bg-amber-50 px-4 py-1.5 text-sm font-semibold text-amber-700">Badge expiré</span>
+            <p class="mt-3 text-sm text-amber-700">Ce badge est expiré.</p>
+          {% elif badge.statut_verification == 'perdu' or badge.statut_verification == 'vole' %}
+            <span class="inline-flex rounded-full bg-red-50 px-4 py-1.5 text-sm font-semibold text-red-700">Badge déclaré {{ badge.statut_verification_label|lower }}</span>
+            <p class="mt-3 text-sm text-red-700">Ce badge a été déclaré perdu ou volé. Il ne doit pas être accepté comme justificatif.</p>
+          {% elif badge.statut_verification == 'restitue' %}
+            <span class="inline-flex rounded-full bg-slate-100 px-4 py-1.5 text-sm font-semibold text-slate-700">Badge restitué</span>
+            <p class="mt-3 text-sm text-slate-600">Ce badge a été restitué à l’administration.</p>
+          {% elif badge.statut_verification == 'suspendu' %}
+            <span class="inline-flex rounded-full bg-amber-50 px-4 py-1.5 text-sm font-semibold text-amber-700">Badge suspendu</span>
+            <p class="mt-3 text-sm text-amber-700">Ce badge est suspendu.</p>
+          {% else %}
+            <span class="inline-flex rounded-full bg-slate-100 px-4 py-1.5 text-sm font-semibold text-slate-700">{{ badge.statut_verification_label }}</span>
+            <p class="mt-3 text-sm text-slate-600">Le statut du badge ne permet pas de le considérer comme actif.</p>
+          {% endif %}
+        </div>
+
+        <div class="grid gap-5 sm:grid-cols-[120px_1fr] sm:items-start">
+          <div class="mx-auto h-28 w-28 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 sm:mx-0">
+            {% if badge.publication_photo_autorisee and badge.employe.photo %}
+              <img src="{{ badge.employe.photo.url }}" alt="Photo du titulaire" class="h-full w-full object-cover">
+            {% else %}
+              <div class="flex h-full w-full items-center justify-center text-4xl text-slate-300">👤</div>
+            {% endif %}
+          </div>
+          <dl class="grid gap-3 text-sm">
+            <div><dt class="text-slate-400">Titulaire</dt><dd class="text-lg font-bold text-slate-900">{{ badge.employe.nom }} {{ badge.employe.prenoms }}</dd></div>
+            <div><dt class="text-slate-400">Fonction</dt><dd class="font-medium text-slate-800">{{ badge.fonction_affichage }}</dd></div>
+            <div><dt class="text-slate-400">Structure</dt><dd class="font-medium text-slate-800">{{ badge.structure_affichage }}</dd></div>
+            <div><dt class="text-slate-400">Catégorie du badge</dt><dd class="font-medium text-slate-800">{{ badge.categorie.nom }}{% if badge.precision_categorie %} — {{ badge.precision_categorie }}{% endif %}</dd></div>
+            <div><dt class="text-slate-400">Numéro du badge</dt><dd class="font-mono font-semibold text-slate-900">{{ badge.numero_badge }}</dd></div>
+            <div><dt class="text-slate-400">Période de validité</dt><dd class="font-medium text-slate-800">{{ badge.periode_validite }}</dd></div>
+          </dl>
+        </div>
+
+        <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">
+          Cette page confirme uniquement l’identité administrative et le statut du badge. Elle n’expose pas les coordonnées personnelles, les accès système, les observations internes ou les permissions du titulaire.
+        </div>
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,5 +1,6 @@
 from . import relances
 from .models import AffectationTerritoriale, FicheParoisse, Profil
+from .navigation import build_ui_module
 from .notifications import nb_notifications_non_lues
 from .permissions import (
     districts_autorises,
@@ -18,6 +19,7 @@ def role_context(request):
 
     La sidebar ne doit pas dupliquer la logique métier : elle lit seulement
     des indicateurs calculés ici, eux-mêmes basés sur les permissions serveur.
+    ``ui_module`` indique au layout global quel sidebar métier afficher.
     """
     user = getattr(request, "user", None)
     role = get_role(user)
@@ -74,14 +76,14 @@ def role_context(request):
         "peut_voir_menu_relances": relances.peut_voir_menu_relances(user),
         "nb_relances_disponibles": relances.nb_actions_relance_disponibles(user),
         "nb_notifications_non_lues": nb_notifications_non_lues(user),
-        # Sites particuliers.
+        # Sites particuliers / responsables.
         "peut_gerer_sites_particuliers": peut_gerer_sites_particuliers(user),
         "peut_gerer_responsables_ecclesiaux": peut_gerer_responsables_ecclesiaux(user),
         "peut_rechercher_paroisses": peut_rechercher_paroisses(user),
-        # Identité visuelle du module courant (Super administrateur uniquement).
-        "ui_module": _build_ui_module(request, role),
         # Périmètre utilisateur pour l'affichage dans les templates.
         "user_scope": _build_user_scope(user, role),
+        # Navigation modulaire.
+        "ui_module": build_ui_module(request, role),
     }
 
 
@@ -90,7 +92,6 @@ def role_context(request):
 # métier — les contrôles restent dans permissions.py).
 # ---------------------------------------------------------------------------
 
-# Libellés courts adaptés à l'interface.
 _ROLE_LABELS = {
     Profil.Role.SUPER_ADMIN: "Super administrateur",
     Profil.Role.OP_PROVINCE: "Opérateur provincial",
@@ -101,12 +102,7 @@ _ROLE_LABELS = {
 
 
 def _build_user_scope(user, role):
-    """Construit un dict décrivant le périmètre affiché de l'utilisateur.
-
-    Retourne ``None`` pour les utilisateurs non authentifiés.
-    Les données servent exclusivement à l'affichage : aucune logique métier
-    n'est fondée sur ces valeurs.
-    """
+    """Construit un dict décrivant le périmètre affiché de l'utilisateur."""
     if not getattr(user, "is_authenticated", False):
         return None
 
@@ -124,7 +120,6 @@ def _build_user_scope(user, role):
     if not profil:
         return scope
 
-    # Périmètre principal (lecture directe du profil).
     if profil.region_id:
         scope["region_nom"] = profil.region.nom if profil.region else None
     if profil.province_id:
@@ -134,7 +129,6 @@ def _build_user_scope(user, role):
     if profil.zone_id:
         scope["zone_nom"] = profil.zone.nom if profil.zone else None
 
-    # Affectations supplémentaires ACTIVES.
     if role in (
         Profil.Role.OP_PROVINCE,
         Profil.Role.OP_DISTRICT,
@@ -160,7 +154,6 @@ def _build_user_scope(user, role):
         scope["affectations_sup"] = aff_list
         scope["nb_affectations_sup"] = len(aff_list)
 
-    # Compteurs de couverture (pour résumé « X zones autorisées »).
     if role == Profil.Role.SUPER_ADMIN:
         scope["couverture_label"] = "Accès global à l'ensemble du système"
     elif role == Profil.Role.OP_PROVINCE:
@@ -181,59 +174,3 @@ def _build_user_scope(user, role):
         scope["couverture_label"] = ""
 
     return scope
-
-
-# ---------------------------------------------------------------------------
-# Identité visuelle des modules pour le Super administrateur.
-# ---------------------------------------------------------------------------
-
-
-def _build_ui_module(request, role):
-    """Détermine le shell visuel du module courant.
-
-    Cette fonction ne porte aucune permission métier. Elle sert uniquement à
-    choisir le titre et la sidebar affichés dans ``base.html`` pour le Super
-    administrateur. Les autres rôles conservent exactement la navigation
-    historique du recensement.
-    """
-    if role != Profil.Role.SUPER_ADMIN:
-        return None
-
-    resolver_match = getattr(request, "resolver_match", None)
-    url_name = getattr(resolver_match, "url_name", "") or ""
-
-    if "site_particulier" in url_name or url_name == "responsabilite_hierarchique_update":
-        return {
-            "slug": "sites-particuliers",
-            "sidebar_title": "Sites particuliers",
-            "header_title": "Gestion des sites particuliers",
-            "home_url_name": "recensement:site_particulier_list",
-            "sidebar_template": "recensement/includes/module_sidebars/_sites_particuliers_nav.html",
-        }
-
-    if "responsable_ecclesial" in url_name or "mandat_responsable" in url_name:
-        return {
-            "slug": "responsables-ecclesiaux",
-            "sidebar_title": "Responsables ecclésiaux",
-            "header_title": "Responsables ecclésiaux",
-            "home_url_name": "recensement:responsable_ecclesial_list",
-            "sidebar_template": "recensement/includes/module_sidebars/_responsables_nav.html",
-        }
-
-    if "utilisateur" in url_name or "affectation" in url_name or url_name == "historique_affectations":
-        return {
-            "slug": "administration",
-            "sidebar_title": "Administration",
-            "header_title": "Administration de la plateforme",
-            "home_url_name": "recensement:utilisateur_list",
-            "sidebar_template": "recensement/includes/module_sidebars/_administration_nav.html",
-        }
-
-    # Les routes historiques restantes appartiennent au module Paroisses.
-    return {
-        "slug": "paroisses",
-        "sidebar_title": "Paroisses",
-        "header_title": "Recensement des paroisses",
-        "home_url_name": "recensement:dashboard",
-        "sidebar_template": "recensement/includes/module_sidebars/_paroisses_nav.html",
-    }

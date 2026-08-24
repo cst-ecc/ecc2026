@@ -2519,7 +2519,6 @@ class HistoriqueSiteParticulier(models.Model):
     def __str__(self):
         return f"{self.get_action_display()} — {self.site.nom} — {self.date_action:%d/%m/%Y %H:%M}"
 
-
 # ---------------------------------------------------------------------------
 # Administration générale — Organisations, employés et accès modulaires
 # ---------------------------------------------------------------------------
@@ -2536,9 +2535,7 @@ def _normaliser_sigle_organisation(value):
 
 
 def _sigle_depuis_nom(nom):
-    mots = re.findall(
-        r"[A-Za-z0-9]+", unicodedata.normalize("NFKD", nom or "").encode("ascii", "ignore").decode("ascii")
-    )
+    mots = re.findall(r"[A-Za-z0-9]+", unicodedata.normalize("NFKD", nom or "").encode("ascii", "ignore").decode("ascii"))
     sigle = "".join(mot[0] for mot in mots if mot).upper()
     return sigle[:8] or "ORG"
 
@@ -2729,13 +2726,9 @@ class Employe(models.Model):
         self.telephone = (self.telephone or "").strip()
         self.email = (self.email or "").strip().lower()
         if self.date_debut_service and self.date_fin_service and self.date_fin_service < self.date_debut_service:
-            raise ValidationError(
-                {"date_fin_service": "La date de fin ne peut pas précéder la date de début de service."}
-            )
+            raise ValidationError({"date_fin_service": "La date de fin ne peut pas précéder la date de début de service."})
         if self.date_fin_service and self.statut == self.Statut.ACTIF:
-            raise ValidationError(
-                {"statut": "Un employé avec une date de fin de service ne peut pas rester au statut actif."}
-            )
+            raise ValidationError({"statut": "Un employé avec une date de fin de service ne peut pas rester au statut actif."})
 
     def save(self, *args, **kwargs):
         if not self.matricule:
@@ -3017,6 +3010,359 @@ class HistoriqueRolePlateforme(models.Model):
         return f"{self.get_action_display()} — {self.role.nom} — {self.date_action:%d/%m/%Y %H:%M}"
 
 
+
+class CategorieBadgeAdministratif(models.Model):
+    """Référentiel extensible des catégories de badges administratifs ECC.
+
+    Les catégories de badge sont distinctes de l'organisation de rattachement
+    et de la fonction de l'employé. Exemple : un employé rattaché au CSMo peut
+    recevoir un badge de catégorie ``particulier``.
+    """
+
+    class TypePrincipal(models.TextChoices):
+        MONDIAL = "mondial", "Mondial"
+        DIOCESAIN = "diocesain", "Diocésain"
+        PARTICULIER = "particulier", "Particulier"
+        AUTRE = "autre", "Autre catégorie approuvée"
+
+    code = models.SlugField(max_length=80, unique=True)
+    nom = models.CharField(max_length=150, unique=True)
+    type_principal = models.CharField(
+        max_length=20,
+        choices=TypePrincipal.choices,
+        default=TypePrincipal.AUTRE,
+        db_index=True,
+    )
+    description = models.TextField(blank=True)
+    est_active = models.BooleanField(default=True, db_index=True)
+    ordre = models.PositiveSmallIntegerField(default=0)
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["ordre", "nom"]
+        verbose_name = "Catégorie de badge administratif"
+        verbose_name_plural = "Catégories de badges administratifs"
+        indexes = [models.Index(fields=["type_principal", "est_active"], name="catbadge_type_actif_idx")]
+
+    def clean(self):
+        super().clean()
+        self.nom = (self.nom or "").strip()
+        self.code = RolePlateforme._normaliser_code(self.code or self.nom)
+        if not self.nom:
+            raise ValidationError({"nom": "Le nom de la catégorie est obligatoire."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nom
+
+
+class BadgeAdministratif(models.Model):
+    """Badge administratif officiel lié à un employé.
+
+    Le badge possède son propre numéro, son statut et sa période de validité.
+    Il ne se confond ni avec le matricule de l'employé, ni avec le compte
+    utilisateur éventuellement lié.
+    """
+
+    class Statut(models.TextChoices):
+        PREPARATION = "preparation", "En préparation"
+        ACTIF = "actif", "Actif"
+        SUSPENDU = "suspendu", "Suspendu"
+        EXPIRE = "expire", "Expiré"
+        PERDU = "perdu", "Perdu"
+        VOLE = "vole", "Volé"
+        ANNULE = "annule", "Annulé"
+        RESTITUE = "restitue", "Restitué"
+
+    class EtatRestitution(models.TextChoices):
+        BON = "bon", "Bon état"
+        USE = "use", "Usé"
+        DETERIORE = "deteriore", "Détérioré"
+        NON_RESTITUE = "non_restitue", "Non restitué"
+
+    STATUTS_NON_VALIDES = (
+        Statut.SUSPENDU,
+        Statut.EXPIRE,
+        Statut.PERDU,
+        Statut.VOLE,
+        Statut.ANNULE,
+        Statut.RESTITUE,
+    )
+
+    employe = models.ForeignKey(
+        Employe,
+        on_delete=models.PROTECT,
+        related_name="badges_administratifs",
+    )
+    numero_badge = models.CharField(
+        max_length=60,
+        unique=True,
+        editable=False,
+        db_index=True,
+        help_text="Numéro unique du badge, non réattribuable.",
+    )
+    token_public = models.SlugField(
+        max_length=80,
+        unique=True,
+        editable=False,
+        db_index=True,
+        help_text="Identifiant public non sensible utilisé par le QR code.",
+    )
+    categorie = models.ForeignKey(
+        CategorieBadgeAdministratif,
+        on_delete=models.PROTECT,
+        related_name="badges",
+        verbose_name="Catégorie du badge",
+    )
+    precision_categorie = models.CharField(
+        max_length=180,
+        blank=True,
+        verbose_name="Précision / sous-catégorie",
+        help_text="Exemples : CST, CSMo, Conseil Pastoral, Commission, Mission temporaire.",
+    )
+    fonction_badge = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Fonction imprimée sur le badge",
+    )
+    structure_badge = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Structure affichée sur le badge",
+    )
+    diocese = models.CharField(max_length=180, blank=True, verbose_name="Diocèse")
+    structure_diocesaine = models.CharField(max_length=200, blank=True, verbose_name="Structure diocésaine")
+    niveau_habilitation = models.CharField(max_length=150, blank=True, verbose_name="Niveau d'habilitation")
+    date_delivrance = models.DateField(verbose_name="Date de délivrance")
+    date_expiration = models.DateField(verbose_name="Date d'expiration")
+    statut = models.CharField(max_length=20, choices=Statut.choices, default=Statut.PREPARATION, db_index=True)
+    publication_photo_autorisee = models.BooleanField(
+        default=False,
+        verbose_name="Autoriser la photo sur la page publique QR",
+    )
+    mentions_securite = models.TextField(blank=True, verbose_name="Mentions administratives ou de sécurité")
+
+    date_remise = models.DateField(null=True, blank=True, verbose_name="Date de remise")
+    remis_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="badges_remis",
+    )
+    date_restitution = models.DateField(null=True, blank=True, verbose_name="Date de restitution")
+    restitue_a = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="badges_restitues_receptionnes",
+    )
+    etat_restitution = models.CharField(
+        max_length=20,
+        choices=EtatRestitution.choices,
+        blank=True,
+        verbose_name="État du badge à la restitution",
+    )
+    motif_restitution = models.TextField(blank=True)
+    date_desactivation_electronique = models.DateTimeField(null=True, blank=True)
+
+    badge_remplace = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="badges_remplacement",
+        verbose_name="Badge remplacé",
+    )
+    observations_internes = models.TextField(blank=True, verbose_name="Observations internes")
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="badges_administratifs_crees",
+    )
+    modifie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="badges_administratifs_modifies",
+    )
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date_delivrance", "-id"]
+        verbose_name = "Badge administratif"
+        verbose_name_plural = "Badges administratifs"
+        indexes = [
+            models.Index(fields=["statut", "date_expiration"], name="badge_statut_exp_idx"),
+            models.Index(fields=["employe", "statut"], name="badge_employe_statut_idx"),
+            models.Index(fields=["categorie", "statut"], name="badge_categorie_statut_idx"),
+        ]
+
+    @property
+    def titulaire_nom_complet(self):
+        return self.employe.nom_complet if self.employe_id else "—"
+
+    @property
+    def fonction_affichage(self):
+        return self.fonction_badge or (self.employe.fonction if self.employe_id else "—")
+
+    @property
+    def structure_affichage(self):
+        if self.structure_badge:
+            return self.structure_badge
+        if self.employe_id and self.employe.organisation_id:
+            return self.employe.organisation.sigle
+        return "—"
+
+    @property
+    def categorie_affichage(self):
+        return self.categorie.nom if self.categorie_id else "—"
+
+    @property
+    def periode_validite(self):
+        debut = self.date_delivrance.strftime("%d/%m/%Y") if self.date_delivrance else "Début non renseigné"
+        fin = self.date_expiration.strftime("%d/%m/%Y") if self.date_expiration else "Expiration non renseignée"
+        return f"{debut} — {fin}"
+
+    @property
+    def est_expire_calendaire(self):
+        return bool(self.date_expiration and self.date_expiration < timezone.localdate())
+
+    @property
+    def statut_verification(self):
+        if self.statut == self.Statut.ACTIF and self.est_expire_calendaire:
+            return self.Statut.EXPIRE
+        return self.statut
+
+    @property
+    def statut_verification_label(self):
+        return dict(self.Statut.choices).get(self.statut_verification, self.statut_verification)
+
+    @property
+    def est_valide_verification(self):
+        return self.statut_verification == self.Statut.ACTIF
+
+    @staticmethod
+    def _prefixe_badge(categorie=None):
+        type_principal = getattr(categorie, "type_principal", "") if categorie else ""
+        return {
+            CategorieBadgeAdministratif.TypePrincipal.MONDIAL: "MON",
+            CategorieBadgeAdministratif.TypePrincipal.DIOCESAIN: "DIO",
+            CategorieBadgeAdministratif.TypePrincipal.PARTICULIER: "PAR",
+        }.get(type_principal, "BAD")
+
+    def _generer_numero_badge(self):
+        annee = timezone.localdate().year
+        sigle = "ORG"
+        if self.employe_id and self.employe.organisation_id:
+            sigle = _normaliser_sigle_organisation(self.employe.organisation.sigle) or "ORG"
+        prefixe = self._prefixe_badge(self.categorie)
+        for _ in range(100):
+            suffixe = "".join(secrets.choice(_MATRICULE_ALPHABET) for _ in range(5))
+            numero = f"BADGE{annee}{prefixe}{sigle}{suffixe}"
+            if not BadgeAdministratif.objects.filter(numero_badge=numero).exists():
+                return numero
+        raise ValidationError("Impossible de générer un numéro de badge unique. Veuillez réessayer.")
+
+    def _generer_token_public(self):
+        for _ in range(100):
+            token = "".join(secrets.choice(_MATRICULE_ALPHABET.lower() + "23456789") for _ in range(18))
+            if not BadgeAdministratif.objects.filter(token_public=token).exists():
+                return token
+        raise ValidationError("Impossible de générer un identifiant public de badge. Veuillez réessayer.")
+
+    def clean(self):
+        super().clean()
+        self.precision_categorie = (self.precision_categorie or "").strip()
+        self.fonction_badge = (self.fonction_badge or "").strip()
+        self.structure_badge = (self.structure_badge or "").strip()
+        self.diocese = (self.diocese or "").strip()
+        self.structure_diocesaine = (self.structure_diocesaine or "").strip()
+        self.niveau_habilitation = (self.niveau_habilitation or "").strip()
+        if not self.fonction_badge and self.employe_id:
+            self.fonction_badge = self.employe.fonction
+        if not self.structure_badge and self.employe_id and self.employe.organisation_id:
+            self.structure_badge = self.employe.organisation.sigle
+        if self.date_delivrance and self.date_expiration and self.date_expiration <= self.date_delivrance:
+            raise ValidationError({"date_expiration": "La date d'expiration doit être postérieure à la date de délivrance."})
+        if self.categorie_id and self.categorie.type_principal == CategorieBadgeAdministratif.TypePrincipal.DIOCESAIN:
+            if not self.diocese:
+                raise ValidationError({"diocese": "Le diocèse est recommandé/nécessaire pour un badge diocésain."})
+        if self.statut == self.Statut.RESTITUE and not self.date_restitution:
+            raise ValidationError({"date_restitution": "La date de restitution est obligatoire pour un badge restitué."})
+
+    def save(self, *args, **kwargs):
+        if not self.numero_badge:
+            self.numero_badge = self._generer_numero_badge()
+        if not self.token_public:
+            self.token_public = self._generer_token_public()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.numero_badge} — {self.titulaire_nom_complet}"
+
+
+class HistoriqueBadgeAdministratif(models.Model):
+    """Journal immuable des actions effectuées sur les badges administratifs."""
+
+    class Action(models.TextChoices):
+        CREATION = "creation", "Création du badge"
+        MODIFICATION = "modification", "Modification du badge"
+        REMISE = "remise", "Remise du badge"
+        RESTITUTION = "restitution", "Restitution du badge"
+        ACTIVATION = "activation", "Activation du badge"
+        SUSPENSION = "suspension", "Suspension du badge"
+        ANNULATION = "annulation", "Annulation du badge"
+        PERTE = "perte", "Déclaration de perte"
+        VOL = "vol", "Déclaration de vol"
+        EXPIRATION = "expiration", "Expiration constatée"
+        DESACTIVATION_ELECTRONIQUE = "desactivation_electronique", "Désactivation électronique"
+        RENOUVELLEMENT = "renouvellement", "Renouvellement"
+        REMPLACEMENT = "remplacement", "Remplacement"
+        QR_CODE = "qrcode", "Consultation ou génération QR code"
+        MODIFICATION_CATEGORIE = "modification_categorie", "Modification de catégorie"
+
+    badge = models.ForeignKey(BadgeAdministratif, on_delete=models.CASCADE, related_name="historique")
+    employe = models.ForeignKey(Employe, on_delete=models.PROTECT, related_name="historique_badges")
+    action = models.CharField(max_length=40, choices=Action.choices, db_index=True)
+    ancien_statut = models.CharField(max_length=20, blank=True)
+    nouveau_statut = models.CharField(max_length=20, blank=True)
+    effectue_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historiques_badges_effectues",
+    )
+    donnees_avant = models.JSONField(default=dict, blank=True)
+    donnees_apres = models.JSONField(default=dict, blank=True)
+    details = models.JSONField(default=dict, blank=True)
+    motif = models.TextField(blank=True)
+    date_action = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_action", "-id"]
+        verbose_name = "Historique de badge administratif"
+        verbose_name_plural = "Historiques de badges administratifs"
+        indexes = [
+            models.Index(fields=["action", "date_action"], name="hist_badge_action_date_idx"),
+            models.Index(fields=["badge", "date_action"], name="hist_badge_badge_date_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_action_display()} — {self.badge.numero_badge} — {self.date_action:%d/%m/%Y %H:%M}"
+
+
 class HistoriqueEmploye(models.Model):
     """Journal des actions administratives effectuées sur les employés."""
 
@@ -3058,3 +3404,4 @@ class HistoriqueEmploye(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} — {self.employe.matricule} — {self.date_action:%d/%m/%Y %H:%M}"
+

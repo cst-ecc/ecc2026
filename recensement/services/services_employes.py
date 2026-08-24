@@ -6,7 +6,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
-from ..models import AccesModuleUtilisateur, HistoriqueEmploye
+from ..models import AccesModuleUtilisateur, Employe, HistoriqueEmploye
 from ..module_registry import iter_module_access_choices, parse_access_value, serialize_access
 
 

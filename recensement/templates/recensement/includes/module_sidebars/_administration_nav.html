@@ -1,16 +1,16 @@
 {% with url_name=request.resolver_match.url_name submodule_slug=request.resolver_match.kwargs.submodule_slug %}
-<a href="{% url 'recensement:module_detail' 'administration' %}" class="sidebar-link mb-2"><span>← Sous-modules</span></a>
+<a href="{% url 'recensement:module_detail' 'administration' %}" class="sidebar-link mb-2"><span>← Administration</span></a>
 
 <details class="sidebar-group" open>
   <summary class="sidebar-summary"><span>Administration</span><span aria-hidden="true">›</span></summary>
   <div class="sidebar-submenu">
     <a href="{% url 'recensement:utilisateur_systeme_list' %}"
-       class="sidebar-link {% if url_name == 'utilisateur_systeme_list' or url_name == 'utilisateur_systeme_create' %}is-active{% endif %}">
+       class="sidebar-link {% if url_name == 'utilisateur_systeme_list' or url_name == 'utilisateur_systeme_create' or url_name == 'utilisateur_systeme_created' or url_name == 'utilisateur_systeme_update' or url_name == 'utilisateur_systeme_toggle' %}is-active{% endif %}">
       <span>Gestion des utilisateurs</span>
     </a>
 
     <a href="{% url 'recensement:utilisateur_list' %}"
-       class="sidebar-link {% if url_name == 'utilisateur_list' or url_name == 'utilisateur_create' or url_name == 'utilisateur_update' or url_name == 'utilisateur_created' or url_name == 'utilisateur_reset_password' or url_name == 'utilisateur_delete' or url_name == 'historique_affectations' or 'affectation' in url_name %}is-active{% endif %}">
+       class="sidebar-link {% if url_name == 'utilisateur_list' or url_name == 'utilisateur_create' or url_name == 'utilisateur_update' or url_name == 'utilisateur_created' or url_name == 'utilisateur_reset_password' or url_name == 'utilisateur_delete' or url_name == 'historique_affectations' or url_name == 'affectations_multiples_synchroniser' or url_name == 'affectation_ajouter' or url_name == 'affectation_action' or url_name == 'utilisateur_toggle_actif' %}is-active{% endif %}">
       <span>Gestion des opérateurs</span>
     </a>
 
@@ -22,6 +22,21 @@
     <a href="{% url 'recensement:submodule_construction' 'administration' 'journal-activite' %}"
        class="sidebar-link {% if submodule_slug == 'journal-activite' %}is-active{% endif %}">
       <span>Journal d’activité</span>
+    </a>
+  </div>
+</details>
+
+<details class="sidebar-group" {% if url_name == 'employe_list' or url_name == 'employe_create' or url_name == 'employe_update' or url_name == 'employe_detail' or url_name == 'organisation_list' or url_name == 'organisation_create' or url_name == 'organisation_update' or url_name == 'badge_list' or url_name == 'badge_detail' or url_name == 'badge_update' or url_name == 'badge_action' or url_name == 'badge_create_for_employe' %}open{% endif %}>
+  <summary class="sidebar-summary"><span>Accès liés</span><span aria-hidden="true">›</span></summary>
+  <div class="sidebar-submenu">
+    <a href="{% url 'recensement:employe_list' %}" class="sidebar-link {% if url_name == 'employe_list' or url_name == 'employe_create' or url_name == 'employe_update' or url_name == 'employe_detail' or url_name == 'employe_changer_statut' %}is-active{% endif %}">
+      <span>Employés</span>
+    </a>
+    <a href="{% url 'recensement:badge_list' %}" class="sidebar-link {% if url_name == 'badge_list' or url_name == 'badge_detail' or url_name == 'badge_update' or url_name == 'badge_action' or url_name == 'badge_create_for_employe' %}is-active{% endif %}">
+      <span>Badges administratifs</span>
+    </a>
+    <a href="{% url 'recensement:organisation_list' %}" class="sidebar-link {% if url_name == 'organisation_list' or url_name == 'organisation_create' or url_name == 'organisation_update' %}is-active{% endif %}">
+      <span>Organisations</span>
     </a>
   </div>
 </details>

@@ -1,25 +1,27 @@
-{% with url_name=request.resolver_match.url_name %}
+{% with url_name=request.resolver_match.url_name submodule_slug=request.resolver_match.kwargs.submodule_slug %}
 <a href="{% url 'recensement:module_detail' 'paroisses' %}" class="sidebar-link mb-2">
-  <span>← Sous-modules Paroisses</span>
+  <span>← Paroisses</span>
 </a>
 
 <details class="sidebar-group" open>
   <summary class="sidebar-summary"><span>Recensement des paroisses</span><span aria-hidden="true">›</span></summary>
   <div class="sidebar-submenu">
     <a href="{% url 'recensement:dashboard' %}" class="sidebar-link {% if url_name == 'dashboard' %}is-active{% endif %}">Tableau de bord</a>
-    <a href="{% url 'recensement:fiche_list' %}" class="sidebar-link {% if url_name == 'fiche_list' or url_name == 'fiche_detail' or url_name == 'fiche_update' %}is-active{% endif %}">Fiches recensées</a>
+    <a href="{% url 'recensement:fiche_list' %}" class="sidebar-link {% if url_name == 'fiche_list' or url_name == 'fiche_detail' or url_name == 'fiche_update' or url_name == 'fiche_delete' %}is-active{% endif %}">Fiches recensées</a>
     {% if peut_creer_fiche %}<a href="{% url 'recensement:fiche_create' %}" class="sidebar-link {% if url_name == 'fiche_create' %}is-active{% endif %}">Nouvelle fiche</a>{% endif %}
-    {% if peut_valider_fiches %}<a href="{% url 'recensement:fiche_a_valider' %}" class="sidebar-link {% if url_name == 'fiche_a_valider' %}is-active{% endif %}"><span>À valider</span>{% if nb_a_valider %}<span class="sidebar-count">{{ nb_a_valider }}</span>{% endif %}</a>{% endif %}
+    {% if peut_valider_fiches or is_super_admin %}<a href="{% url 'recensement:fiche_a_valider' %}" class="sidebar-link {% if url_name == 'fiche_a_valider' or url_name == 'fiche_valider' %}is-active{% endif %}"><span>À valider</span>{% if nb_a_valider %}<span class="sidebar-count">{{ nb_a_valider }}</span>{% endif %}</a>{% endif %}
     {% if peut_voir_carte %}<a href="{% url 'recensement:carte' %}" class="sidebar-link {% if url_name == 'carte' %}is-active{% endif %}">Carte des paroisses</a>{% endif %}
+    <a href="{% url 'recensement:fiche_list' %}?statut=validees" class="sidebar-link {% if request.GET.statut == 'validees' %}is-active{% endif %}">Paroisses validées</a>
   </div>
 </details>
 
-<details class="sidebar-group" {% if url_name == 'suivi_modifications' or url_name == 'relances_liste' %}open{% endif %}>
-  <summary class="sidebar-summary"><span>Suivi du recensement</span><span aria-hidden="true">›</span></summary>
+<details class="sidebar-group" {% if url_name == 'suivi_modifications' or url_name == 'relances_liste' or url_name == 'fiche_export_excel' or url_name == 'fiche_export_preview' %}open{% endif %}>
+  <summary class="sidebar-summary"><span>Suivi et exports</span><span aria-hidden="true">›</span></summary>
   <div class="sidebar-submenu">
     <a href="{% url 'recensement:suivi_modifications' %}" class="sidebar-link {% if url_name == 'suivi_modifications' %}is-active{% endif %}">Suivi des fiches</a>
+    <a href="{% url 'recensement:fiche_list' %}" class="sidebar-link {% if url_name == 'fiche_export_preview' or url_name == 'fiche_export_excel' %}is-active{% endif %}">Exports paroissiaux</a>
     {% if peut_voir_menu_relances %}
-      <a href="{% url 'recensement:relances_liste' %}" class="sidebar-link {% if url_name == 'relances_liste' %}is-active{% endif %}">
+      <a href="{% url 'recensement:relances_liste' %}" class="sidebar-link {% if url_name == 'relances_liste' or url_name == 'relance_lancer' or url_name == 'relance_intervention_super_admin' %}is-active{% endif %}">
         <span>Relances</span>{% if nb_relances_disponibles %}<span class="sidebar-count">{{ nb_relances_disponibles }}</span>{% endif %}
       </a>
     {% endif %}

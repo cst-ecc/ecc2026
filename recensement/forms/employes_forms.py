@@ -2,11 +2,16 @@
 
 from django import forms
 from django.contrib.auth.models import User
-
 from ..access_forms import INPUT_CSS, SELECT_CSS
-from ..models import Employe, OrganisationAdministrative
-from ..module_registry import iter_module_access_choices
-from .validators import valider_telephone_international
+from ..forms.validators import valider_telephone_international
+from ..models import AccesModuleUtilisateur, Employe, OrganisationAdministrative, Profil
+from ..module_registry import (
+    all_access_values,
+    expand_module_access_values,
+    iter_module_access_choices,
+    module_access_groups,
+    serialize_access,
+)
 
 
 class OrganisationAdministrativeForm(forms.ModelForm):
@@ -14,15 +19,11 @@ class OrganisationAdministrativeForm(forms.ModelForm):
         model = OrganisationAdministrative
         fields = ["nom", "sigle", "type_organisation", "description", "est_active"]
         widgets = {
-            "nom": forms.TextInput(
-                attrs={"class": INPUT_CSS, "placeholder": "Ex : Conseil Supérieur de Mise en œuvre"}
-            ),
+            "nom": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : Conseil Supérieur de Mise en œuvre"}),
             "sigle": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : CSMO"}),
             "type_organisation": forms.Select(attrs={"class": SELECT_CSS}),
             "description": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 3}),
-            "est_active": forms.CheckboxInput(
-                attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}
-            ),
+            "est_active": forms.CheckboxInput(attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}),
         }
         labels = {
             "nom": "Nom de l'organisation",
@@ -31,6 +32,43 @@ class OrganisationAdministrativeForm(forms.ModelForm):
             "description": "Description",
             "est_active": "Organisation active",
         }
+
+
+
+
+def _est_super_administrateur(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    profil = getattr(user, "profil", None)
+    return bool(getattr(user, "is_superuser", False) or (profil and profil.role == Profil.Role.SUPER_ADMIN))
+
+
+def valeurs_acces_attribuables_par(user):
+    """Valeurs d'accès que l'utilisateur connecté peut attribuer.
+
+    Le Super administrateur peut tout attribuer. Pour les futurs
+    gestionnaires non super-administrateurs, on limite strictement aux accès
+    modulaires dont ils disposent eux-mêmes. Un accès complet à un module
+    permet d'accorder ce module et ses sous-modules ; un accès partiel ne
+    permet d'accorder que les sous-modules effectivement détenus.
+    """
+    if _est_super_administrateur(user):
+        return all_access_values()
+
+    if not user or not getattr(user, "is_authenticated", False):
+        return set()
+
+    valeurs = set()
+    actifs = AccesModuleUtilisateur.objects.filter(
+        utilisateur=user,
+        statut=AccesModuleUtilisateur.Statut.ACTIVE,
+    )
+    for acces in actifs:
+        value = serialize_access(acces.module_slug, acces.submodule_slug)
+        valeurs.add(value)
+        if not acces.submodule_slug:
+            valeurs.update(expand_module_access_values([value]))
+    return valeurs
 
 
 class EmployeForm(forms.ModelForm):
@@ -44,9 +82,7 @@ class EmployeForm(forms.ModelForm):
         required=False,
         choices=iter_module_access_choices(),
         label="Modules et sous-modules autorisés",
-        widget=forms.CheckboxSelectMultiple(
-            attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}
-        ),
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}),
     )
 
     class Meta:
@@ -78,9 +114,7 @@ class EmployeForm(forms.ModelForm):
             "email": forms.EmailInput(attrs={"class": INPUT_CSS, "placeholder": "exemple@ecc.bj"}),
             "photo": forms.ClearableFileInput(attrs={"class": INPUT_CSS}),
             "observations": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 4}),
-            "acces_plateforme": forms.CheckboxInput(
-                attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}
-            ),
+            "acces_plateforme": forms.CheckboxInput(attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}),
             "utilisateur": forms.Select(attrs={"class": SELECT_CSS}),
         }
         labels = {
@@ -101,6 +135,7 @@ class EmployeForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         self.instance_employe = kwargs.get("instance")
+        self.attributeur = kwargs.pop("attributeur", None)
         super().__init__(*args, **kwargs)
         organisations = OrganisationAdministrative.objects.filter(est_active=True)
         if self.instance and self.instance.pk and self.instance.organisation_id:
@@ -115,6 +150,24 @@ class EmployeForm(forms.ModelForm):
 
         if self.instance and self.instance.pk:
             self.initial.setdefault("acces_modules", list(self.instance.acces_modules_snapshot or []))
+
+        self.valeurs_acces_attribuables = valeurs_acces_attribuables_par(self.attributeur)
+        choix_autorises = [
+            (value, label)
+            for value, label in iter_module_access_choices()
+            if value in self.valeurs_acces_attribuables
+        ]
+        self.fields["acces_modules"].choices = choix_autorises
+
+        if self.is_bound:
+            selected_values = self.data.getlist("acces_modules") if hasattr(self.data, "getlist") else []
+        else:
+            selected_values = self.initial.get("acces_modules", []) or []
+        selected_values = expand_module_access_values(selected_values)
+        self.access_groups = module_access_groups(
+            allowed_values=self.valeurs_acces_attribuables,
+            selected_values=selected_values,
+        )
 
     def clean_telephone(self):
         value = (self.cleaned_data.get("telephone") or "").strip()
@@ -134,24 +187,27 @@ class EmployeForm(forms.ModelForm):
         creer_compte = bool(cleaned.get("creer_compte_utilisateur"))
         utilisateur = cleaned.get("utilisateur")
         email = cleaned.get("email") or ""
-        acces_modules = cleaned.get("acces_modules") or []
+        acces_modules = expand_module_access_values(cleaned.get("acces_modules") or [])
+        cleaned["acces_modules"] = acces_modules
 
         if cleaned.get("date_debut_service") and cleaned.get("date_fin_service"):
             if cleaned["date_fin_service"] < cleaned["date_debut_service"]:
                 self.add_error("date_fin_service", "La date de fin ne peut pas précéder la date de début de service.")
 
         if creer_compte and utilisateur:
-            self.add_error(
-                "utilisateur",
-                "Choisissez soit un utilisateur existant, soit la création d'un nouveau compte, pas les deux.",
-            )
+            self.add_error("utilisateur", "Choisissez soit un utilisateur existant, soit la création d'un nouveau compte, pas les deux.")
 
         if creer_compte and not acces_plateforme:
             self.add_error("creer_compte_utilisateur", "Cochez d'abord l'autorisation d'accès à la plateforme.")
 
         if acces_modules and not acces_plateforme:
+            self.add_error("acces_modules", "Les modules ne peuvent être attribués que si l'accès plateforme est autorisé.")
+
+        acces_interdits = sorted(set(acces_modules) - set(self.valeurs_acces_attribuables))
+        if acces_interdits:
             self.add_error(
-                "acces_modules", "Les modules ne peuvent être attribués que si l'accès plateforme est autorisé."
+                "acces_modules",
+                "Vous ne pouvez pas attribuer un accès que vous ne possédez pas vous-même.",
             )
 
         if acces_plateforme and not acces_modules:

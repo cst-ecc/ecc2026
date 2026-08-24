@@ -22,8 +22,8 @@
   >
     <div class="h-14 shrink-0 flex items-center justify-between gap-2 px-4 border-b border-brand-700">
       {% block sidebar_brand %}
-        {% if is_super_admin and ui_module %}
-          <a href="{% url ui_module.home_url_name %}" class="min-w-0 truncate font-semibold text-white">
+        {% if ui_module %}
+          <a href="{{ ui_module.home_url|default:'#' }}" class="min-w-0 truncate font-semibold text-white">
             {{ ui_module.sidebar_title }}
           </a>
         {% else %}
@@ -47,7 +47,7 @@
 
     <nav class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
       {% block sidebar_navigation %}
-        {% if is_super_admin and ui_module %}
+        {% if ui_module %}
           {% include ui_module.sidebar_template %}
         {% else %}
           {% include "recensement/includes/_sidebar_nav.html" %}
@@ -76,7 +76,7 @@
 
   <div class="flex min-h-screen min-w-0 flex-col md:pl-64">
 
-    <!-- Navbar moderne : menu mobile + cloche notifications -->
+    <!-- Navbar moderne : menu mobile + recherche + cloche notifications -->
     <header class="sticky top-0 z-30 h-14 shrink-0 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
       <div class="mx-auto flex h-full w-full max-w-5xl items-center justify-between gap-3 px-3 sm:px-6">
         <div class="flex min-w-0 items-center gap-3">
@@ -96,11 +96,7 @@
           <div class="min-w-0">
             <div class="truncate text-sm font-semibold text-slate-900 sm:text-base">
               {% block app_header_title %}
-                {% if is_super_admin and ui_module %}
-                  {{ ui_module.header_title }}
-                {% else %}
-                  Recensement des paroisses
-                {% endif %}
+                {% if ui_module %}{{ ui_module.header_title }}{% else %}Recensement des paroisses{% endif %}
               {% endblock %}
             </div>
             {% if user_scope %}
@@ -146,7 +142,7 @@
 
     <footer class="mt-6 border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
       <p>
-        &copy; {% now "Y" %} Église du Christianisme Céleste — {% block footer_context %}{% if is_super_admin and ui_module %}{{ ui_module.sidebar_title }}{% else %}Recensement des paroisses{% endif %}{% endblock %}
+        &copy; {% now "Y" %} Église du Christianisme Céleste — {% block footer_context %}{% if ui_module %}{{ ui_module.footer_context }}{% else %}Recensement des paroisses{% endif %}{% endblock %}
       </p>
 
       <p class="mt-2">

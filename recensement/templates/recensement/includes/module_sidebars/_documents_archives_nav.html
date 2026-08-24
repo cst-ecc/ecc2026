@@ -1,0 +1,16 @@
+{% with submodule_slug=request.resolver_match.kwargs.submodule_slug %}
+<a href="{% url 'recensement:module_detail' 'documents-archives' %}" class="sidebar-link mb-2"><span>← Documents et Archives</span></a>
+
+<details class="sidebar-group" open>
+  <summary class="sidebar-summary"><span>Documents et Archives</span><span aria-hidden="true">›</span></summary>
+  <div class="sidebar-submenu">
+    <a href="{% url 'recensement:submodule_construction' 'documents-archives' 'ordres-de-culte' %}" class="sidebar-link {% if submodule_slug == 'ordres-de-culte' %}is-active{% endif %}">Ordres de culte</a>
+    <a href="{% url 'recensement:submodule_construction' 'documents-archives' 'textes-bibliques' %}" class="sidebar-link {% if submodule_slug == 'textes-bibliques' %}is-active{% endif %}">Textes bibliques</a>
+    <a href="{% url 'recensement:submodule_construction' 'documents-archives' 'constitution-ecc' %}" class="sidebar-link {% if submodule_slug == 'constitution-ecc' %}is-active{% endif %}">Constitution</a>
+    <a href="{% url 'recensement:submodule_construction' 'documents-archives' 'reglement-interieur' %}" class="sidebar-link {% if submodule_slug == 'reglement-interieur' %}is-active{% endif %}">Règlement intérieur</a>
+    <a href="{% url 'recensement:submodule_construction' 'documents-archives' 'cantiques' %}" class="sidebar-link {% if submodule_slug == 'cantiques' %}is-active{% endif %}">Cantiques</a>
+    <a href="{% url 'recensement:submodule_construction' 'documents-archives' 'archives-institutionnelles' %}" class="sidebar-link {% if submodule_slug == 'archives-institutionnelles' %}is-active{% endif %}">Archives historiques</a>
+    <a href="{% url 'recensement:submodule_construction' 'documents-archives' 'publication-diffusion' %}" class="sidebar-link {% if submodule_slug == 'publication-diffusion' %}is-active{% endif %}">Documents administratifs</a>
+  </div>
+</details>
+{% endwith %}

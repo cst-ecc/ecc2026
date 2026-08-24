@@ -14,8 +14,9 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from ..forms.employes_forms import EmployeForm, OrganisationAdministrativeForm
 from ..identifiants import generer_mot_de_passe_provisoire
-from ..models import Employe, HistoriqueEmploye, OrganisationAdministrative, Profil
+from ..models import BadgeAdministratif, Employe, HistoriqueEmploye, OrganisationAdministrative, Profil
 from ..permissions import get_role
+from ..services.services_badges import badge_courant_pour_employe
 from ..services.services_employes import (
     envoyer_email_acces_employe,
     journaliser_employe,
@@ -253,6 +254,20 @@ def employe_list(request):
     employes = employes.order_by("nom", "prenoms", "matricule")
     paginator = Paginator(employes, EMPLOYES_PAR_PAGE)
     page_obj = paginator.get_page(request.GET.get("page"))
+    employes_page = list(page_obj.object_list)
+    employe_ids = [employe.pk for employe in employes_page]
+    badges_courants = {}
+    if employe_ids:
+        for badge in (
+            BadgeAdministratif.objects.select_related("categorie")
+            .filter(employe_id__in=employe_ids)
+            .exclude(statut__in=[BadgeAdministratif.Statut.ANNULE, BadgeAdministratif.Statut.RESTITUE])
+            .order_by("employe_id", "-date_delivrance", "-id")
+        ):
+            badges_courants.setdefault(badge.employe_id, badge)
+    for employe in employes_page:
+        employe.badge_courant = badges_courants.get(employe.pk)
+
     params = request.GET.copy()
     params.pop("page", None)
 
@@ -260,7 +275,7 @@ def employe_list(request):
         request,
         "recensement/employes/employe_list.html",
         {
-            "employes": page_obj.object_list,
+            "employes": employes_page,
             "page_obj": page_obj,
             "page_range": paginator.get_elided_page_range(page_obj.number, on_each_side=1, on_ends=1),
             "pagination_ellipsis": paginator.ELLIPSIS,
@@ -280,7 +295,7 @@ def employe_list(request):
 def employe_create(request):
     _exiger_admin_employes(request.user)
     if request.method == "POST":
-        form = EmployeForm(request.POST, request.FILES)
+        form = EmployeForm(request.POST, request.FILES, attributeur=request.user)
         if form.is_valid():
             with transaction.atomic():
                 employe = form.save(commit=False)
@@ -302,7 +317,7 @@ def employe_create(request):
             return redirect("recensement:employe_detail", pk=employe.pk)
         messages.error(request, "Veuillez corriger les erreurs indiquées.")
     else:
-        form = EmployeForm()
+        form = EmployeForm(attributeur=request.user)
     return render(request, "recensement/employes/employe_form.html", {"form": form, "is_edit": False})
 
 
@@ -313,7 +328,7 @@ def employe_update(request, pk):
     employe = get_object_or_404(_employe_queryset(), pk=pk)
     if request.method == "POST":
         avant = snapshot_employe(employe)
-        form = EmployeForm(request.POST, request.FILES, instance=employe)
+        form = EmployeForm(request.POST, request.FILES, instance=employe, attributeur=request.user)
         if form.is_valid():
             with transaction.atomic():
                 employe = form.save(commit=False)
@@ -335,10 +350,8 @@ def employe_update(request, pk):
         messages.error(request, "Veuillez corriger les erreurs indiquées.")
     else:
         initial = {"acces_modules": valeurs_acces_actives(employe.utilisateur)} if employe.utilisateur_id else {}
-        form = EmployeForm(instance=employe, initial=initial)
-    return render(
-        request, "recensement/employes/employe_form.html", {"form": form, "employe": employe, "is_edit": True}
-    )
+        form = EmployeForm(instance=employe, initial=initial, attributeur=request.user)
+    return render(request, "recensement/employes/employe_form.html", {"form": form, "employe": employe, "is_edit": True})
 
 
 @login_required
@@ -347,16 +360,25 @@ def employe_detail(request, pk):
     _exiger_admin_employes(request.user)
     employe = get_object_or_404(_employe_queryset(), pk=pk)
     historique = employe.historique.select_related("effectue_par")[:50]
+    badges = employe.badges_administratifs.select_related("categorie", "cree_par", "modifie_par").order_by("-date_delivrance", "-id")
+    badge_courant = badge_courant_pour_employe(employe)
     mdp_provisoire = request.session.pop(f"employe_mdp_provisoire_{employe.pk}", None)
+    qrcode_url = (
+        reverse("recensement:badge_qrcode", kwargs={"pk": badge_courant.pk})
+        if badge_courant
+        else reverse("recensement:employe_qrcode", kwargs={"matricule": employe.matricule})
+    )
     return render(
         request,
         "recensement/employes/employe_detail.html",
         {
             "employe": employe,
             "historique": historique,
+            "badges": badges,
+            "badge_courant": badge_courant,
             "acces_modules": libelles_acces_actifs(employe.utilisateur),
             "mdp_provisoire": mdp_provisoire,
-            "qrcode_url": reverse("recensement:employe_qrcode", kwargs={"matricule": employe.matricule}),
+            "qrcode_url": qrcode_url,
             "statuts": Employe.Statut.choices,
         },
     )
@@ -407,19 +429,29 @@ def employe_verifier(request, matricule):
 
 @require_GET
 def employe_qrcode(request, matricule):
-    employe = get_object_or_404(Employe, matricule__iexact=matricule)
+    employe = get_object_or_404(Employe.objects.select_related("organisation"), matricule__iexact=matricule)
+    badge = badge_courant_pour_employe(employe)
     if getattr(request, "user", None) is not None and request.user.is_authenticated:
         journaliser_employe(
             employe=employe,
             action=HistoriqueEmploye.Action.QR_CODE,
             effectue_par=request.user,
-            details={"source": "qrcode_png"},
+            details={"source": "qrcode_png", "badge_id": badge.pk if badge else None},
         )
-    url_verification = request.build_absolute_uri(
-        reverse("recensement:employe_verifier", kwargs={"matricule": employe.matricule})
-    )
+    if badge:
+        url_verification = request.build_absolute_uri(
+            reverse("recensement:badge_verifier", kwargs={"token_public": badge.token_public})
+        )
+        filename = f"qrcode-badge-{badge.numero_badge}.png"
+    else:
+        # Compatibilité : les anciens QR employés continuent d'ouvrir la page employé
+        # lorsqu'aucun badge administratif n'est encore enregistré.
+        url_verification = request.build_absolute_uri(
+            reverse("recensement:employe_verifier", kwargs={"matricule": employe.matricule})
+        )
+        filename = f"qrcode-employe-{employe.matricule}.png"
     image_png = generer_qrcode_png(url_verification)
     response = HttpResponse(image_png, content_type="image/png")
     response["Cache-Control"] = "public, max-age=86400"
-    response["Content-Disposition"] = f'inline; filename="qrcode-employe-{employe.matricule}.png"'
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response

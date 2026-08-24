@@ -1,0 +1,15 @@
+{% with url_name=request.resolver_match.url_name submodule_slug=request.resolver_match.kwargs.submodule_slug %}
+<a href="{% url 'recensement:module_detail' 'patrimoines-sites' %}" class="sidebar-link mb-2"><span>← Patrimoines et Sites</span></a>
+
+<details class="sidebar-group" open>
+  <summary class="sidebar-summary"><span>Patrimoines et Sites</span><span aria-hidden="true">›</span></summary>
+  <div class="sidebar-submenu">
+    <a href="{% url 'recensement:site_particulier_list' %}" class="sidebar-link {% if url_name == 'site_particulier_list' or url_name == 'site_particulier_detail' or url_name == 'site_particulier_update' or url_name == 'site_particulier_create' or url_name == 'responsabilite_hierarchique_update' %}is-active{% endif %}">Sites particuliers</a>
+    <a href="{% url 'recensement:submodule_construction' 'patrimoines-sites' 'patrimoine-ecclesial' %}" class="sidebar-link {% if submodule_slug == 'patrimoine-ecclesial' %}is-active{% endif %}">Patrimoine ecclésial</a>
+    <a href="{% url 'recensement:submodule_construction' 'patrimoines-sites' 'sites-historiques' %}" class="sidebar-link {% if submodule_slug == 'sites-historiques' %}is-active{% endif %}">Sites historiques</a>
+    <a href="{% url 'recensement:submodule_construction' 'patrimoines-sites' 'sites-liturgiques' %}" class="sidebar-link {% if submodule_slug == 'sites-liturgiques' %}is-active{% endif %}">Sites liturgiques</a>
+    <a href="{% url 'recensement:submodule_construction' 'patrimoines-sites' 'localisation-gps' %}" class="sidebar-link {% if submodule_slug == 'localisation-gps' %}is-active{% endif %}">Localisation GPS</a>
+    <a href="{% url 'recensement:submodule_construction' 'patrimoines-sites' 'responsables-sites' %}" class="sidebar-link {% if submodule_slug == 'responsables-sites' %}is-active{% endif %}">Responsables des sites</a>
+  </div>
+</details>
+{% endwith %}

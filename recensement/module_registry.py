@@ -83,7 +83,8 @@ MODULE_DEFINITIONS = (
                 "slug": "exports-paroissiaux",
                 "nom": "Exports des paroisses",
                 "description": (
-                    "Accès aux données paroissiales exportables depuis les écrans existants du recensement."
+                    "Accès aux données paroissiales exportables depuis les écrans "
+                    "existants du recensement."
                 ),
                 "statut": "partiel",
                 "icone": "export",
@@ -115,7 +116,8 @@ MODULE_DEFINITIONS = (
                 "slug": "sites-particuliers",
                 "nom": "Sites particuliers",
                 "description": (
-                    "Gestion séparée des sites particuliers de l’ECC au moyen des écrans déjà disponibles."
+                    "Gestion séparée des sites particuliers de l’ECC au moyen des "
+                    "écrans déjà disponibles."
                 ),
                 "statut": "actif",
                 "icone": "site",
@@ -182,7 +184,8 @@ MODULE_DEFINITIONS = (
                 "slug": "ordres-de-culte",
                 "nom": "Ordres de culte",
                 "description": (
-                    "Téléversement, classement et mise à disposition future des ordres de culte autorisés."
+                    "Téléversement, classement et mise à disposition future des ordres "
+                    "de culte autorisés."
                 ),
                 "statut": "construction",
                 "icone": "document",
@@ -201,7 +204,8 @@ MODULE_DEFINITIONS = (
                 "slug": "constitution-ecc",
                 "nom": "Constitution de l’ECC",
                 "description": (
-                    "Référencement et mise à disposition des versions autorisées de la Constitution de l’Église."
+                    "Référencement et mise à disposition des versions autorisées de la "
+                    "Constitution de l’Église."
                 ),
                 "statut": "construction",
                 "icone": "document",
@@ -210,7 +214,8 @@ MODULE_DEFINITIONS = (
                 "slug": "reglement-interieur",
                 "nom": "Règlement intérieur",
                 "description": (
-                    "Référencement et consultation future des versions autorisées du Règlement intérieur de l’Église."
+                    "Référencement et consultation future des versions autorisées du "
+                    "Règlement intérieur de l’Église."
                 ),
                 "statut": "construction",
                 "icone": "document",
@@ -219,7 +224,8 @@ MODULE_DEFINITIONS = (
                 "slug": "cantiques",
                 "nom": "Cantiques",
                 "description": (
-                    "Classement et mise à disposition future des recueils et documents de cantiques autorisés."
+                    "Classement et mise à disposition future des recueils et documents "
+                    "de cantiques autorisés."
                 ),
                 "statut": "construction",
                 "icone": "music",
@@ -261,7 +267,8 @@ MODULE_DEFINITIONS = (
         "slug": "grades-onctions",
         "nom": "Grades / Onctions",
         "description": (
-            "Référentiel futur des grades ECC, onctions, catégories et versions francophone, anglophone et harmonisée."
+            "Référentiel futur des grades ECC, onctions, catégories et versions "
+            "francophone, anglophone et harmonisée."
         ),
         "statut": "construction",
         "icone": "grades",
@@ -387,12 +394,15 @@ MODULE_DEFINITIONS = (
     {
         "slug": "parametres",
         "nom": "Paramètres",
-        "description": ("Paramétrage général et futurs référentiels transversaux de la plateforme."),
+        "description": (
+            "Paramétrage général et futurs référentiels transversaux de la plateforme."
+        ),
         "statut": "construction",
         "icone": "settings",
         "submodules": (),
     },
 )
+
 
 
 # Cibles de permissions qui ne doivent pas nécessairement apparaître comme
@@ -402,6 +412,7 @@ MODULE_DEFINITIONS = (
 PERMISSION_TARGETS_EXTRA = (
     ("submodule:administration:employes", "Administration — Employés"),
     ("submodule:administration:organisations", "Administration — Organisations"),
+    ("submodule:administration:badges-administratifs", "Administration — Badges administratifs"),
 )
 
 
@@ -427,6 +438,7 @@ def iter_module_access_choices():
     return choices
 
 
+
 def label_access_value(value):
     """Retourne un libellé lisible pour une cible de permission."""
     labels = dict(iter_module_access_choices())
@@ -449,3 +461,93 @@ def serialize_access(module_slug, submodule_slug=""):
     if submodule_slug:
         return f"submodule:{module_slug}:{submodule_slug}"
     return f"module:{module_slug}"
+
+
+def module_access_groups(*, allowed_values=None, selected_values=None):
+    """Regroupe les cibles d'accès par module pour les formulaires.
+
+    Cette fonction sert à construire une interface lisible : un accès complet
+    par module, puis ses sous-modules/fonctionnalités. Les valeurs restent les
+    mêmes que celles produites par ``iter_module_access_choices()`` afin de ne
+    pas casser les données existantes.
+    """
+    allowed_values = set(allowed_values) if allowed_values is not None else None
+    selected_values = set(selected_values or [])
+    extras_by_module = {}
+    for value, label in PERMISSION_TARGETS_EXTRA:
+        parsed = parse_access_value(value)
+        if not parsed:
+            continue
+        extras_by_module.setdefault(parsed["module_slug"], []).append(
+            {
+                "value": value,
+                "label": label.split(" — ", 1)[-1],
+                "checked": value in selected_values,
+                "extra": True,
+            }
+        )
+
+    groups = []
+    for module in MODULE_DEFINITIONS:
+        module_slug = module["slug"]
+        module_value = serialize_access(module_slug, "")
+        children = []
+        for submodule in module.get("submodules", ()):
+            value = serialize_access(module_slug, submodule["slug"])
+            if allowed_values is not None and value not in allowed_values:
+                continue
+            children.append(
+                {
+                    "value": value,
+                    "label": submodule["nom"],
+                    "description": submodule.get("description", ""),
+                    "checked": value in selected_values,
+                    "extra": False,
+                }
+            )
+        for extra in extras_by_module.get(module_slug, []):
+            if allowed_values is None or extra["value"] in allowed_values:
+                children.append(extra)
+
+        if allowed_values is not None and module_value not in allowed_values and not children:
+            continue
+
+        groups.append(
+            {
+                "slug": module_slug,
+                "nom": module["nom"],
+                "description": module.get("description", ""),
+                "module_value": module_value,
+                "module_checked": module_value in selected_values,
+                "module_allowed": allowed_values is None or module_value in allowed_values,
+                "children": children,
+            }
+        )
+    return groups
+
+
+def all_access_values():
+    """Toutes les valeurs d'accès connues, sous forme de set."""
+    return {value for value, _label in iter_module_access_choices()}
+
+
+def expand_module_access_values(values):
+    """Étend les accès complets de module vers leurs sous-modules.
+
+    Si ``module:administration`` est soumis, les sous-modules et cibles extra
+    rattachés à Administration sont ajoutés. Cela garantit que l'option
+    « Accès complet » est aussi comprise côté backend, et pas seulement par JS.
+    """
+    values = {value for value in (values or []) if value}
+    expanded = set(values)
+    known = dict(iter_module_access_choices())
+    for value in list(values):
+        parsed = parse_access_value(value)
+        if not parsed or parsed.get("submodule_slug"):
+            continue
+        module_slug = parsed["module_slug"]
+        prefix = f"submodule:{module_slug}:"
+        for candidate in known:
+            if candidate.startswith(prefix):
+                expanded.add(candidate)
+    return sorted(expanded)

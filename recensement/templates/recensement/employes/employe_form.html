@@ -1,4 +1,5 @@
 {% extends "recensement/base.html" %}
+{% load static %}
 
 {% block title %}{% if is_edit %}Modifier {{ employe.matricule }}{% else %}Nouvel employé{% endif %} — Administration{% endblock %}
 {% block sidebar_brand %}<a href="{% url 'recensement:module_detail' 'administration' %}" class="min-w-0 truncate font-semibold text-white">Administration</a>{% endblock %}
@@ -51,14 +52,80 @@
         <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">{{ form.creer_compte_utilisateur }}<span><strong>{{ form.creer_compte_utilisateur.label }}</strong><br><span class="text-slate-500">Un identifiant basé sur le matricule et un mot de passe provisoire seront générés.</span>{% for error in form.creer_compte_utilisateur.errors %}<span class="mt-1 block text-red-600">{{ error }}</span>{% endfor %}</span></label>
       </div>
 
-      <div>
-        <p class="mb-2 text-sm font-medium text-slate-700">{{ form.acces_modules.label }}</p>
-        <div class="grid max-h-72 gap-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-2">
-          {% for checkbox in form.acces_modules %}
-            <label class="flex items-start gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">{{ checkbox.tag }}<span>{{ checkbox.choice_label }}</span></label>
+      <div data-employe-access-root>
+        <div class="mb-4 rounded-2xl border border-brand-100 bg-brand-50 p-4">
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <label class="flex items-start gap-3 text-sm text-brand-900">
+              <input type="checkbox" data-access-global-master class="mt-0.5 rounded border-brand-300 text-brand-600 focus:ring-brand-500">
+              <span>
+                <strong>Donner accès à tous les modules</strong><br>
+                <span class="text-brand-700">Sélectionne tous les modules et toutes leurs fonctionnalités autorisées.</span>
+              </span>
+            </label>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" data-access-select-all class="rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-700">
+                Tout sélectionner
+              </button>
+              <button type="button" data-access-clear-all class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                Tout désélectionner
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p class="mb-3 text-sm font-medium text-slate-700">{{ form.acces_modules.label }}</p>
+        <div class="space-y-4">
+          {% for group in form.access_groups %}
+            <section class="rounded-2xl border border-slate-200 bg-white p-4" data-access-module="{{ group.slug }}">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0">
+                  <h3 class="font-semibold text-slate-900">{{ group.nom }}</h3>
+                  <p class="mt-1 text-xs leading-5 text-slate-500">{{ group.description }}</p>
+                </div>
+                {% if group.module_allowed %}
+                  <label class="flex shrink-0 items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                    <input type="checkbox"
+                           name="acces_modules"
+                           value="{{ group.module_value }}"
+                           data-access-checkbox
+                           data-access-module="{{ group.slug }}"
+                           data-access-module-master="{{ group.slug }}"
+                           {% if group.module_checked %}checked{% endif %}
+                           class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                    Accès complet à ce module
+                  </label>
+                {% endif %}
+              </div>
+
+              {% if group.children %}
+                <div class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {% for child in group.children %}
+                    <label class="flex items-start gap-2 rounded-xl border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50">
+                      <input type="checkbox"
+                             name="acces_modules"
+                             value="{{ child.value }}"
+                             data-access-checkbox
+                             data-access-module="{{ group.slug }}"
+                             {% if child.checked %}checked{% endif %}
+                             class="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                      <span>
+                        <span class="font-medium text-slate-700">{{ child.label }}</span>
+                        {% if child.extra %}<span class="ml-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">cible directe</span>{% endif %}
+                      </span>
+                    </label>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <p class="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-500">Aucune fonctionnalité détaillée n’est déclarée pour ce module.</p>
+              {% endif %}
+            </section>
+          {% empty %}
+            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Aucun accès modulaire n’est attribuable avec votre compte actuel.
+            </div>
           {% endfor %}
         </div>
-        {% for error in form.acces_modules.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+        {% for error in form.acces_modules.errors %}<p class="mt-2 text-sm text-red-600">{{ error }}</p>{% endfor %}
       </div>
     </div>
   </section>
@@ -73,4 +140,9 @@
     <button type="submit" class="rounded-lg bg-brand-600 px-5 py-2.5 font-semibold text-white hover:bg-brand-700">{% if is_edit %}Enregistrer{% else %}Créer l’employé{% endif %}</button>
   </div>
 </form>
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="{% static 'recensement/js/employe_access_selector.js' %}" defer></script>
 {% endblock %}

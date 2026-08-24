@@ -1,0 +1,105 @@
+{% extends "recensement/base.html" %}
+
+{% block title %}{% if is_edit %}Modifier badge{% else %}Nouveau badge{% endif %} — {{ employe.matricule }}{% endblock %}
+{% block sidebar_brand %}<a href="{% url 'recensement:module_detail' 'administration' %}" class="min-w-0 truncate font-semibold text-white">Administration</a>{% endblock %}
+{% block sidebar_navigation %}{% include "recensement/includes/module_sidebars/_administration_nav.html" %}{% endblock %}
+{% block app_header_title %}Administration — Badge administratif{% endblock %}
+{% block footer_context %}Administration{% endblock %}
+
+{% block content %}
+<a href="{% if is_edit %}{% url 'recensement:badge_detail' badge.pk %}{% else %}{% url 'recensement:employe_detail' employe.pk %}{% endif %}" class="text-sm text-slate-500 hover:text-slate-700">← Retour</a>
+<h1 class="mt-2 text-xl font-semibold text-slate-900">{% if is_edit %}Modifier le badge administratif{% else %}Créer un badge administratif{% endif %}</h1>
+<p class="mt-1 text-sm text-slate-500">Titulaire : <strong>{{ employe.nom_complet }}</strong> — {{ employe.matricule }} — {{ employe.organisation.sigle }}</p>
+
+<form method="post" class="mt-5 space-y-5">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+
+  <section class="app-card">
+    <div class="border-b border-slate-100 px-5 py-3 font-semibold text-slate-800">Catégorie et identification du badge</div>
+    <div class="grid gap-4 p-5 sm:grid-cols-2">
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.categorie.id_for_label }}">{{ form.categorie.label }}</label>
+        {{ form.categorie }}
+        <p class="mt-1 text-xs text-slate-400">CST/CSMo : Particulier. Conseil Pastoral : Mondial.</p>
+        {% for error in form.categorie.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.precision_categorie.id_for_label }}">{{ form.precision_categorie.label }}</label>
+        {{ form.precision_categorie }}
+        {% for error in form.precision_categorie.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.fonction_badge.id_for_label }}">{{ form.fonction_badge.label }}</label>
+        {{ form.fonction_badge }}
+        {% for error in form.fonction_badge.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.structure_badge.id_for_label }}">{{ form.structure_badge.label }}</label>
+        {{ form.structure_badge }}
+        {% for error in form.structure_badge.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.niveau_habilitation.id_for_label }}">{{ form.niveau_habilitation.label }}</label>
+        {{ form.niveau_habilitation }}
+        {% for error in form.niveau_habilitation.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="app-card">
+    <div class="border-b border-slate-100 px-5 py-3 font-semibold text-slate-800">Informations diocésaines, si applicable</div>
+    <div class="grid gap-4 p-5 sm:grid-cols-2">
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.diocese.id_for_label }}">{{ form.diocese.label }}</label>
+        {{ form.diocese }}
+        {% for error in form.diocese.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.structure_diocesaine.id_for_label }}">{{ form.structure_diocesaine.label }}</label>
+        {{ form.structure_diocesaine }}
+        {% for error in form.structure_diocesaine.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="app-card">
+    <div class="border-b border-slate-100 px-5 py-3 font-semibold text-slate-800">Validité et sécurité</div>
+    <div class="grid gap-4 p-5 sm:grid-cols-2">
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.date_delivrance.id_for_label }}">{{ form.date_delivrance.label }}</label>
+        {{ form.date_delivrance }}
+        {% for error in form.date_delivrance.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.date_expiration.id_for_label }}">{{ form.date_expiration.label }}</label>
+        {{ form.date_expiration }}
+        {% for error in form.date_expiration.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.statut.id_for_label }}">{{ form.statut.label }}</label>
+        {{ form.statut }}
+        {% for error in form.statut.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <label class="flex items-center gap-2 pt-7 text-sm text-slate-700">
+        {{ form.publication_photo_autorisee }} {{ form.publication_photo_autorisee.label }}
+      </label>
+      <div class="sm:col-span-2">
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.mentions_securite.id_for_label }}">{{ form.mentions_securite.label }}</label>
+        {{ form.mentions_securite }}
+        {% for error in form.mentions_securite.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+      <div class="sm:col-span-2">
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.observations_internes.id_for_label }}">{{ form.observations_internes.label }}</label>
+        {{ form.observations_internes }}
+        {% for error in form.observations_internes.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <div class="flex justify-end gap-2">
+    <a href="{% if is_edit %}{% url 'recensement:badge_detail' badge.pk %}{% else %}{% url 'recensement:employe_detail' employe.pk %}{% endif %}" class="rounded-lg border border-slate-300 px-4 py-2.5 text-slate-700 hover:bg-slate-50">Annuler</a>
+    <button type="submit" class="rounded-lg bg-brand-600 px-5 py-2.5 font-semibold text-white hover:bg-brand-700">Enregistrer</button>
+  </div>
+</form>
+{% endblock %}

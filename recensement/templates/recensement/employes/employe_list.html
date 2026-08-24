@@ -14,6 +14,7 @@
     <p class="mt-1 text-sm text-slate-500">Gestion administrative distincte des comptes utilisateurs.</p>
   </div>
   <div class="flex flex-wrap gap-2">
+    <a href="{% url 'recensement:badge_list' %}" class="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Registre badges</a>
     <a href="{% url 'recensement:organisation_list' %}" class="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Organisations</a>
     <a href="{% url 'recensement:employe_create' %}" class="inline-flex items-center rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">+ Nouvel employé</a>
   </div>
@@ -59,6 +60,7 @@
         <th class="px-4 py-3 font-medium">Fonction</th>
         <th class="px-4 py-3 font-medium">Organisation</th>
         <th class="px-4 py-3 font-medium">Période</th>
+        <th class="px-4 py-3 font-medium">Badge</th>
         <th class="px-4 py-3 font-medium">Accès</th>
         <th class="px-4 py-3 font-medium">E-mail</th>
         <th class="px-4 py-3 font-medium">Statut</th>
@@ -73,6 +75,15 @@
           <td class="px-4 py-3 text-slate-700">{{ employe.fonction }}</td>
           <td class="px-4 py-3 text-slate-600">{{ employe.organisation.sigle }}</td>
           <td class="px-4 py-3 text-xs text-slate-600">{{ employe.periode_service }}</td>
+          <td class="px-4 py-3 text-xs">
+            {% if employe.badge_courant %}
+              {% if employe.badge_courant.est_valide_verification %}<span class="rounded-full bg-green-50 px-2 py-0.5 font-semibold text-green-700">Valide</span>
+              {% else %}<span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">{{ employe.badge_courant.statut_verification_label }}</span>{% endif %}
+              <br><a href="{% url 'recensement:badge_detail' employe.badge_courant.pk %}" class="font-mono text-brand-600 hover:underline">{{ employe.badge_courant.numero_badge }}</a>
+            {% else %}
+              <a href="{% url 'recensement:badge_create_for_employe' employe.pk %}" class="text-brand-600 hover:underline">Créer badge</a>
+            {% endif %}
+          </td>
           <td class="px-4 py-3 text-xs">
             {% if employe.acces_plateforme and employe.utilisateur %}
               <span class="rounded-full bg-green-50 px-2 py-0.5 font-semibold text-green-700">Oui</span><br><span class="text-slate-400">{{ employe.utilisateur.username }}</span>
@@ -96,7 +107,7 @@
           </td>
         </tr>
       {% empty %}
-        <tr><td colspan="9" class="px-4 py-8 text-center text-slate-400">Aucun employé enregistré.</td></tr>
+        <tr><td colspan="10" class="px-4 py-8 text-center text-slate-400">Aucun employé enregistré.</td></tr>
       {% endfor %}
     </tbody>
   </table>
