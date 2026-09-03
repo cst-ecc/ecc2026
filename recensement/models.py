@@ -2519,7 +2519,6 @@ class HistoriqueSiteParticulier(models.Model):
     def __str__(self):
         return f"{self.get_action_display()} — {self.site.nom} — {self.date_action:%d/%m/%Y %H:%M}"
 
-
 # ---------------------------------------------------------------------------
 # Administration générale — Organisations, employés et accès modulaires
 # ---------------------------------------------------------------------------
@@ -2536,9 +2535,7 @@ def _normaliser_sigle_organisation(value):
 
 
 def _sigle_depuis_nom(nom):
-    mots = re.findall(
-        r"[A-Za-z0-9]+", unicodedata.normalize("NFKD", nom or "").encode("ascii", "ignore").decode("ascii")
-    )
+    mots = re.findall(r"[A-Za-z0-9]+", unicodedata.normalize("NFKD", nom or "").encode("ascii", "ignore").decode("ascii"))
     sigle = "".join(mot[0] for mot in mots if mot).upper()
     return sigle[:8] or "ORG"
 
@@ -2729,13 +2726,9 @@ class Employe(models.Model):
         self.telephone = (self.telephone or "").strip()
         self.email = (self.email or "").strip().lower()
         if self.date_debut_service and self.date_fin_service and self.date_fin_service < self.date_debut_service:
-            raise ValidationError(
-                {"date_fin_service": "La date de fin ne peut pas précéder la date de début de service."}
-            )
+            raise ValidationError({"date_fin_service": "La date de fin ne peut pas précéder la date de début de service."})
         if self.date_fin_service and self.statut == self.Statut.ACTIF:
-            raise ValidationError(
-                {"statut": "Un employé avec une date de fin de service ne peut pas rester au statut actif."}
-            )
+            raise ValidationError({"statut": "Un employé avec une date de fin de service ne peut pas rester au statut actif."})
 
     def save(self, *args, **kwargs):
         if not self.matricule:
@@ -3017,6 +3010,7 @@ class HistoriqueRolePlateforme(models.Model):
         return f"{self.get_action_display()} — {self.role.nom} — {self.date_action:%d/%m/%Y %H:%M}"
 
 
+
 class CategorieBadgeAdministratif(models.Model):
     """Référentiel extensible des catégories de badges administratifs ECC.
 
@@ -3089,6 +3083,13 @@ class BadgeAdministratif(models.Model):
         USE = "use", "Usé"
         DETERIORE = "deteriore", "Détérioré"
         NON_RESTITUE = "non_restitue", "Non restitué"
+
+    class NiveauHabilitation(models.TextChoices):
+        ZONE_A = "ZONE_A", "Zone A"
+        ZONE_B = "ZONE_B", "Zone B"
+        ZONE_C = "ZONE_C", "Zone C"
+        ZONE_D = "ZONE_D", "Zone D"
+        ZONE_E = "ZONE_E", "Zone E"
 
     STATUTS_NON_VALIDES = (
         Statut.SUSPENDU,
@@ -3233,6 +3234,34 @@ class BadgeAdministratif(models.Model):
     def categorie_affichage(self):
         return self.categorie.nom if self.categorie_id else "—"
 
+    @classmethod
+    def normaliser_niveau_habilitation(cls, valeur):
+        """Retourne le code canonique d'une zone d'habilitation.
+
+        Le champ reste un CharField afin de ne pas casser les valeurs
+        historiques éventuellement saisies avant cette correction. Les valeurs
+        prévues sont toutefois structurées côté formulaire : ZONE_A à ZONE_E.
+        """
+        valeur = (valeur or "").strip()
+        if not valeur:
+            return ""
+
+        mapping_labels = {label.upper(): code for code, label in cls.NiveauHabilitation.choices}
+        mapping_codes = {code.upper(): code for code, _label in cls.NiveauHabilitation.choices}
+        normalisee = valeur.replace("-", "_").replace(" ", "_").upper()
+        if normalisee in mapping_codes:
+            return mapping_codes[normalisee]
+        if valeur.upper() in mapping_labels:
+            return mapping_labels[valeur.upper()]
+        return valeur
+
+    @property
+    def niveau_habilitation_affichage(self):
+        valeur = self.normaliser_niveau_habilitation(self.niveau_habilitation)
+        if not valeur:
+            return "—"
+        return dict(self.NiveauHabilitation.choices).get(valeur, valeur)
+
     @property
     def periode_validite(self):
         debut = self.date_delivrance.strftime("%d/%m/%Y") if self.date_delivrance else "Début non renseigné"
@@ -3293,22 +3322,18 @@ class BadgeAdministratif(models.Model):
         self.structure_badge = (self.structure_badge or "").strip()
         self.diocese = (self.diocese or "").strip()
         self.structure_diocesaine = (self.structure_diocesaine or "").strip()
-        self.niveau_habilitation = (self.niveau_habilitation or "").strip()
+        self.niveau_habilitation = self.normaliser_niveau_habilitation(self.niveau_habilitation)
         if not self.fonction_badge and self.employe_id:
             self.fonction_badge = self.employe.fonction
         if not self.structure_badge and self.employe_id and self.employe.organisation_id:
             self.structure_badge = self.employe.organisation.sigle
         if self.date_delivrance and self.date_expiration and self.date_expiration <= self.date_delivrance:
-            raise ValidationError(
-                {"date_expiration": "La date d'expiration doit être postérieure à la date de délivrance."}
-            )
+            raise ValidationError({"date_expiration": "La date d'expiration doit être postérieure à la date de délivrance."})
         if self.categorie_id and self.categorie.type_principal == CategorieBadgeAdministratif.TypePrincipal.DIOCESAIN:
             if not self.diocese:
                 raise ValidationError({"diocese": "Le diocèse est recommandé/nécessaire pour un badge diocésain."})
         if self.statut == self.Statut.RESTITUE and not self.date_restitution:
-            raise ValidationError(
-                {"date_restitution": "La date de restitution est obligatoire pour un badge restitué."}
-            )
+            raise ValidationError({"date_restitution": "La date de restitution est obligatoire pour un badge restitué."})
 
     def save(self, *args, **kwargs):
         if not self.numero_badge:
@@ -3414,3 +3439,4 @@ class HistoriqueEmploye(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} — {self.employe.matricule} — {self.date_action:%d/%m/%Y %H:%M}"
+

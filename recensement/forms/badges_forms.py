@@ -7,7 +7,17 @@ from ..access_forms import INPUT_CSS, SELECT_CSS
 from ..models import BadgeAdministratif, CategorieBadgeAdministratif
 
 
+NIVEAU_HABILITATION_CHOICES = [("", "— Sélectionner —")] + list(BadgeAdministratif.NiveauHabilitation.choices)
+
+
 class BadgeAdministratifForm(forms.ModelForm):
+    niveau_habilitation = forms.ChoiceField(
+        required=False,
+        choices=NIVEAU_HABILITATION_CHOICES,
+        label="Niveau d'habilitation",
+        widget=forms.Select(attrs={"class": SELECT_CSS}),
+        help_text="Zones provisoires d’habilitation. La signification métier précise sera définie ultérieurement.",
+    )
     class Meta:
         model = BadgeAdministratif
         fields = [
@@ -27,28 +37,15 @@ class BadgeAdministratifForm(forms.ModelForm):
         ]
         widgets = {
             "categorie": forms.Select(attrs={"class": SELECT_CSS, "id": "id_categorie_badge"}),
-            "precision_categorie": forms.TextInput(
-                attrs={"class": INPUT_CSS, "placeholder": "Ex : CST, CSMo, Conseil Pastoral, Commission..."}
-            ),
-            "fonction_badge": forms.TextInput(
-                attrs={"class": INPUT_CSS, "placeholder": "Fonction à afficher sur le badge"}
-            ),
-            "structure_badge": forms.TextInput(
-                attrs={"class": INPUT_CSS, "placeholder": "Structure à afficher : CSMo, CST, Conseil Pastoral..."}
-            ),
+            "precision_categorie": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : CST, CSMo, Conseil Pastoral, Commission..."}),
+            "fonction_badge": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Fonction à afficher sur le badge"}),
+            "structure_badge": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Structure à afficher : CSMo, CST, Conseil Pastoral..."}),
             "diocese": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : Diocèse du Bénin"}),
-            "structure_diocesaine": forms.TextInput(
-                attrs={"class": INPUT_CSS, "placeholder": "Structure diocésaine concernée"}
-            ),
-            "niveau_habilitation": forms.TextInput(
-                attrs={"class": INPUT_CSS, "placeholder": "Niveau institutionnel ou habilitation"}
-            ),
-            "date_delivrance": forms.DateInput(attrs={"class": INPUT_CSS, "type": "date"}),
-            "date_expiration": forms.DateInput(attrs={"class": INPUT_CSS, "type": "date"}),
+            "structure_diocesaine": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Structure diocésaine concernée"}),
+            "date_delivrance": forms.DateInput(format="%Y-%m-%d", attrs={"class": INPUT_CSS, "type": "date"}),
+            "date_expiration": forms.DateInput(format="%Y-%m-%d", attrs={"class": INPUT_CSS, "type": "date"}),
             "statut": forms.Select(attrs={"class": SELECT_CSS}),
-            "publication_photo_autorisee": forms.CheckboxInput(
-                attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}
-            ),
+            "publication_photo_autorisee": forms.CheckboxInput(attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}),
             "mentions_securite": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 3}),
             "observations_internes": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 4}),
         }
@@ -71,14 +68,33 @@ class BadgeAdministratifForm(forms.ModelForm):
     def __init__(self, *args, employe=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.employe = employe or getattr(self.instance, "employe", None)
-        self.fields["categorie"].queryset = CategorieBadgeAdministratif.objects.filter(est_active=True).order_by(
-            "ordre", "nom"
-        )
+        self.fields["categorie"].queryset = CategorieBadgeAdministratif.objects.filter(est_active=True).order_by("ordre", "nom")
+        self.fields["date_delivrance"].input_formats = ["%Y-%m-%d"]
+        self.fields["date_expiration"].input_formats = ["%Y-%m-%d"]
+
+        valeur_actuelle = ""
+        if self.instance and self.instance.pk:
+            valeur_actuelle = BadgeAdministratif.normaliser_niveau_habilitation(self.instance.niveau_habilitation)
+            if not self.is_bound:
+                self.initial.setdefault("niveau_habilitation", valeur_actuelle)
+
+        # Compatibilité prudente : si une ancienne valeur libre existe, elle
+        # reste sélectionnable afin qu'une modification d'un autre champ ne la
+        # fasse pas disparaître. Les nouvelles valeurs proposées restent Zone A
+        # à Zone E.
+        choix = list(NIVEAU_HABILITATION_CHOICES)
+        valeurs_connues = {value for value, _label in choix}
+        if valeur_actuelle and valeur_actuelle not in valeurs_connues:
+            choix.append((valeur_actuelle, f"{valeur_actuelle} (valeur existante)"))
+        self.fields["niveau_habilitation"].choices = choix
 
         if self.employe is not None and not self.is_bound:
             self.initial.setdefault("fonction_badge", self.employe.fonction)
             self.initial.setdefault("structure_badge", self.employe.organisation.sigle)
-            self.initial.setdefault("date_delivrance", timezone.localdate())
+            self.initial.setdefault("date_delivrance", timezone.localdate().isoformat())
+
+    def clean_niveau_habilitation(self):
+        return BadgeAdministratif.normaliser_niveau_habilitation(self.cleaned_data.get("niveau_habilitation"))
 
     def clean(self):
         cleaned = super().clean()
@@ -89,14 +105,10 @@ class BadgeAdministratifForm(forms.ModelForm):
         if categorie:
             if categorie.type_principal == CategorieBadgeAdministratif.TypePrincipal.DIOCESAIN and not diocese:
                 self.add_error("diocese", "Indiquez le diocèse pour un badge diocésain.")
-            if (
-                categorie.type_principal
-                in (
-                    CategorieBadgeAdministratif.TypePrincipal.MONDIAL,
-                    CategorieBadgeAdministratif.TypePrincipal.PARTICULIER,
-                )
-                and not precision
-            ):
+            if categorie.type_principal in (
+                CategorieBadgeAdministratif.TypePrincipal.MONDIAL,
+                CategorieBadgeAdministratif.TypePrincipal.PARTICULIER,
+            ) and not precision:
                 self.add_error(
                     "precision_categorie",
                     "Précisez la structure ou la sous-catégorie : CST, CSMo, Conseil Pastoral, commission, etc.",

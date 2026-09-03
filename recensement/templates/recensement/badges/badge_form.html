@@ -42,6 +42,7 @@
       <div>
         <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ form.niveau_habilitation.id_for_label }}">{{ form.niveau_habilitation.label }}</label>
         {{ form.niveau_habilitation }}
+        <p class="mt-1 text-xs text-slate-400">Zones provisoires : Zone A à Zone E. La valeur métier exacte pourra être définie plus tard.</p>
         {% for error in form.niveau_habilitation.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
       </div>
     </div>

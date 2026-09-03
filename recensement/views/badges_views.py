@@ -12,7 +12,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from ..forms.badges_forms import BadgeActionForm, BadgeAdministratifForm
 from ..models import BadgeAdministratif, CategorieBadgeAdministratif, Employe, HistoriqueBadgeAdministratif, Profil
@@ -157,9 +157,7 @@ def badge_detail(request, pk):
             "historique": historique,
             "actions_badge": ACTIONS_BADGE,
             "qrcode_url": reverse("recensement:badge_qrcode", kwargs={"pk": badge.pk}),
-            "verification_url": request.build_absolute_uri(
-                reverse("recensement:badge_verifier", kwargs={"token_public": badge.token_public})
-            ),
+            "verification_url": request.build_absolute_uri(reverse("recensement:badge_verifier", kwargs={"token_public": badge.token_public})),
         },
     )
 
@@ -180,9 +178,7 @@ def badge_update(request, pk):
                 apres = snapshot_badge(badge)
                 if avant != apres:
                     action = HistoriqueBadgeAdministratif.Action.MODIFICATION
-                    if avant.get("categorie_id") != apres.get("categorie_id") or avant.get(
-                        "precision_categorie"
-                    ) != apres.get("precision_categorie"):
+                    if avant.get("categorie_id") != apres.get("categorie_id") or avant.get("precision_categorie") != apres.get("precision_categorie"):
                         action = HistoriqueBadgeAdministratif.Action.MODIFICATION_CATEGORIE
                     journaliser_badge(
                         badge=badge,
@@ -215,14 +211,7 @@ def badge_action(request, pk, action):
         if form.is_valid():
             appliquer_action_badge(badge=badge, action=action, form=form, effectue_par=request.user)
             messages.success(request, "Action enregistrée sur le badge administratif.")
-            if badge.employe.utilisateur_id and action in {
-                "suspendre",
-                "annuler",
-                "perdu",
-                "vole",
-                "restituer",
-                "desactiver",
-            }:
+            if badge.employe.utilisateur_id and action in {"suspendre", "annuler", "perdu", "vole", "restituer", "desactiver"}:
                 messages.warning(
                     request,
                     "Cet employé possède un compte utilisateur. Vérifiez si ses accès plateforme doivent être modifiés ou désactivés.",

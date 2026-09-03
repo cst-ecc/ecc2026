@@ -350,10 +350,12 @@ def employe_update(request, pk):
         messages.error(request, "Veuillez corriger les erreurs indiquées.")
     else:
         initial = {"acces_modules": valeurs_acces_actives(employe.utilisateur)} if employe.utilisateur_id else {}
+        if employe.date_debut_service:
+            initial["date_debut_service"] = employe.date_debut_service.isoformat()
+        if employe.date_fin_service:
+            initial["date_fin_service"] = employe.date_fin_service.isoformat()
         form = EmployeForm(instance=employe, initial=initial, attributeur=request.user)
-    return render(
-        request, "recensement/employes/employe_form.html", {"form": form, "employe": employe, "is_edit": True}
-    )
+    return render(request, "recensement/employes/employe_form.html", {"form": form, "employe": employe, "is_edit": True})
 
 
 @login_required
@@ -362,15 +364,18 @@ def employe_detail(request, pk):
     _exiger_admin_employes(request.user)
     employe = get_object_or_404(_employe_queryset(), pk=pk)
     historique = employe.historique.select_related("effectue_par")[:50]
-    badges = employe.badges_administratifs.select_related("categorie", "cree_par", "modifie_par").order_by(
-        "-date_delivrance", "-id"
-    )
+    badges = employe.badges_administratifs.select_related("categorie", "cree_par", "modifie_par").order_by("-date_delivrance", "-id")
     badge_courant = badge_courant_pour_employe(employe)
     mdp_provisoire = request.session.pop(f"employe_mdp_provisoire_{employe.pk}", None)
     qrcode_url = (
         reverse("recensement:badge_qrcode", kwargs={"pk": badge_courant.pk})
         if badge_courant
         else reverse("recensement:employe_qrcode", kwargs={"matricule": employe.matricule})
+    )
+    verification_url = (
+        reverse("recensement:badge_verifier", kwargs={"token_public": badge_courant.token_public})
+        if badge_courant
+        else reverse("recensement:employe_verifier", kwargs={"matricule": employe.matricule})
     )
     return render(
         request,
@@ -383,6 +388,8 @@ def employe_detail(request, pk):
             "acces_modules": libelles_acces_actifs(employe.utilisateur),
             "mdp_provisoire": mdp_provisoire,
             "qrcode_url": qrcode_url,
+            "verification_url": verification_url,
+            "verification_absolute_url": request.build_absolute_uri(verification_url),
             "statuts": Employe.Statut.choices,
         },
     )

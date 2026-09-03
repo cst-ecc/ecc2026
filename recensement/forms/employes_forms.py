@@ -2,7 +2,6 @@
 
 from django import forms
 from django.contrib.auth.models import User
-
 from ..access_forms import INPUT_CSS, SELECT_CSS
 from ..forms.validators import valider_telephone_international
 from ..models import AccesModuleUtilisateur, Employe, OrganisationAdministrative, Profil
@@ -20,15 +19,11 @@ class OrganisationAdministrativeForm(forms.ModelForm):
         model = OrganisationAdministrative
         fields = ["nom", "sigle", "type_organisation", "description", "est_active"]
         widgets = {
-            "nom": forms.TextInput(
-                attrs={"class": INPUT_CSS, "placeholder": "Ex : Conseil Supérieur de Mise en œuvre"}
-            ),
+            "nom": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : Conseil Supérieur de Mise en œuvre"}),
             "sigle": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : CSMO"}),
             "type_organisation": forms.Select(attrs={"class": SELECT_CSS}),
             "description": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 3}),
-            "est_active": forms.CheckboxInput(
-                attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}
-            ),
+            "est_active": forms.CheckboxInput(attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}),
         }
         labels = {
             "nom": "Nom de l'organisation",
@@ -37,6 +32,8 @@ class OrganisationAdministrativeForm(forms.ModelForm):
             "description": "Description",
             "est_active": "Organisation active",
         }
+
+
 
 
 def _est_super_administrateur(user):
@@ -85,9 +82,7 @@ class EmployeForm(forms.ModelForm):
         required=False,
         choices=iter_module_access_choices(),
         label="Modules et sous-modules autorisés",
-        widget=forms.CheckboxSelectMultiple(
-            attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}
-        ),
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}),
     )
 
     class Meta:
@@ -112,16 +107,14 @@ class EmployeForm(forms.ModelForm):
             "prenoms": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Prénoms"}),
             "fonction": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : Secrétaire Administratif"}),
             "organisation": forms.Select(attrs={"class": SELECT_CSS}),
-            "date_debut_service": forms.DateInput(attrs={"class": INPUT_CSS, "type": "date"}),
-            "date_fin_service": forms.DateInput(attrs={"class": INPUT_CSS, "type": "date"}),
+            "date_debut_service": forms.DateInput(format="%Y-%m-%d", attrs={"class": INPUT_CSS, "type": "date"}),
+            "date_fin_service": forms.DateInput(format="%Y-%m-%d", attrs={"class": INPUT_CSS, "type": "date"}),
             "statut": forms.Select(attrs={"class": SELECT_CSS}),
             "telephone": forms.TextInput(attrs={"class": INPUT_CSS, "placeholder": "Ex : +2290196355621"}),
             "email": forms.EmailInput(attrs={"class": INPUT_CSS, "placeholder": "exemple@ecc.bj"}),
             "photo": forms.ClearableFileInput(attrs={"class": INPUT_CSS}),
             "observations": forms.Textarea(attrs={"class": INPUT_CSS, "rows": 4}),
-            "acces_plateforme": forms.CheckboxInput(
-                attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}
-            ),
+            "acces_plateforme": forms.CheckboxInput(attrs={"class": "rounded border-slate-300 text-brand-600 focus:ring-brand-500"}),
             "utilisateur": forms.Select(attrs={"class": SELECT_CSS}),
         }
         labels = {
@@ -144,6 +137,19 @@ class EmployeForm(forms.ModelForm):
         self.instance_employe = kwargs.get("instance")
         self.attributeur = kwargs.pop("attributeur", None)
         super().__init__(*args, **kwargs)
+        self.fields["date_debut_service"].input_formats = ["%Y-%m-%d"]
+        self.fields["date_fin_service"].input_formats = ["%Y-%m-%d"]
+
+        # Les champs DateInput(type=date) exigent une valeur HTML5 YYYY-MM-DD.
+        # Sans format explicite, une date existante peut apparaître vide en
+        # modification et provoquer une erreur lorsqu'on ne change qu'une photo
+        # ou un autre champ isolé.
+        if self.instance and self.instance.pk and not self.is_bound:
+            if self.instance.date_debut_service:
+                self.initial.setdefault("date_debut_service", self.instance.date_debut_service.isoformat())
+            if self.instance.date_fin_service:
+                self.initial.setdefault("date_fin_service", self.instance.date_fin_service.isoformat())
+
         organisations = OrganisationAdministrative.objects.filter(est_active=True)
         if self.instance and self.instance.pk and self.instance.organisation_id:
             organisations = organisations | OrganisationAdministrative.objects.filter(pk=self.instance.organisation_id)
@@ -160,7 +166,9 @@ class EmployeForm(forms.ModelForm):
 
         self.valeurs_acces_attribuables = valeurs_acces_attribuables_par(self.attributeur)
         choix_autorises = [
-            (value, label) for value, label in iter_module_access_choices() if value in self.valeurs_acces_attribuables
+            (value, label)
+            for value, label in iter_module_access_choices()
+            if value in self.valeurs_acces_attribuables
         ]
         self.fields["acces_modules"].choices = choix_autorises
 
@@ -200,18 +208,13 @@ class EmployeForm(forms.ModelForm):
                 self.add_error("date_fin_service", "La date de fin ne peut pas précéder la date de début de service.")
 
         if creer_compte and utilisateur:
-            self.add_error(
-                "utilisateur",
-                "Choisissez soit un utilisateur existant, soit la création d'un nouveau compte, pas les deux.",
-            )
+            self.add_error("utilisateur", "Choisissez soit un utilisateur existant, soit la création d'un nouveau compte, pas les deux.")
 
         if creer_compte and not acces_plateforme:
             self.add_error("creer_compte_utilisateur", "Cochez d'abord l'autorisation d'accès à la plateforme.")
 
         if acces_modules and not acces_plateforme:
-            self.add_error(
-                "acces_modules", "Les modules ne peuvent être attribués que si l'accès plateforme est autorisé."
-            )
+            self.add_error("acces_modules", "Les modules ne peuvent être attribués que si l'accès plateforme est autorisé.")
 
         acces_interdits = sorted(set(acces_modules) - set(self.valeurs_acces_attribuables))
         if acces_interdits:

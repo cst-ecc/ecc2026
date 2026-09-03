@@ -57,6 +57,7 @@
             <div><dt class="text-slate-400">Fonction</dt><dd class="font-medium text-slate-800">{{ badge.fonction_affichage }}</dd></div>
             <div><dt class="text-slate-400">Structure</dt><dd class="font-medium text-slate-800">{{ badge.structure_affichage }}</dd></div>
             <div><dt class="text-slate-400">Catégorie du badge</dt><dd class="font-medium text-slate-800">{{ badge.categorie.nom }}{% if badge.precision_categorie %} — {{ badge.precision_categorie }}{% endif %}</dd></div>
+            <div><dt class="text-slate-400">Niveau d’habilitation</dt><dd class="font-semibold text-slate-900">{{ badge.niveau_habilitation_affichage }}</dd></div>
             <div><dt class="text-slate-400">Numéro du badge</dt><dd class="font-mono font-semibold text-slate-900">{{ badge.numero_badge }}</dd></div>
             <div><dt class="text-slate-400">Période de validité</dt><dd class="font-medium text-slate-800">{{ badge.periode_validite }}</dd></div>
           </dl>
