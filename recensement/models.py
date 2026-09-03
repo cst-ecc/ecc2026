@@ -2519,6 +2519,7 @@ class HistoriqueSiteParticulier(models.Model):
     def __str__(self):
         return f"{self.get_action_display()} — {self.site.nom} — {self.date_action:%d/%m/%Y %H:%M}"
 
+
 # ---------------------------------------------------------------------------
 # Administration générale — Organisations, employés et accès modulaires
 # ---------------------------------------------------------------------------
@@ -2535,7 +2536,9 @@ def _normaliser_sigle_organisation(value):
 
 
 def _sigle_depuis_nom(nom):
-    mots = re.findall(r"[A-Za-z0-9]+", unicodedata.normalize("NFKD", nom or "").encode("ascii", "ignore").decode("ascii"))
+    mots = re.findall(
+        r"[A-Za-z0-9]+", unicodedata.normalize("NFKD", nom or "").encode("ascii", "ignore").decode("ascii")
+    )
     sigle = "".join(mot[0] for mot in mots if mot).upper()
     return sigle[:8] or "ORG"
 
@@ -2726,9 +2729,13 @@ class Employe(models.Model):
         self.telephone = (self.telephone or "").strip()
         self.email = (self.email or "").strip().lower()
         if self.date_debut_service and self.date_fin_service and self.date_fin_service < self.date_debut_service:
-            raise ValidationError({"date_fin_service": "La date de fin ne peut pas précéder la date de début de service."})
+            raise ValidationError(
+                {"date_fin_service": "La date de fin ne peut pas précéder la date de début de service."}
+            )
         if self.date_fin_service and self.statut == self.Statut.ACTIF:
-            raise ValidationError({"statut": "Un employé avec une date de fin de service ne peut pas rester au statut actif."})
+            raise ValidationError(
+                {"statut": "Un employé avec une date de fin de service ne peut pas rester au statut actif."}
+            )
 
     def save(self, *args, **kwargs):
         if not self.matricule:
@@ -3008,7 +3015,6 @@ class HistoriqueRolePlateforme(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} — {self.role.nom} — {self.date_action:%d/%m/%Y %H:%M}"
-
 
 
 class CategorieBadgeAdministratif(models.Model):
@@ -3328,12 +3334,16 @@ class BadgeAdministratif(models.Model):
         if not self.structure_badge and self.employe_id and self.employe.organisation_id:
             self.structure_badge = self.employe.organisation.sigle
         if self.date_delivrance and self.date_expiration and self.date_expiration <= self.date_delivrance:
-            raise ValidationError({"date_expiration": "La date d'expiration doit être postérieure à la date de délivrance."})
+            raise ValidationError(
+                {"date_expiration": "La date d'expiration doit être postérieure à la date de délivrance."}
+            )
         if self.categorie_id and self.categorie.type_principal == CategorieBadgeAdministratif.TypePrincipal.DIOCESAIN:
             if not self.diocese:
                 raise ValidationError({"diocese": "Le diocèse est recommandé/nécessaire pour un badge diocésain."})
         if self.statut == self.Statut.RESTITUE and not self.date_restitution:
-            raise ValidationError({"date_restitution": "La date de restitution est obligatoire pour un badge restitué."})
+            raise ValidationError(
+                {"date_restitution": "La date de restitution est obligatoire pour un badge restitué."}
+            )
 
     def save(self, *args, **kwargs):
         if not self.numero_badge:
@@ -3439,4 +3449,3 @@ class HistoriqueEmploye(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} — {self.employe.matricule} — {self.date_action:%d/%m/%Y %H:%M}"
-
